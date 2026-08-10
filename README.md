@@ -37,6 +37,32 @@ It is seeded from `Content/Versions/`, the dated history every installed copy of
 
 That poll only ever sees the build that is current when it runs, so a build superseded within the hour can be missing from it. The copy on your own disk stays the complete source.
 
+## The watcher
+
+`.github/workflows/watcher.yml` runs every ten minutes as the org App.
+Each tick asks every listing's authority host for its releases and stamps every release that has no file under `releases/<id>/` yet, so a release published out of version order is stamped too.
+
+There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
+
+| Tool | What it does |
+|---|---|
+| `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
+| `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
+| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
+| `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs, which is the one check of this tooling nobody here wrote. |
+
+A release the watcher cannot stamp, a tag that does not parse or an archive whose install root is neither derivable nor authored, becomes one open issue per listing on the authored repository, kept current rather than reopened every tick.
+
+A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue.
+
+`download.mirrors` is the one field the watcher may append to after publish, and only after downloading the other host's archive and finding it byte-identical.
+
+To run a tick by hand, dispatch the workflow: `listing` narrows it to one id, and `dry_run` derives everything and writes nothing. Locally, against a checkout of the authored half:
+
+```text
+python3 tools/watch.py --authored ../content-index --dry-run
+```
+
 ## A published release is immutable
 
 Identity, the version, the download and the install data never change.

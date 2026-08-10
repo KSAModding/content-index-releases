@@ -1,0 +1,8 @@
+# The authored repository, checked out beside this one by the watcher.
+/.authored/
+
+# The watcher's derived cache: ETags, failure counts, issue numbers. Rebuildable
+# from the repository and the hosts, so it is never committed.
+/.watcher/
+
+__pycache__/
