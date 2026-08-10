@@ -27,6 +27,15 @@ https://ksamodding.github.io/content-index-releases/v1/index.json
 | Path | Contents |
 |---|---|
 | `releases/<id>/<version>.json` | One stamped document per release. |
+| `game-versions.json` | Every KSA production build we know of, ordered by revision. |
+
+## The game release list
+
+`game-versions.json` is what an authored month bound such as `2026.7` resolves against, and the snapshot ships it so a client needs no separate request.
+
+It is seeded from `Content/Versions/`, the dated history every installed copy of the game already carries, and kept current by an hourly poll of the master server.
+
+That poll only ever sees the build that is current when it runs, so a build superseded within the hour can be missing from it. The copy on your own disk stays the complete source.
 
 ## A published release is immutable
 

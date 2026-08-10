@@ -1,0 +1,59 @@
+# Poll the master server for the current production build and append it to
+# game-versions.json.
+name: game versions
+
+on:
+  schedule:
+    - cron: "23 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: game-versions
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: update
+    runs-on: ubuntu-latest
+    steps:
+      # Only the org App may write to the default branch unattended.
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          # Always the tip of main. An old checkout would append to an outdated
+          # list and fail to push, and this keeps a re-run idempotent.
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Poll the master server
+        id: poll
+        run: |
+          set -euo pipefail
+          response="$(curl -fsS --max-time 30 --retry 3 --retry-delay 5 \
+            http://ksa-master1.rocketwerkz.com:8082/version || true)"
+          if [ -z "$response" ]; then
+            echo "master server unreachable, nothing to do this run"
+            echo "added=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "master server says: $response"
+          added="$(python3 tools/update_game_versions.py "$response")"
+          echo "added=$added" >> "$GITHUB_OUTPUT"
+
+      - name: Commit
+        if: steps.poll.outputs.added != ''
+        run: |
+          set -euo pipefail
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git add game-versions.json
+          git commit -m "Add game build ${{ steps.poll.outputs.added }}"
+          git push
