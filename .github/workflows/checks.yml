@@ -1,0 +1,37 @@
+# The tooling's own tests. Nothing here reads a release file: validating what is
+# submitted is the release and amendment checks' job.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    # The examples check talks to real release hosts, so it runs on its own
+    # clock rather than in front of a pull request.
+    - cron: "37 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: python3 -m unittest discover -s tools -t tools -v
+
+  examples:
+    name: examples
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # examples/ in the design repository was stamped by hand from the same
+      # archives. Re-deriving it is the one check of this tooling that nobody
+      # here wrote, and it exercises the host adapters against the real hosts.
+      - env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python3 tools/verify_examples.py --check-mirrors
