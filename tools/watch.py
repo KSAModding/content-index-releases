@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -51,6 +52,9 @@ CACHE_VERSION = 2
 LISTING_MARKER = "<!-- watcher:listing={id} -->"
 SIGNATURE_MARKER = "<!-- watcher:signature={signature} -->"
 WAITING_MARKER = "<!-- watcher:waiting={sha} -->"
+
+# The same marker read back, to find which listing an open issue belongs to.
+MARKED_LISTING = re.compile(r"<!-- watcher:listing=(\S+) -->")
 
 # A check run conclusion that is neither a pass nor a reject: the check could
 # not run to a verdict, which never auto-merges and never auto-rejects, and is
@@ -307,18 +311,33 @@ class Issues:
             )
         self.log(f"  kept {self.api.repository}#{number} current")
 
-    def resolve(self, listing_id, cache):
+    def open_listings(self):
+        """The listing id of every open issue the watcher owns, to its issue."""
+        found = {}
+        for labelled in (True, False):
+            for issue in self._all_open(labelled):
+                match = MARKED_LISTING.search(issue.get("body") or "")
+                if match:
+                    found.setdefault(match.group(1), issue)
+        return found
+
+    @property
+    def degraded(self):
+        """Whether a read failed this tick, so the issue list is incomplete."""
+        return self._degraded
+
+    def resolve(self, listing_id, cache, reason=None):
         """Close the listing's issue, because the tick evaluated it cleanly.
 
         Best-effort like `report`: a failure here leaves an issue open one tick
         longer, which is not worth the rest of the tick.
         """
         try:
-            self._resolve(listing_id, cache)
+            self._resolve(listing_id, cache, reason)
         except (urllib.error.HTTPError, HostError) as error:
             self.log(f"  could not close the issue for {listing_id}: {error}")
 
-    def _resolve(self, listing_id, cache):
+    def _resolve(self, listing_id, cache, reason=None):
         issue = self.find(listing_id, cache)
         if issue is None:
             return
@@ -326,7 +345,8 @@ class Issues:
         self.api.send(
             "POST",
             f"/issues/{number}/comments",
-            {"body": "The watcher stamped this listing without an error, so this is done."},
+            {"body": reason
+             or "The watcher stamped this listing without an error, so this is done."},
         )
         self.api.send("PATCH", f"/issues/{number}", {"state": "closed"})
         cache.section("listings", listing_id).pop("issue", None)
@@ -667,7 +687,8 @@ class Watcher:
 
     def tick(self):
         try:
-            for path in self.listings():
+            paths = self.listings()
+            for path in paths:
                 listing_id = path.stem
                 try:
                     with path.open("rb") as handle:
@@ -699,6 +720,8 @@ class Watcher:
                         self.cache,
                     )
 
+            self.close_orphans(paths)
+
             if not self.options.no_sweep:
                 self.log(f"sweeping {self.options.authored_repo}:")
                 Sweep(self.api, self.cache, self.options, self.log).run()
@@ -709,6 +732,32 @@ class Watcher:
                 self.cache.save()
             self.summarize()
         return 0
+
+    def close_orphans(self, paths):
+        """Close the issue of a listing this tick no longer scans.
+
+        A delisted or deleted listing never reaches `one_listing`, so nothing
+        else would ever close its issue and it would outlive the listing.
+
+        Three guards, because closing is the destructive direction: a narrow
+        dispatch knows nothing about the listings it skipped, an empty listing
+        set is how an unreadable status file looks, and a failed issue read
+        makes every id look orphaned.
+        """
+        if self.options.listing or not paths or self.issues.degraded:
+            return
+        watched = {path.stem.lower() for path in paths}
+        for listing_id, issue in self.issues.open_listings().items():
+            if listing_id.lower() in watched:
+                continue
+            self.log(f"{listing_id}: no longer scanned, closing #{issue['number']}")
+            self.issues.resolve(
+                listing_id,
+                self.cache,
+                reason="The watcher no longer scans this listing, so it has nothing "
+                "left to report here. A delisting, a deleted document, or a renamed "
+                "id gets here.",
+            )
 
     def one_listing(self, listing_id, authored):
         state = self.cache.section("listings", listing_id)
@@ -729,6 +778,15 @@ class Watcher:
             if errors:
                 self.failed.append(listing_id)
                 self.issues.report(listing_id, errors, self.cache)
+            else:
+                # The listing left the watcher's half. Anything it reports here
+                # is about a host it no longer names.
+                self.issues.resolve(
+                    listing_id,
+                    self.cache,
+                    reason="This listing has no [releases] section any more, so the "
+                    "watcher has nothing left to report here.",
+                )
             return
 
         # Keyed per listing, not per host: two listings naming the same

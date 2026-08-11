@@ -64,18 +64,23 @@ class StubApi:
 class RecorderIssues:
     """Records what the watcher would report, for tick-level tests."""
 
-    def __init__(self):
+    def __init__(self, listings=None, degraded=False):
         self.reported = []
         self.resolved = []
+        self.listings = listings or {}
+        self.degraded = degraded
 
     def report(self, listing_id, errors, cache):
         self.reported.append((listing_id, list(errors)))
 
-    def resolve(self, listing_id, cache):
+    def resolve(self, listing_id, cache, reason=None):
         self.resolved.append(listing_id)
 
     def resolve_if(self, listing_id, signature, cache):
         self.resolved.append((listing_id, signature))
+
+    def open_listings(self):
+        return self.listings
 
 
 def cache():
@@ -340,6 +345,61 @@ class TheRepositoryIsTheState(WatcherCase):
             (folder / ".authored" / "listings" / "A.toml").write_text('id = "A"\n')
             (folder / ".authored" / "index-status.toml").write_text("= broken\n")
             self.assertEqual(watcher.listings(), [])
+
+
+class AnIssueOutlivesNothing(WatcherCase):
+    """An issue about a listing the watcher stopped scanning has to close."""
+
+    def tick(self, folder, documents, argv=(), **kwargs):
+        watcher = self.watcher(folder, ["--no-sweep", "--no-commit", *argv])
+        watcher.issues = RecorderIssues(**kwargs)
+        for identifier in documents:
+            (folder / ".authored" / "listings" / f"{identifier}.toml").write_text(
+                f'id = "{identifier}"\n'
+            )
+        watcher.tick()
+        return watcher
+
+    def test_a_delisted_listing_stops_holding_its_issue_open(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            (folder / ".authored").mkdir(parents=True, exist_ok=True)
+            (folder / ".authored" / "index-status.toml").write_text(
+                '[[entries]]\nid = "Gone"\nstate = "delisted"\n'
+            )
+            watcher = self.tick(
+                folder, ("Kept", "Gone"),
+                listings={"Gone": {"number": 7}, "Kept": {"number": 8}},
+            )
+            # Gone is never scanned, so only this pass can close it. Kept names
+            # no host either, which the case below covers.
+            self.assertIn("Gone", watcher.issues.resolved)
+
+    def test_a_listing_that_drops_its_releases_section_closes_its_issue(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.tick(folder, ("Kept",), listings={})
+            # Kept has no [releases] section, so nothing about a host is left
+            # to report and its issue closes.
+            self.assertEqual(watcher.issues.resolved, ["Kept"])
+
+    def test_a_narrow_dispatch_closes_nothing_it_did_not_look_at(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.tick(
+                folder, ("Wanted", "Other"), argv=("--listing", "Wanted"),
+                listings={"Other": {"number": 7}},
+            )
+            self.assertNotIn("Other", watcher.issues.resolved)
+
+    def test_a_failed_issue_read_closes_nothing(self):
+        # Every id looks orphaned when the list could not be read.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.tick(
+                folder, ("Kept",), listings={"Gone": {"number": 7}}, degraded=True
+            )
+            self.assertNotIn("Gone", watcher.issues.resolved)
 
 
 class TheTickSurvivesOneListing(WatcherCase):
