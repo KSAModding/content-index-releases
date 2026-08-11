@@ -7,38 +7,10 @@ file under `releases/<id>/` yet, commit it, keep one error issue per listing
 current on the authored repository, and sweep that repository's open pull
 requests.
 
-The properties this implementation keeps, and where:
+What is stamped in the repository is the whole state, so a tick GitHub delays,
+drops or cancels costs latency and not data, and a re-run stamps nothing twice.
 
-    state is the repository            `stamped()` reads what is stamped from
-                                       disk. There is no queue, so a cancelled
-                                       or dropped tick costs latency, not data.
-
-    every tick is idempotent           the scan rule is set membership, so a
-                                       re-run stamps nothing twice.
-
-    a version is stamped exactly once  `check_for_a_swap()` never overwrites a
-                                       stamped file, and reports a tag that
-                                       reappeared with different bytes.
-
-    one open issue per listing         `Issues` edits the listing's issue
-                                       instead of opening a new one per tick.
-
-    the ETag store is derived cache    `Cache` is written outside the
-                                       repository, and an ETag is only stored
-                                       once every release behind it is stamped,
-                                       so losing the cache costs one expensive
-                                       tick and a stale cache cannot hide a
-                                       release.
-
-    mirrors are append-only            `mirror_pass()` appends a verified
-                                       byte-identical URL and touches nothing
-                                       else.
-
-    release files and nothing else     every write goes through `write()`,
-                                       which refuses a path outside releases/.
-
-The per-release derivation is tools/stamp_release.py, the same code the release
-pull request checks re-derive with. The hosts are tools/hosts.py.
+Per-release derivation is tools/stamp_release.py, the hosts are tools/hosts.py.
 """
 
 import argparse
@@ -47,7 +19,9 @@ import json
 import os
 import subprocess
 import sys
+import time
 import tomllib
+import traceback
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -56,11 +30,21 @@ from pathlib import Path
 
 import hosts
 from hosts import HostError
-from stamp_release import StampError, serialize, stamp
+from stamp_release import (
+    GAME_MONTH,
+    StampError,
+    month_is_over,
+    resolve_bound,
+    serialize,
+    stamp,
+    valid_id,
+)
 
 GITHUB_API = "https://api.github.com"
 
-CACHE_VERSION = 1
+# 2: the host ETag entries moved to a per-listing key. The cache is derived,
+# so a version bump just costs one expensive tick.
+CACHE_VERSION = 2
 
 # The marker that makes a listing's issue findable without a search, and the
 # signature that decides whether a genuinely new error deserves a comment.
@@ -88,7 +72,7 @@ def iso(moment):
 def parse_iso(text):
     try:
         return datetime.fromisoformat((text or "").replace("Z", "+00:00"))
-    except ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -101,15 +85,19 @@ class Cache:
     costs one expensive tick and nothing else.
     """
 
-    def __init__(self, path):
+    def __init__(self, path, log=None):
+        self._log = log or (lambda message: None)
         self.path = Path(path) if path else None
         self.data = {"version": CACHE_VERSION}
         if self.path and self.path.is_file():
             try:
                 loaded = json.loads(self.path.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+            except (json.JSONDecodeError, OSError) as error:
+                # Starting cold is fine, but a restore that fails every tick
+                # must not look exactly like one, so say it happened.
+                self._log(f"the derived cache could not be read and starts cold: {error}")
                 loaded = {}
-            if loaded.get("version") == CACHE_VERSION:
+            if isinstance(loaded, dict) and loaded.get("version") == CACHE_VERSION:
                 self.data = loaded
         for section in ("hosts", "listings", "mirrors", "swaps", "sweep"):
             self.data.setdefault(section, {})
@@ -118,12 +106,17 @@ class Cache:
         return self.data[name].setdefault(key, {})
 
     def save(self):
+        """Best-effort, like every other cache operation: a full disk after the
+        stamping is done must not fail the tick and keep the push from running."""
         if not self.path:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("w", encoding="utf-8", newline="\n") as handle:
-            json.dump(self.data, handle, indent=1, sort_keys=True)
-            handle.write("\n")
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("w", encoding="utf-8", newline="\n") as handle:
+                json.dump(self.data, handle, indent=1, sort_keys=True)
+                handle.write("\n")
+        except OSError as error:
+            self._log(f"the derived cache could not be written: {error}")
 
 
 class Api:
@@ -142,27 +135,57 @@ class Api:
         answer = self.http.get(url, accept="application/vnd.github+json", api=True)
         return json.loads(answer.body) if answer.body else None
 
+    def get_paged(self, path, key=None, max_pages=10, **query):
+        """Every item across pages, because a one-page read that looks complete
+        is how a duplicate issue gets opened past 100 open ones."""
+        items = []
+        for page in range(1, max_pages + 1):
+            answer = self.get(path, per_page=100, page=page, **query)
+            batch = (answer or {}).get(key) if key else (answer or [])
+            batch = batch or []
+            items.extend(batch)
+            if len(batch) < 100:
+                break
+        return items
+
     def send(self, method, path, payload):
         url = f"{GITHUB_API}/repos/{self.repository}{path}"
         if self.dry_run or not self.http.token:
             self.log(f"    would {method} {path} {json.dumps(payload)[:200]}")
             return None
         body = json.dumps(payload).encode("utf-8")
-        request = urllib.request.Request(
-            url,
-            data=body,
-            method=method,
-            headers={
-                "Accept": "application/vnd.github+json",
-                "Authorization": f"Bearer {self.http.token}",
-                "Content-Type": "application/json",
-                "User-Agent": hosts.USER_AGENT,
-                "X-GitHub-Api-Version": "2022-11-28",
-            },
-        )
-        with urllib.request.urlopen(request, timeout=self.http.timeout) as answer:
-            raw = answer.read()
-        return json.loads(raw) if raw else None
+        last = None
+        for attempt in range(3):
+            request = urllib.request.Request(
+                url,
+                data=body,
+                method=method,
+                headers={
+                    "Accept": "application/vnd.github+json",
+                    "Authorization": f"Bearer {self.http.token}",
+                    "Content-Type": "application/json",
+                    "User-Agent": hosts.USER_AGENT,
+                    "X-GitHub-Api-Version": "2022-11-28",
+                },
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=self.http.timeout) as answer:
+                    raw = answer.read()
+                return json.loads(raw) if raw else None
+            except urllib.error.HTTPError as error:
+                # A 4xx is an answer. A 5xx, or a secondary rate limit on a
+                # write (a 403 with Retry-After), is the API having a bad
+                # moment, and one of those must not mark a listing failed for
+                # a reason that has nothing to do with the listing.
+                transient = error.code in (403, 429) and hosts._rate_limited(error.headers)
+                if error.code < 500 and not transient:
+                    raise
+                last = error
+            except (urllib.error.URLError, TimeoutError, OSError) as error:
+                last = error
+            if attempt < 2:
+                time.sleep(2 ** attempt)
+        raise HostError(f"{method} {url}: {last}")
 
 
 class Issues:
@@ -179,20 +202,29 @@ class Issues:
         self.label = label
         self.log = log
         self._open = {}
+        self._degraded = False
+
+    @staticmethod
+    def signature_of(errors):
+        """The stable fingerprint of a failure, for edit-versus-comment decisions."""
+        return hashlib.sha256("\n".join(sorted(errors)).encode()).hexdigest()[:16]
 
     def _all_open(self, labelled):
         """The open issues of the authored repository, listed once per tick.
 
         The label narrows the list to the watcher's own issues, and the
         unlabelled list is the fallback for the tick that opened an issue before
-        the label existed.
+        the label existed. A listing that fails marks the lookup degraded, so
+        `report` skips creating rather than duplicating an issue it could not
+        see.
         """
         if labelled not in self._open:
             query = {"labels": self.label} if labelled else {}
             try:
-                issues = self.api.get("/issues", state="open", per_page=100, **query) or []
+                issues = self.api.get_paged("/issues", state="open", **query)
             except (urllib.error.HTTPError, HostError) as error:
                 self.log(f"  could not list issues: {error}")
+                self._degraded = True
                 issues = []
             self._open[labelled] = [
                 issue for issue in issues if "pull_request" not in issue
@@ -217,23 +249,47 @@ class Issues:
         return None
 
     def report(self, listing_id, errors, cache):
-        """Keep the listing's issue current with `errors`."""
-        signature = hashlib.sha256("\n".join(sorted(errors)).encode()).hexdigest()[:16]
+        """Keep the listing's issue current with `errors`.
+
+        Never raises for an API-shaped failure: reporting is best-effort, and
+        several callers sit inside except clauses, where a raise would leave
+        the per-listing guard and take the rest of the tick with it.
+        """
+        try:
+            self._report(listing_id, errors, cache)
+        except (urllib.error.HTTPError, HostError) as error:
+            self.log(f"  could not keep the issue for {listing_id} current: {error}")
+
+    def _report(self, listing_id, errors, cache):
+        signature = self.signature_of(errors)
         body = self._body(listing_id, errors, signature)
         title = f"{listing_id}: the watcher could not stamp a release"
         issue = self.find(listing_id, cache)
 
         if issue is None:
+            if self._degraded:
+                self.log(
+                    "  not opening an issue: the issue list could not be read "
+                    "this tick, and a blind create duplicates"
+                )
+                return
             try:
                 created = self.api.send(
                     "POST", "/issues", {"title": title, "body": body, "labels": [self.label]}
                 )
             except urllib.error.HTTPError as error:
+                if error.code != 422:
+                    self.log(f"  could not open an issue (HTTP {error.code})")
+                    return
                 # A label the repository does not define is not worth losing the
                 # report over; the marker in the body is what the watcher finds
                 # the issue by anyway.
-                self.log(f"  the '{self.label}' label was refused (HTTP {error.code})")
-                created = self.api.send("POST", "/issues", {"title": title, "body": body})
+                self.log(f"  the '{self.label}' label was refused (HTTP 422)")
+                try:
+                    created = self.api.send("POST", "/issues", {"title": title, "body": body})
+                except urllib.error.HTTPError as retry_error:
+                    self.log(f"  could not open an issue (HTTP {retry_error.code})")
+                    return
             if created:
                 cache.section("listings", listing_id)["issue"] = created["number"]
                 self.log(f"  opened {self.api.repository}#{created['number']}")
@@ -252,7 +308,17 @@ class Issues:
         self.log(f"  kept {self.api.repository}#{number} current")
 
     def resolve(self, listing_id, cache):
-        """Close the listing's issue, because the tick evaluated it cleanly."""
+        """Close the listing's issue, because the tick evaluated it cleanly.
+
+        Best-effort like `report`: a failure here leaves an issue open one tick
+        longer, which is not worth the rest of the tick.
+        """
+        try:
+            self._resolve(listing_id, cache)
+        except (urllib.error.HTTPError, HostError) as error:
+            self.log(f"  could not close the issue for {listing_id}: {error}")
+
+    def _resolve(self, listing_id, cache):
         issue = self.find(listing_id, cache)
         if issue is None:
             return
@@ -265,6 +331,19 @@ class Issues:
         self.api.send("PATCH", f"/issues/{number}", {"state": "closed"})
         cache.section("listings", listing_id).pop("issue", None)
         self.log(f"  closed {self.api.repository}#{number}")
+
+    def resolve_if(self, listing_id, signature, cache):
+        """Close the listing's issue only when it reports exactly `signature`.
+
+        The recovery from an unreachable host must not close an issue that
+        meanwhile reports something else, and the signature marker is what
+        tells the two apart.
+        """
+        issue = self.find(listing_id, cache)
+        if issue is None:
+            return
+        if SIGNATURE_MARKER.format(signature=signature) in (issue.get("body") or ""):
+            self.resolve(listing_id, cache)
 
     def _body(self, listing_id, errors, signature):
         return "\n".join(
@@ -287,11 +366,10 @@ class Issues:
 class Sweep:
     """The event-driven half, swept once per tick.
 
-    GitHub drops event-driven triggers with nothing to retry them, which the
-    2026-08-06 incident showed, so every tick re-dispatches the validation of
-    an open pull request whose head commit has no check suite or whose latest
-    run ended in could-not-evaluate, and pings a steward for a run sitting in
-    the waiting-for-approval state, which a dispatch cannot release.
+    GitHub drops event-driven triggers with nothing to retry them, so every tick
+    re-dispatches the validation of an open pull request whose head commit has
+    no check suite or whose latest run ended in could-not-evaluate, and pings a
+    steward for a run waiting for approval, which a dispatch cannot release.
     """
 
     def __init__(self, api, cache, options, log=print):
@@ -302,7 +380,7 @@ class Sweep:
 
     def run(self):
         try:
-            pulls = self.api.get("/pulls", state="open", per_page=self.options.sweep_limit)
+            pulls = self.api.get_paged("/pulls", state="open")[: self.options.sweep_limit]
         except urllib.error.HTTPError as error:
             self.log(f"  could not list pull requests: HTTP {error.code}")
             return
@@ -310,11 +388,18 @@ class Sweep:
             self.log(f"  could not list pull requests: {error}")
             return
 
-        for pull in pulls or []:
+        for pull in pulls:
             try:
                 self._one(pull)
             except (urllib.error.HTTPError, HostError) as error:
                 self.log(f"  #{pull['number']}: {error}")
+
+        # The sweep section would otherwise keep a key per head commit forever,
+        # in a file the workflow uploads and downloads every ten minutes.
+        open_shas = {pull["head"]["sha"] for pull in pulls}
+        section = self.cache.data["sweep"]
+        for sha in [key for key in section if key not in open_shas]:
+            del section[sha]
 
     def _one(self, pull):
         number, sha = pull["number"], pull["head"]["sha"]
@@ -378,9 +463,12 @@ class Sweep:
     def _dispatch(self, number, sha, state, reason):
         attempts = state.get("attempts", 0)
         last = parse_iso(state.get("last"))
+        refused = parse_iso(state.get("refused"))
         if attempts >= self.options.sweep_attempts:
             return
         if last and now() - last < timedelta(minutes=self.options.sweep_cooldown):
+            return
+        if refused and now() - refused < timedelta(hours=self.options.sweep_refusal_hours):
             return
 
         self.log(f"  #{number}: re-dispatching validation ({reason})")
@@ -392,14 +480,17 @@ class Sweep:
             )
         except urllib.error.HTTPError as error:
             # A validation workflow that does not accept a dispatch yet is the
-            # authored repository's business, and never fails a tick.
+            # authored repository's business, and never fails a tick. The
+            # refusal is retried on a clock rather than retired for good, so
+            # stuck pull requests recover the moment the workflow gains the
+            # input.
             self.log(
                 f"  #{number}: {self.options.sweep_workflow} did not accept the dispatch "
                 f"(HTTP {error.code}); the sweep needs it to take a pull_request input"
             )
-            state["last"] = iso(now())
-            state["attempts"] = self.options.sweep_attempts
+            state["refused"] = iso(now())
             return
+        state.pop("refused", None)
         state["last"] = iso(now())
         state["attempts"] = attempts + 1
 
@@ -429,7 +520,7 @@ class Watcher:
         self.options = options
         self.releases_root = Path(options.releases)
         self.authored_root = Path(options.authored)
-        self.cache = Cache(options.cache)
+        self.cache = Cache(options.cache, log=self.log)
         self.http = hosts.Http(token=options.token, log=self.log)
         self.api = Api(self.http, options.authored_repo, options.dry_run, self.log)
         self.issues = Issues(self.api, options.issue_label, self.log)
@@ -458,15 +549,34 @@ class Watcher:
             return {}
         return {path.stem: path for path in sorted(folder.glob("*.json"))}
 
+    def read_release(self, path, errors):
+        """A stamped release file, or None with the corruption reported.
+
+        The repository is the state, so a stamped file that does not parse is
+        exactly the corruption that has to reach a human, not the catch-all.
+        """
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            errors.append(
+                f"the stamped file releases/{path.parent.name}/{path.name} "
+                f"is not readable JSON: {error}"
+            )
+            return None
+
     def write(self, path, text, message):
         """Write one release file and commit it. Refuses anything else.
 
-        The bypass on the default branch is scoped to the App the watcher runs
-        as, so the watcher's own code enforces the same limit the ruleset
-        cannot: release files and nothing else.
+        The branch protection bypass is scoped to an identity, not to a path, so
+        this is where the limit is enforced. Both sides are resolved: a `..`
+        keeps `releases` in `Path.parents` while the file lands outside it.
         """
         path = Path(path)
-        if self.releases_root not in path.parents:
+        try:
+            contained = path.resolve().is_relative_to(self.releases_root.resolve())
+        except OSError:
+            contained = False
+        if not contained or path.resolve() == self.releases_root.resolve():
             raise RuntimeError(f"the watcher does not write {path}")
         if self.options.dry_run:
             self.log(f"    would write {path} and commit '{message}'")
@@ -499,6 +609,11 @@ class Watcher:
 
         wanted = {name.lower() for name in self.options.listing or []}
         delisted = self.delisted()
+        if delisted is None:
+            # Failing open would stamp releases a steward delisted, so an
+            # unreadable status file skips the whole tick's listings instead.
+            self.log("index-status.toml is unreadable, so no listing is scanned this tick")
+            return []
         chosen = []
         for path in sorted(folder.glob("*.toml")):
             if wanted and path.stem.lower() not in wanted:
@@ -510,7 +625,7 @@ class Watcher:
         return chosen
 
     def delisted(self):
-        """The ids the index has delisted.
+        """The ids the index has delisted, or None when the file is unreadable.
 
         A delisted listing is out of the snapshot, so stamping further releases
         for it would be the watcher arguing with a steward.
@@ -518,50 +633,107 @@ class Watcher:
         path = self.authored_root / "index-status.toml"
         if not path.is_file():
             return set()
-        with path.open("rb") as handle:
-            document = tomllib.load(handle)
+        try:
+            with path.open("rb") as handle:
+                document = tomllib.load(handle)
+        except (OSError, tomllib.TOMLDecodeError) as error:
+            self.log(f"could not read {path.name}: {error}")
+            return None
         return {
             (entry.get("id") or "").lower()
             for entry in document.get("entries") or []
             if entry.get("state") == "delisted"
         }
 
+    def listing_problem(self, path, listing_id):
+        """Why this listing cannot be processed at all, or None.
+
+        The id becomes a path segment under releases/, so the id rules are the
+        gate in front of every path this tick builds from it, and the file stem
+        is what the delisting and `--listing` filters match, so it has to name
+        the same listing.
+        """
+        if not valid_id(listing_id):
+            return (
+                f"the id '{listing_id}' does not satisfy the id rules of "
+                "RFC 0031, so the watcher does not use it"
+            )
+        if path.stem.lower() != listing_id.lower():
+            return (
+                f"the file is named '{path.stem}.toml' but the document says "
+                f"id = '{listing_id}'; the file name and the id must match"
+            )
+        return None
+
     def tick(self):
-        for path in self.listings():
-            with path.open("rb") as handle:
-                authored = tomllib.load(handle)
-            listing_id = (authored.get("id") or path.stem).strip()
-            self.log(f"{listing_id}:")
-            try:
-                self.one_listing(listing_id, authored)
-            except Exception as error:  # noqa: BLE001 - one listing never fails the tick
-                self.log(f"  unexpected: {error!r}")
-                self.failed.append(listing_id)
+        try:
+            for path in self.listings():
+                listing_id = path.stem
+                try:
+                    with path.open("rb") as handle:
+                        authored = tomllib.load(handle)
+                    listing_id = (authored.get("id") or path.stem).strip()
+                    problem = self.listing_problem(path, listing_id)
+                    if problem:
+                        self.log(f"{listing_id}: {problem}")
+                        self.failed.append(listing_id)
+                        self.issues.report(listing_id, [problem], self.cache)
+                        continue
+                    self.log(f"{listing_id}:")
+                    self.one_listing(listing_id, authored)
+                except tomllib.TOMLDecodeError as error:
+                    # `report` never raises for API failures, which matters
+                    # here: an exception inside an except clause would leave
+                    # the loop past the sibling guard below.
+                    message = f"{path.name} is not valid TOML: {error}"
+                    self.log(f"{listing_id}: {message}")
+                    self.failed.append(listing_id)
+                    self.issues.report(listing_id, [message], self.cache)
+                except Exception as error:  # noqa: BLE001 - one listing never fails the tick
+                    self.log(f"  unexpected: {error!r}")
+                    self.log(traceback.format_exc())
+                    self.failed.append(listing_id)
+                    self.issues.report(
+                        listing_id,
+                        [f"the watcher hit an internal error on this listing: {error!r}"],
+                        self.cache,
+                    )
 
-        if not self.options.no_sweep:
-            self.log(f"sweeping {self.options.authored_repo}:")
-            Sweep(self.api, self.cache, self.options, self.log).run()
-
-        self.cache.save()
-        self.summarize()
+            if not self.options.no_sweep:
+                self.log(f"sweeping {self.options.authored_repo}:")
+                Sweep(self.api, self.cache, self.options, self.log).run()
+        finally:
+            # A dry run must leave no trace: an ETag it stored would make the
+            # next real tick take the 304 path over releases it never stamped.
+            if not self.options.dry_run:
+                self.cache.save()
+            self.summarize()
         return 0
 
     def one_listing(self, listing_id, authored):
         state = self.cache.section("listings", listing_id)
         errors = []
 
+        self.month_pass(listing_id, authored, errors)
+
         try:
             authority, mirrors = hosts.build(
                 authored.get("releases"), self.http, listing_id
             )
         except StampError as error:
-            self.issues.report(listing_id, [str(error)], self.cache)
+            self.failed.append(listing_id)
+            self.issues.report(listing_id, errors + [str(error)], self.cache)
             return
         if authority is None:
             self.log("  no [releases] section, so releases enter by pull request")
+            if errors:
+                self.failed.append(listing_id)
+                self.issues.report(listing_id, errors, self.cache)
             return
 
-        host_state = self.cache.section("hosts", authority.key)
+        # Keyed per listing, not per host: two listings naming the same
+        # repository must not blind each other through a shared ETag.
+        host_state = self.cache.section("hosts", f"{listing_id}/{authority.key}")
         try:
             releases, etag = authority.releases(host_state.get("etag"))
         except HostError as error:
@@ -569,21 +741,29 @@ class Watcher:
             return
         except StampError as error:
             state["unreachable"] = 0
-            self.issues.report(listing_id, [str(error)], self.cache)
+            state.pop("unreachable_signature", None)
+            self.failed.append(listing_id)
+            self.issues.report(listing_id, errors + [str(error)], self.cache)
             return
 
-        state["unreachable"] = 0
+        self.recover(listing_id, state)
         settled = True
 
         if releases is None:
             self.log("  unchanged since the last tick")
         else:
             self.log(f"  {len(releases)} release(s) on {authority.key}")
+            if getattr(authority, "truncated", False):
+                errors.append(
+                    "the host lists more releases than one scan covers, so the "
+                    "oldest are not watched; raising the watcher's max_pages "
+                    "needs a human"
+                )
             settled = self.stamp_pass(
                 listing_id, authored, authority, mirrors, releases, errors
             )
 
-        self.mirror_pass(listing_id, mirrors)
+        self.mirror_pass(listing_id, mirrors, errors)
 
         if settled:
             # The ETag stands for "every release behind this answer is either
@@ -620,6 +800,7 @@ class Watcher:
             else None
         )
         settled = True
+        outside_lookback = 0
 
         # Oldest first, so a budget that runs out leaves a monotone history and
         # the next tick simply carries on.
@@ -641,6 +822,10 @@ class Watcher:
 
             date = parse_iso(release.release_date)
             if cutoff and date and date < cutoff:
+                # Skipped, not settled: the ETag must not claim these are done,
+                # or a later backfill dispatch takes the 304 path over them.
+                outside_lookback += 1
+                settled = False
                 continue
 
             if self.stamp_budget <= 0:
@@ -657,6 +842,11 @@ class Watcher:
             else:
                 self.stamp_budget -= 1
 
+        if outside_lookback:
+            self.log(
+                f"    {outside_lookback} release(s) outside the lookback window, "
+                "left for a wider tick"
+            )
         return settled
 
     def stamp_one(self, listing_id, authored, authority, mirror_hosts, release):
@@ -676,12 +866,15 @@ class Watcher:
     def check_for_a_swap(self, listing_id, authority, release, path, errors):
         """A stamped version is never overwritten, and a swap gets reported.
 
-        The cheap signal is the size and the URL the host now serves, which the
-        release list already carries. A swap that keeps the byte count is not
-        detectable without downloading every stamped archive on every tick, and
-        it is what `download.sha256` protects a client from anyway.
+        The signal is the size and URL the release list already carries; a swap
+        keeping the byte count needs every archive re-downloaded per tick for an
+        answer `download.sha256` already gives the client. Two limits: SpaceDock
+        reports no size, so only the URL comparison remains there, and a deleted
+        asset reads as unchanged.
         """
-        document = json.loads(path.read_text(encoding="utf-8"))
+        document = self.read_release(path, errors)
+        if document is None:
+            return True  # Reported; nothing changes here until a human acts.
         download = document.get("download") or {}
         stamped_digest = (download.get("sha256") or "").upper()
         same_size = release.size is None or release.size == download.get("size")
@@ -705,12 +898,16 @@ class Watcher:
         except HostError as error:
             self.log(f"    {release.version}: {error}")
             return False
+        except StampError as error:
+            errors.append(f"`{release.version}`: {error}")
+            return True
 
         digest = hashlib.sha256(archive).hexdigest().upper()
         seen.update({"size": release.size, "url": release.url, "checked": iso(now())})
         if digest == stamped_digest:
             seen["digest"] = None
-            self.log(f"    {release.version}: the same bytes at a new URL, nothing to do")
+            self.log(f"    {release.version}: the same bytes at a new URL")
+            self.append_mirror(path, document, release.url)
             return True
 
         seen["digest"] = digest
@@ -726,14 +923,95 @@ class Watcher:
             "way forward is a new version, or a yank of this one."
         )
 
+    def month_pass(self, listing_id, authored, errors):
+        """Resolve an authored `game_max` month once that month is over.
+
+        Adding the bound is the stamp correction RFC 0033 describes, not an
+        amendment: the file only becomes less permissive and nothing already
+        present is touched. It reads the authored document, so it needs no host
+        and runs for every listing.
+        """
+        bound = ((authored.get("compatibility") or {}).get("game_max") or "").strip()
+        match = GAME_MONTH.match(bound)
+        if match is None:
+            return
+        if not month_is_over(int(match.group(1)), int(match.group(2)), now()):
+            return
+
+        try:
+            display, revision = resolve_bound(bound, "game_max", self.game_versions, now())
+        except StampError as error:
+            errors.append(f"game_max: {error}")
+            return
+        if display is None:
+            return
+
+        for version, path in self.stamped_versions(listing_id).items():
+            document = self.read_release(path, errors)
+            if document is None:
+                continue
+            if "game_max" in document or "game_min_revision" not in document:
+                continue
+            if revision < document["game_min_revision"]:
+                errors.append(
+                    f"game_max `{bound}` resolves to revision {revision}, below "
+                    f"`{version}`'s stamped game_min_revision "
+                    f"{document['game_min_revision']}, so it is not applied"
+                )
+                continue
+            updated = {}
+            for key, value in document.items():
+                updated[key] = value
+                if key == "game_min_revision":
+                    # Inserted where a fresh stamp would put it, so a corrected
+                    # file and a fresh one have the same shape.
+                    updated["game_max"] = display
+                    updated["game_max_revision"] = revision
+            self.write(
+                path,
+                serialize(updated),
+                f"Resolve the game_max month for {listing_id} {version}",
+            )
+            self.log(f"    resolved game_max {display} onto {version}")
+
+    def append_mirror(self, path, document, url):
+        """Record a further URL proven byte-identical, as a mirror.
+
+        `download.url` is immutable, so a release whose authority now serves
+        the same bytes from a new address keeps its stamped URL and gains the
+        new one as a mirror, which RFC 0031 admits for any source whose bytes
+        match the sha256.
+        """
+        download = document.get("download") or {}
+        if not url or url == download.get("url"):
+            return
+        mirrors = list(download.get("mirrors") or [])
+        if url in mirrors:
+            return
+        download["mirrors"] = mirrors + [url]
+        self.write(
+            path,
+            serialize(document),
+            f"Add a mirror for {document['id']} {document['version']}",
+        )
+        self.mirrored.append(f"{document['id']} {document['version']}")
+
     def mirrors_for(self, mirror_hosts, release, archive):
-        """The non-authority hosts serving byte-identical bytes for this release."""
+        """The non-authority hosts serving byte-identical bytes for this release.
+
+        Shares the mirror budget with `mirror_pass`: verifying costs a full
+        download, and a fresh-stamp burst must not multiply that unbounded. A
+        mirror that did not fit the budget is appended by a later tick's pass.
+        """
         digest = hashlib.sha256(archive).hexdigest().upper()
         found = []
         for host in mirror_hosts:
             candidate = self.mirror_release(host, release.version)
             if candidate is None:
                 continue
+            if self.mirror_budget <= 0:
+                break
+            self.mirror_budget -= 1
             url = self.verify_mirror(host, candidate, digest)
             if url:
                 found.append(url)
@@ -769,7 +1047,7 @@ class Watcher:
             return None
         return release.url
 
-    def mirror_pass(self, listing_id, mirror_hosts):
+    def mirror_pass(self, listing_id, mirror_hosts, errors):
         """Append a mirror that appeared after a release was stamped.
 
         The one field the watcher may append to after publish, watcher-only and
@@ -782,7 +1060,9 @@ class Watcher:
 
         candidates = []
         for version, path in self.stamped_versions(listing_id).items():
-            document = json.loads(path.read_text(encoding="utf-8"))
+            document = self.read_release(path, errors)
+            if document is None:
+                continue
             known = set((document.get("download") or {}).get("mirrors") or [])
             if len(known) >= len(mirror_hosts):
                 continue
@@ -793,8 +1073,12 @@ class Watcher:
         for _, version, path in sorted(candidates, key=lambda entry: entry[0]):
             if self.mirror_budget <= 0:
                 return
-            document = json.loads(path.read_text(encoding="utf-8"))
-            download = document["download"]
+            document = self.read_release(path, errors)
+            if document is None:
+                continue
+            download = document.get("download")
+            if not download:
+                continue
             known = list(download.get("mirrors") or [])
             found = []
             for host in mirror_hosts:
@@ -820,22 +1104,33 @@ class Watcher:
     def unreachable(self, listing_id, state, message):
         """A host that could not be evaluated. Latency, not data.
 
-        It only becomes the author's business once it stays that way across
-        consecutive ticks, which is what keeps a five minute outage out of
-        everybody's notifications.
+        It reaches the author only after consecutive failed ticks, so a short
+        outage stays out of everyone's notifications. `>=` rather than `==`
+        keeps a lost cache from restarting the countdown silently, and the count
+        stays out of the text so an unchanged outage is not a new failure.
         """
         count = state.get("unreachable", 0) + 1
         state["unreachable"] = count
         self.log(f"  could not be evaluated ({count} tick(s) in a row): {message}")
-        if count == self.options.unreachable_ticks:
-            self.issues.report(
-                listing_id,
-                [
-                    f"the authority host has not been reachable for {count} consecutive "
-                    f"ticks: {message}"
-                ],
-                self.cache,
-            )
+        if count >= self.options.unreachable_ticks:
+            errors = [
+                "the authority host has stayed unreachable across consecutive "
+                f"ticks: {message}"
+            ]
+            state["unreachable_signature"] = Issues.signature_of(errors)
+            self.failed.append(listing_id)
+            self.issues.report(listing_id, errors, self.cache)
+
+    def recover(self, listing_id, state):
+        """The host answered again. Close the outage issue, and only that one.
+
+        The signature guard keeps a recovery from closing an issue that
+        meanwhile reports something else about the listing.
+        """
+        signature = state.pop("unreachable_signature", None)
+        state["unreachable"] = 0
+        if signature:
+            self.issues.resolve_if(listing_id, signature, self.cache)
 
     def summarize(self):
         summary = [
@@ -906,6 +1201,10 @@ def parse_arguments(argv):
     parser.add_argument("--sweep-limit", type=int, default=30)
     parser.add_argument("--sweep-attempts", type=int, default=3)
     parser.add_argument("--sweep-cooldown", type=int, default=30, help="minutes")
+    parser.add_argument(
+        "--sweep-refusal-hours", type=int, default=24,
+        help="hours before a dispatch the workflow refused is tried again",
+    )
     parser.add_argument("--no-sweep", action="store_true")
     parser.add_argument("--no-commit", action="store_true")
     parser.add_argument(
