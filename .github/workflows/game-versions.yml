@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # Only the org App may write to the default branch unattended.
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app-token
         with:
           app-id: ${{ vars.INDEX_APP_ID }}
