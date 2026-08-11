@@ -69,7 +69,7 @@ jobs:
       # Derived cache, never state: the per-listing ETags, the failure counts
       # and the issue numbers. Losing it costs one expensive tick.
       - name: Restore the derived cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .watcher
           key: watcher-${{ github.run_id }}
@@ -123,7 +123,7 @@ jobs:
 
       - name: Save the derived cache
         if: ${{ success() && inputs.dry_run != true }}
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .watcher
           key: watcher-${{ github.run_id }}
