@@ -1,5 +1,5 @@
-# The tooling's own tests. Nothing here reads a release file: validating what is
-# submitted is the release and amendment checks' job.
+# The tooling's own tests. Nothing here reads a release file: the release and
+# amendment checks validate what is submitted.
 name: checks
 
 on:
@@ -7,8 +7,8 @@ on:
   push:
     branches: [main]
   schedule:
-    # The examples check talks to real release hosts, so it runs on its own
-    # clock rather than in front of a pull request.
+    # The examples job talks to real release hosts. It runs on its own clock,
+    # not in front of a pull request.
     - cron: "37 6 * * 1"
   workflow_dispatch:
 
@@ -29,9 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # examples/ in the design repository was stamped by hand from the same
-      # archives. Re-deriving it is the one check of this tooling that nobody
-      # here wrote, and it exercises the host adapters against the real hosts.
+      # Re-derives the design repository's hand-stamped examples/ from the real
+      # release hosts and diffs.
       - env:
           GITHUB_TOKEN: ${{ github.token }}
         run: python3 tools/verify_examples.py --check-mirrors

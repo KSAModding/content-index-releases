@@ -737,12 +737,9 @@ class Watcher:
         """Close the issue of a listing this tick no longer scans.
 
         A delisted or deleted listing never reaches `one_listing`, so nothing
-        else would ever close its issue and it would outlive the listing.
-
-        Three guards, because closing is the destructive direction: a narrow
-        dispatch knows nothing about the listings it skipped, an empty listing
-        set is how an unreadable status file looks, and a failed issue read
-        makes every id look orphaned.
+        else closes its issue. Closing is the destructive direction, so three
+        cases are skipped: a narrow dispatch, an empty listing set, which is
+        what an unreadable status file looks like, and a failed issue read.
         """
         if self.options.listing or not paths or self.issues.degraded:
             return

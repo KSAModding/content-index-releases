@@ -1,16 +1,14 @@
 # Ask every listing's authority host for its releases and stamp every release
 # that has no file under releases/<id>/ yet (RFC 0033).
 #
-# The tick holds no state: what is stamped in the repository is the state, so a
-# run GitHub delays, drops or cancels costs latency and not data, and a re-run
-# stamps nothing twice.
+# The tick holds no state. What is stamped in the repository is the state, so a
+# dropped run costs latency and not data, and a re-run stamps nothing twice.
 name: watcher
 
 on:
   schedule:
-    # Every ten minutes, which is a tuning parameter and needs no RFC to change.
-    # GitHub's floor is five. Off the hour boundary, where scheduled runs are
-    # delayed or dropped worst.
+    # Ten minutes is a tuning parameter and needs no RFC to change. GitHub's
+    # floor is five. The times sit off the hour, where runs are dropped worst.
     - cron: "4,14,24,34,44,54 * * * *"
   workflow_dispatch:
     inputs:
@@ -68,9 +66,8 @@ jobs:
           path: .authored
           token: ${{ steps.app-token.outputs.token }}
 
-      # Derived cache, never state: the per-listing ETags, so an unchanged
-      # listing costs no rate limit, plus the failure counts and issue numbers.
-      # Losing it costs one expensive tick and nothing else.
+      # Derived cache, never state: the per-listing ETags, the failure counts
+      # and the issue numbers. Losing it costs one expensive tick.
       - name: Restore the derived cache
         uses: actions/cache/restore@v4
         with:
@@ -94,11 +91,9 @@ jobs:
             --authored-repo "${{ github.repository_owner }}/content-index"
             --cache .watcher/cache.json
             --lookback-days "$LOOKBACK_DAYS"
-            # What the sweep re-dispatches, and the required check whose verdict
-            # it reads. Both are the authored repository's validation workflow
-            # (KSAModding/content-index#4), so they live here rather than in the
-            # tool: that workflow has to accept a dispatch carrying the pull
-            # request number and report under this check name.
+            # The workflow the sweep re-dispatches, and the check whose verdict
+            # it reads. Both belong to KSAModding/content-index#4, which has to
+            # accept a pull_request input and report under this check name.
             --sweep-workflow checks.yml
             --verdict-check validate
           )
