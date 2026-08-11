@@ -2,24 +2,17 @@
 # SPDX-License-Identifier: MIT
 """The release hosts the watcher polls, behind one interface.
 
-A host answers two questions: which releases exist, and what are the bytes of
-one of them. `[releases]` in the authored document names the hosts; the
-authority defines which releases exist, and every other host is only ever
-checked for an archive with the same bytes, which is how `download.mirrors`
-gets populated (RFC 0031, RFC 0033).
+A host answers which releases exist and what the bytes of one of them are. The
+authority from `[releases]` defines which releases exist; every other host is
+only checked for a byte-identical archive, which is how `download.mirrors` gets
+populated (RFC 0031, RFC 0033).
 
-Two kinds of failure are kept apart, because they are reported differently:
+The two failure kinds are reported differently and must not be confused:
+HostError means this tick could not evaluate the host and the next one rescans,
+StampError means the release itself is wrong and the author has to act.
 
-    HostError   the host could not be evaluated this tick, a 5xx, a rate
-                limit, a timeout. Costs latency, never data: the next tick
-                rescans.
-    StampError  the release itself is wrong, a version that does not parse or
-                a release carrying no archive. The watcher reports it to the
-                author.
-
-GitHub is polled conditionally against a stored ETag, so an unchanged listing
-costs no rate limit at all. SpaceDock serves no validator, so a SpaceDock
-authority costs one request per tick.
+GitHub is polled conditionally against a stored ETag; SpaceDock serves no
+validator, so a SpaceDock authority costs one request per tick.
 """
 
 import dataclasses
@@ -53,6 +46,11 @@ class HostError(Exception):
     """The host could not be evaluated this tick. Transient by assumption."""
 
 
+class OversizeError(HostError):
+    """The response blew the size limit. Permanent for an archive, so `_download`
+    turns it into a StampError."""
+
+
 @dataclasses.dataclass(frozen=True)
 class HostRelease:
     """One release as a host describes it, before anything is derived from it."""
@@ -60,7 +58,7 @@ class HostRelease:
     host: str
     tag: str
     version: str | None
-    release_date: str
+    release_date: str | None
     url: str | None
     content_type: str = "application/zip"
     size: int | None = None
@@ -145,7 +143,7 @@ def _read(answer, limit):
     limit = limit or MAX_ARCHIVE_BYTES
     body = answer.read(limit + 1)
     if len(body) > limit:
-        raise HostError(f"the response is larger than the {limit} byte limit")
+        raise OversizeError(f"the response is larger than the {limit} byte limit")
     return body
 
 
@@ -155,14 +153,19 @@ def _rate_limited(headers):
 
 
 def _utc(timestamp):
-    """A host timestamp as the ISO 8601 UTC form a release file carries."""
+    """A host timestamp as the ISO 8601 UTC form a release file carries.
+
+    A timestamp that does not parse yields None rather than passing the raw
+    string through: `release_date` is stamped exactly once, and the stamper
+    rejects a release without one, which scopes the failure to that release.
+    """
     if not timestamp:
         return None
     text = timestamp.strip().replace("Z", "+00:00")
     try:
         moment = datetime.fromisoformat(text)
     except ValueError:
-        return timestamp
+        return None
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=timezone.utc)
     return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -173,6 +176,34 @@ def _version_of(tag):
         return normalize_version(tag)
     except StampError:
         return None
+
+
+def _parse_json(url, body):
+    """The body as JSON, or HostError: a 200 carrying HTML is a bad moment."""
+    try:
+        return json.loads(body)
+    except json.JSONDecodeError as error:
+        raise HostError(f"{url}: the answer is not JSON, {error}") from error
+
+
+def _on_host(base, value, what):
+    """`value` resolved against `base`, and only if it stayed on that host.
+
+    `urljoin` returns an absolute or protocol-relative value unchanged, so a
+    host that answers `https://elsewhere/x.zip` would otherwise put a foreign
+    address into a stamped file. The index never trusts a fact it was handed,
+    and a URL is a fact like any other.
+    """
+    if not value:
+        return None
+    resolved = urllib.parse.urljoin(base, str(value))
+    wanted, got = urllib.parse.urlsplit(base), urllib.parse.urlsplit(resolved)
+    if (got.scheme, got.netloc) != (wanted.scheme, wanted.netloc):
+        raise StampError(
+            f"{what} '{value}' resolves to {resolved}, which is not on "
+            f"{wanted.netloc}"
+        )
+    return resolved
 
 
 class Host:
@@ -204,6 +235,9 @@ class GitHubHost(Host):
         self.http = http
         self.listing_id = listing_id or self.repository.split("/")[-1]
         self.max_pages = max_pages
+        # True when the last scan hit max_pages with more pages left, so the
+        # caller can report the tail instead of silently never seeing it.
+        self.truncated = False
 
     @property
     def key(self):
@@ -226,16 +260,25 @@ class GitHubHost(Host):
         if first.status == 304:
             return None, etag
 
-        payloads = [json.loads(first.body)]
+        payloads = [_parse_json(url, first.body)]
         following = LINK_NEXT.search(first.headers.get("Link", "") or "")
         pages = 1
         while following and pages < self.max_pages:
-            answer = self.http.get(
-                following.group(1), accept="application/vnd.github+json", api=True
-            )
-            payloads.append(json.loads(answer.body))
+            try:
+                answer = self.http.get(
+                    following.group(1), accept="application/vnd.github+json", api=True
+                )
+            except urllib.error.HTTPError as error:
+                raise HostError(f"{following.group(1)}: HTTP {error.code}") from error
+            payloads.append(_parse_json(following.group(1), answer.body))
             following = LINK_NEXT.search(answer.headers.get("Link", "") or "")
             pages += 1
+        self.truncated = bool(following)
+        if following:
+            self.http.log(
+                f"{self.repository}: more than {self.max_pages * 100} releases, "
+                "the older ones are not scanned"
+            )
 
         releases = [
             self._release(payload)
@@ -310,7 +353,12 @@ class SpaceDockHost(Host):
     kind = "spacedock"
 
     def __init__(self, mod_id, http):
-        self.mod_id = int(mod_id)
+        try:
+            self.mod_id = int(mod_id)
+        except (TypeError, ValueError):
+            raise StampError(
+                f"'{mod_id}' is not a SpaceDock mod id, which is a number"
+            ) from None
         self.http = http
 
     @property
@@ -328,26 +376,23 @@ class SpaceDockHost(Host):
                 ) from error
             raise HostError(f"{url}: HTTP {error.code}") from error
 
-        try:
-            payload = json.loads(answer.body)
-        except json.JSONDecodeError as error:
-            raise HostError(f"{url}: the answer is not JSON, {error}") from error
+        payload = _parse_json(url, answer.body)
 
         page = payload.get("url") or f"/mod/{self.mod_id}"
+        changelog = _on_host(SPACEDOCK, page, "the mod page")
         releases = []
         for version in payload.get("versions") or []:
             tag = (version.get("friendly_version") or "").strip()
-            path = version.get("download_path")
             releases.append(
                 HostRelease(
                     host=self.kind,
                     tag=tag,
                     version=_version_of(tag),
                     release_date=_utc(version.get("created")),
-                    url=urllib.parse.urljoin(SPACEDOCK, path) if path else None,
+                    url=_on_host(SPACEDOCK, version.get("download_path"), "the download path"),
                     content_type="application/zip",
                     prerelease=False,
-                    changelog=urllib.parse.urljoin(SPACEDOCK, page),
+                    changelog=changelog,
                 )
             )
         return releases, None
@@ -366,7 +411,26 @@ def _download(http, release):
                 "should verify against"
             )
         raise StampError("the release carries no archive to download")
-    answer = http.get(release.url, api=release.url.startswith(GITHUB_API))
+    if release.size and release.size > MAX_ARCHIVE_BYTES:
+        raise StampError(
+            f"the archive is {release.size} bytes, above the "
+            f"{MAX_ARCHIVE_BYTES} byte limit"
+        )
+    try:
+        answer = http.get(release.url, api=release.url.startswith(GITHUB_API))
+    except OversizeError as error:
+        # Permanent, unlike the transient failures HostError stands for: the
+        # release stays too large next tick too, so the author hears about it
+        # instead of the watcher downloading and discarding it forever.
+        raise StampError(f"the archive at {release.url}: {error}") from error
+    except urllib.error.HTTPError as error:
+        # A gone archive is a fact about the release, reported to the author.
+        # Everything else is the host having a bad moment this tick.
+        if error.code in (404, 410, 451):
+            raise StampError(
+                f"the archive at {release.url} is gone (HTTP {error.code})"
+            ) from error
+        raise HostError(f"{release.url}: HTTP {error.code}") from error
     served = (answer.headers.get("Content-Type") or "").split(";")[0].strip()
     # What the host says the asset is beats what it happens to serve it as, and
     # the stamper has the bytes to fall back on either way.
