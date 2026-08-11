@@ -57,6 +57,8 @@ A version is stamped exactly once. A tag that reappears with different bytes is 
 
 `download.mirrors` is the one field the watcher may append to after publish, and only after downloading the other host's archive and finding it byte-identical.
 
+An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
+
 To run a tick by hand, dispatch the workflow: `listing` narrows it to one id, and `dry_run` derives everything and writes nothing. Locally, against a checkout of the authored half:
 
 ```text
