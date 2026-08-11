@@ -2,19 +2,15 @@
 # SPDX-License-Identifier: MIT
 """Re-derive the design repository's examples and diff them against the stamper.
 
-examples/ in content-manager-design was stamped by hand, following the watcher
-procedure of RFC 0033: every archive was downloaded from its release host, the
-hashes and sizes were computed from the actual bytes, the derived dependencies
-were read from the mod.toml inside that exact archive. It is therefore the one
-independent check of this repository's tooling that nobody here wrote.
+examples/ in content-manager-design was stamped by hand from the same archives,
+so it is an expectation this repository did not write itself.
 
     python3 tools/verify_examples.py
     python3 tools/verify_examples.py --examples ../content-manager-design/examples
     python3 tools/verify_examples.py --check-mirrors
 
-Unlike the unit tests this needs the network, because the whole point is that
-the bytes come from the real hosts. It exercises tools/hosts.py at the same
-time: a release the host adapter cannot find is a failure here.
+Needs the network, unlike the unit tests: the bytes have to come from the real
+hosts, which exercises tools/hosts.py at the same time.
 """
 
 import argparse
@@ -146,6 +142,10 @@ def _restamp(http, listing_toml, version, game_versions, expected, check_mirrors
     if check_mirrors:
         mirrors = _mirrors(mirror_hosts, version, archive)
 
+    # Wall clock on purpose: the original stamp time is unrecorded, and the
+    # watcher's month pass corrects a stamp once its game_max month completes,
+    # so re-deriving with the current time matches the corrected state an
+    # example is expected to hold.
     document = stamp(
         authored, facts, archive, game_versions,
         mirrors=mirrors, now=datetime.now(timezone.utc),

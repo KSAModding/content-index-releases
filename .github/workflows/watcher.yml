@@ -112,7 +112,7 @@ jobs:
           python3 tools/watch.py "${arguments[@]}"
 
       - name: Push
-        if: ${{ inputs.dry_run != true }}
+        if: ${{ success() && inputs.dry_run != true }}
         run: |
           set -euo pipefail
           for attempt in 1 2 3; do
@@ -127,7 +127,7 @@ jobs:
           exit 1
 
       - name: Save the derived cache
-        if: always()
+        if: ${{ success() && inputs.dry_run != true }}
         uses: actions/cache/save@v4
         with:
           path: .watcher
