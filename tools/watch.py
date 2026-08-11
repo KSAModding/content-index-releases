@@ -92,11 +92,6 @@ def parse_iso(text):
         return None
 
 
-# --------------------------------------------------------------------------- #
-# The derived cache
-# --------------------------------------------------------------------------- #
-
-
 class Cache:
     """Derived cache, never state.
 
@@ -129,11 +124,6 @@ class Cache:
         with self.path.open("w", encoding="utf-8", newline="\n") as handle:
             json.dump(self.data, handle, indent=1, sort_keys=True)
             handle.write("\n")
-
-
-# --------------------------------------------------------------------------- #
-# The authored repository: issues and the sweep
-# --------------------------------------------------------------------------- #
 
 
 class Api:
@@ -434,11 +424,6 @@ class Sweep:
         state["pinged"] = True
 
 
-# --------------------------------------------------------------------------- #
-# The tick
-# --------------------------------------------------------------------------- #
-
-
 class Watcher:
     def __init__(self, options):
         self.options = options
@@ -462,8 +447,6 @@ class Watcher:
     def log(self, message):
         print(message, flush=True)
         self.lines.append(str(message))
-
-    # -- the repository is the state ---------------------------------------- #
 
     def folder(self, listing_id):
         return self.releases_root / listing_id
@@ -506,8 +489,6 @@ class Watcher:
         subprocess.run(
             ["git", "commit", "--quiet", "-m", message, "--", str(path)], check=True
         )
-
-    # -- one listing -------------------------------------------------------- #
 
     def listings(self):
         """The authored listing documents this tick looks at."""
@@ -745,8 +726,6 @@ class Watcher:
             "way forward is a new version, or a yank of this one."
         )
 
-    # -- mirrors ------------------------------------------------------------ #
-
     def mirrors_for(self, mirror_hosts, release, archive):
         """The non-authority hosts serving byte-identical bytes for this release."""
         digest = hashlib.sha256(archive).hexdigest().upper()
@@ -837,8 +816,6 @@ class Watcher:
             )
             self.log(f"    appended {len(found)} mirror(s) to {version}")
             self.mirrored.append(f"{listing_id} {version}")
-
-    # -- reporting ---------------------------------------------------------- #
 
     def unreachable(self, listing_id, state, message):
         """A host that could not be evaluated. Latency, not data.

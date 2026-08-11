@@ -72,11 +72,6 @@ class StampError(Exception):
     """
 
 
-# --------------------------------------------------------------------------- #
-# Versions
-# --------------------------------------------------------------------------- #
-
-
 def normalize_version(tag):
     """The tag as SemVer 2.0.0, with a leading `v` stripped.
 
@@ -115,11 +110,6 @@ def release_status(version, host_prerelease):
     if identifiers or host_prerelease:
         return "testing"
     return "stable"
-
-
-# --------------------------------------------------------------------------- #
-# Game version bounds (RFC 0017)
-# --------------------------------------------------------------------------- #
 
 
 def game_revision(version):
@@ -187,11 +177,6 @@ def resolve_bound(bound, which, game_versions, now):
         if month_of(version) == (year, month) and game_revision(version) == revision
     )
     return display, revision
-
-
-# --------------------------------------------------------------------------- #
-# The archive
-# --------------------------------------------------------------------------- #
 
 
 def open_archive(archive):
@@ -330,11 +315,6 @@ def install_size(handle, root):
     return sum(info.file_size for info in entries_under(handle, root))
 
 
-# --------------------------------------------------------------------------- #
-# Dependencies
-# --------------------------------------------------------------------------- #
-
-
 def derived_dependencies(mod_toml):
     """The code dependencies the archive's own mod.toml declares.
 
@@ -440,11 +420,6 @@ def merge_dependencies(derived, authored):
         merged.append(stamped)
 
     return [entry for index, entry in enumerate(merged) if index not in replaced]
-
-
-# --------------------------------------------------------------------------- #
-# The stamp
-# --------------------------------------------------------------------------- #
 
 
 def listing_snapshot(authored):
@@ -576,11 +551,6 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
 def serialize(document):
     """The release file's bytes, as every stamped file in the repository is written."""
     return json.dumps(document, indent=2, ensure_ascii=False) + "\n"
-
-
-# --------------------------------------------------------------------------- #
-# Command line
-# --------------------------------------------------------------------------- #
 
 
 def main(argv=None):
