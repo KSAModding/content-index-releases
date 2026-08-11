@@ -1,0 +1,129 @@
+# Ask every listing's authority host for its releases and stamp every release
+# that has no file under releases/<id>/ yet (RFC 0033).
+#
+# The tick holds no state. What is stamped in the repository is the state, so a
+# dropped run costs latency and not data, and a re-run stamps nothing twice.
+name: watcher
+
+on:
+  schedule:
+    # Ten minutes is a tuning parameter and needs no RFC to change. GitHub's
+    # floor is five. The times sit off the hour, where runs are dropped worst.
+    - cron: "4,14,24,34,44,54 * * * *"
+  workflow_dispatch:
+    inputs:
+      listing:
+        description: "Only this listing id. Empty means every listing."
+        required: false
+      lookback_days:
+        description: "Ignore releases older than this many days. 0 scans the whole list."
+        required: false
+        default: "0"
+      dry_run:
+        description: "Derive everything, write and open nothing."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # Two ticks writing release files at once would race on the push, and the
+  # scan rule makes a queued tick as good as a parallel one.
+  group: watcher
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    name: tick
+    runs-on: ubuntu-latest
+    steps:
+      # The one identity with access to both halves of the index, and the only
+      # actor the branch protection ruleset lets write here unattended.
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            content-index-releases
+            content-index
+
+      - uses: actions/checkout@v7
+        with:
+          # Always the tip of main: an old checkout would decide "already
+          # stamped" against an outdated tree and then fail to push.
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+
+      # The authored documents the tick reads. A checkout costs one clone
+      # instead of one API request per listing.
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/content-index
+          ref: main
+          path: .authored
+          token: ${{ steps.app-token.outputs.token }}
+
+      # Derived cache, never state: the per-listing ETags, the failure counts
+      # and the issue numbers. Losing it costs one expensive tick.
+      - name: Restore the derived cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .watcher
+          key: watcher-${{ github.run_id }}
+          restore-keys: watcher-
+
+      - name: Tick
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          LISTING: ${{ inputs.listing }}
+          LOOKBACK_DAYS: ${{ inputs.lookback_days || '0' }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+
+          arguments=(
+            --authored .authored
+            --authored-repo "${{ github.repository_owner }}/content-index"
+            --cache .watcher/cache.json
+            --lookback-days "$LOOKBACK_DAYS"
+            # The workflow the sweep re-dispatches, and the check whose verdict
+            # it reads. Both belong to KSAModding/content-index#4, which has to
+            # accept a pull_request input and report under this check name.
+            --sweep-workflow checks.yml
+            --verdict-check validate
+          )
+          if [ -n "$LISTING" ]; then
+            arguments+=(--listing "$LISTING")
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            arguments+=(--dry-run)
+          fi
+
+          python3 tools/watch.py "${arguments[@]}"
+
+      - name: Push
+        if: ${{ success() && inputs.dry_run != true }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            # Something else landed on main, the hourly game versions job most
+            # likely. Release files never conflict with it.
+            git pull --rebase --autostash
+          done
+          echo "could not push after three attempts; the next tick rescans and re-stamps"
+          exit 1
+
+      - name: Save the derived cache
+        if: ${{ success() && inputs.dry_run != true }}
+        uses: actions/cache/save@v4
+        with:
+          path: .watcher
+          key: watcher-${{ github.run_id }}
