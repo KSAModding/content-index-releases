@@ -2,18 +2,13 @@
 # SPDX-License-Identifier: MIT
 """Authored document plus release archive in, release file out, per RFC 0031.
 
-The one place a release file is derived. The watcher stamps with it, and the
-release pull request checks re-derive with it and compare against what was
-submitted, so the two paths cannot disagree.
+The one place a release file is derived: the watcher stamps with it and the
+release pull request checks re-derive with it, so the two paths cannot
+disagree. It needs no token and no network, which is what makes it testable
+against examples/ in the design repository.
 
-It needs no token and touches no network: everything it says comes from the
-authored document, the archive's own bytes, the release facts its caller read
-off the host, and the game release list. That is what makes it testable against
-examples/ in the design repository, where every value was produced by this
-procedure by hand.
-
-A version that does not parse, or an install root that is neither derivable nor
-authored, raises StampError for the caller to report.
+Anything wrong with the release itself raises StampError for the caller to
+report.
 
 RFC 0031 defines the format, RFC 0035 the install descriptor, RFC 0017 the
 version ordering the month bounds resolve against.
@@ -23,6 +18,7 @@ import argparse
 import hashlib
 import io
 import json
+import posixpath
 import re
 import sys
 import tomllib
@@ -62,6 +58,26 @@ LISTING_FIELDS = ("name", "authors", "abstract", "description", "license", "tags
 DEPENDENCY_KINDS = ("required", "optional", "recommends", "suggests", "conflict")
 
 INSTALL_ANCHORS = ("mods", "user-data", "game-root", "standalone")
+
+# The id rules of RFC 0031: 1 to 64 ASCII characters, letters, digits, `-`,
+# `_`, `.`, first and last a letter or digit. The id is a folder name on every
+# platform and a path segment in this repository, so nothing else is safe.
+ID_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]{0,62}[A-Za-z0-9])?$")
+
+# Reserved case-insensitively against the id up to its first dot: the game
+# ships `Content/Core`, and Windows treats dotted device names as devices.
+RESERVED_IDS = frozenset(
+    {"core", "con", "prn", "aux", "nul"}
+    | {f"com{digit}" for digit in "123456789"}
+    | {f"lpt{digit}" for digit in "123456789"}
+)
+
+
+def valid_id(identifier):
+    """Whether the id satisfies the id rules of RFC 0031."""
+    if not identifier or ID_PATTERN.match(identifier) is None:
+        return False
+    return identifier.split(".")[0].lower() not in RESERVED_IDS
 
 
 class StampError(Exception):
@@ -132,15 +148,12 @@ def month_is_over(year, month, now):
 def resolve_bound(bound, which, game_versions, now):
     """Resolve an authored game bound to (display, revision).
 
-    A full version string carries its own revision (RFC 0017), so it never
-    needs the list. A month resolves to the first revision within it as a lower
-    bound and to the last as an upper bound, against the game release list.
+    A full version string carries its own revision (RFC 0017); a month resolves
+    to its first revision as a lower bound and its last as an upper one.
 
-    An upper bound naming a month that is not over yet cannot resolve to its
-    last revision: it returns (None, None), which stamps the release with no
-    upper bound at all, the only honest reading of "open". The watcher
-    re-resolves it once the month completes, which is a stamp correction and
-    not an amendment.
+    An upper bound naming a month still running has no last revision yet, so it
+    returns (None, None) and the release is stamped open. `Watcher.month_pass`
+    adds the bound once the month completes.
     """
     bound = (bound or "").strip()
     if not bound:
@@ -264,20 +277,47 @@ def derive_root(handle, listing_id, content_type):
     )
 
 
-def install_object(handle, listing_id, content_type, authored_install):
+def relative_path(value, what):
+    """The value as the relative `/`-separated path RFC 0035 requires.
+
+    Rule 1 makes an absolute path, a `~` path, or a path whose normalized form
+    escapes its anchor invalid, and rule 2 fixes the separator to `/`. The
+    stamped file carries these paths to every client, so the containment is a
+    validity rule here and not a recommendation, and the returned path is the
+    normalized form, so no client sees a `..` it would normalize its own way.
+    """
+    text = str(value)
+    if not text or text.startswith(("/", "~")) or "\\" in text or re.match(r"^[A-Za-z]:", text):
+        raise StampError(f"{what} '{text}' is not a relative path with '/' separators")
+    depth = 0
+    for part in text.split("/"):
+        if part in ("", "."):
+            continue
+        depth += -1 if part == ".." else 1
+        if depth < 0:
+            raise StampError(f"{what} '{text}' escapes its anchor")
+    normalized = posixpath.normpath(text)
+    return "" if normalized == "." else normalized
+
+
+def install_object(handle, listing_id, content_type, authored_install, provides=None):
     """The release file's `install` object, or None when it says nothing.
 
-    `root` is omitted when it is the archive root, the way RFC 0035 omits
-    `path` for the anchor itself. `target` and `path` appear as resolved at
-    stamp time and are absent where the type default applies, so a mod stamps
-    neither. `[provides]` is never stamped: it says what a loader offers right
-    now, and a stale copy would point a manager at the wrong directory.
+    `root` is omitted when it is the archive root, and `target` and `path` are
+    absent where the type default applies. `[provides]` is never stamped, since
+    a stale copy would point a manager at the wrong directory, but its `launch`
+    is checked against this archive: RFC 0035 makes a missing one a per-release
+    rejection.
     """
     authored_install = authored_install or {}
+    provides = provides or {}
     authored_root = authored_install.get("root")
 
+    if provides and content_type != "mod-loader":
+        raise StampError("[provides] is only permitted on a mod-loader (RFC 0035)")
+
     if authored_root is not None:
-        root, derived = str(authored_root).strip("/"), False
+        root, derived = relative_path(authored_root, "the authored install root"), False
         if root and not entries_under(handle, root):
             raise StampError(f"the authored install root '{root}' is not in the archive")
     else:
@@ -295,19 +335,59 @@ def install_object(handle, listing_id, content_type, authored_install):
     install["derived"] = derived
 
     target = authored_install.get("target")
+    path = authored_install.get("path")
+    if content_type == "mod" and (target is not None or path is not None):
+        # A mod's install location is not the author's to choose: the folder
+        # name is the identity the game sees, and RFC 0035 states the location
+        # as a default rather than an authorable field to keep it that way.
+        raise StampError("a mod cannot author an install target or path (RFC 0035)")
+    if content_type == "mod-loader" and authored_install and target is None:
+        raise StampError(
+            "a mod-loader [install] section needs a target: the type has no "
+            "default to fall back on (RFC 0035)"
+        )
     if target is not None:
         if target not in INSTALL_ANCHORS:
             raise StampError(f"the authored install target '{target}' is not an anchor")
         install["target"] = target
-    path = authored_install.get("path")
     if path is not None:
-        install["path"] = str(path)
+        install["path"] = relative_path(path, "the authored install path")
+
+    _check_provides(handle, root, target, provides)
 
     if set(install) == {"derived"}:
         # Nothing but the fact that nobody authored anything, which the absence
         # of the object already says.
         return None
     return install
+
+
+def _check_provides(handle, root, target, provides):
+    """The release-time checks on a loader's [provides] section (RFC 0035).
+
+    `launch` must exist in the archive, and rule 4 forbids a `standalone`
+    install without one.
+    """
+    launch = provides.get("launch")
+    if launch is not None:
+        launch = relative_path(launch, "the provides launch path")
+        entry = f"{root}/{launch}" if root else launch
+        names = {name.replace("\\", "/") for name in handle.namelist()}
+        if entry not in names:
+            raise StampError(
+                f"the provides launch path '{launch}' is not in the release archive"
+            )
+    if target == "standalone" and launch is None:
+        raise StampError(
+            "target = 'standalone' requires [provides] launch: a directory "
+            "nothing ever runs from is not an install (RFC 0035)"
+        )
+    content_dir = provides.get("content-dir")
+    if content_dir is not None and content_dir not in INSTALL_ANCHORS:
+        raise StampError(f"the provides content-dir '{content_dir}' is not an anchor")
+    content_path = provides.get("content-path")
+    if content_path is not None:
+        relative_path(content_path, "the provides content-path")
 
 
 def install_size(handle, root):
@@ -382,20 +462,16 @@ def _authored_entry(entry):
 def merge_dependencies(derived, authored):
     """The merged dependency list of RFC 0031.
 
-    Derived entries are ground truth for code dependencies, because the loader
-    acts on that data at runtime, so nothing can suppress one. An authored
-    entry replaces the derived entry of the same id, which is how bounds get
-    added, and an authored `any_of` replaces the derived entry of every member
-    it names.
-
-    A member of an `any_of` whose derived entry was not `Optional = true` is a
-    validation error: the loader refuses to start the mod without that specific
-    dependency, so an alternative set would claim a choice runtime does not
-    offer.
+    Derived entries are ground truth, because the loader acts on them at
+    runtime, so nothing can suppress one. An authored entry replaces the derived
+    entry of the same id, and an authored `any_of` replaces the entry of every
+    member it names. Naming a member whose derived entry was not optional is an
+    error: the loader refuses to start without it, so the choice does not exist.
     """
     merged = [dict(entry) for entry in derived]
     by_id = {entry["id"].lower(): index for index, entry in enumerate(merged)}
     replaced = set()
+    seen_authored = set()
 
     for entry in authored or []:
         stamped = _authored_entry(entry)
@@ -404,6 +480,13 @@ def merge_dependencies(derived, authored):
             if "any_of" in stamped
             else [stamped["id"]]
         )
+
+        for name in names:
+            if name.lower() in seen_authored:
+                raise StampError(
+                    f"the authored dependencies name '{name}' more than once"
+                )
+            seen_authored.add(name.lower())
 
         for name in names:
             index = by_id.get(name.lower())
@@ -438,9 +521,7 @@ def listing_snapshot(authored):
 def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
     """The release file for one release.
 
-    `authored` is the parsed authored document, `archive` the release archive's
-    bytes, `game_versions` the `versions` list of the game release list, and
-    `release` the facts the caller read off the release host:
+    `release` carries the facts the caller read off the host:
 
         tag             the tag or version string the host names, required
         release_date    ISO 8601 UTC timestamp of the release, required
@@ -449,9 +530,7 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
         prerelease      the host's pre-release flag, defaults to false
         changelog       URL of the release's changelog, optional
 
-    `now` is when the stamp happens, which only the open month bound depends
-    on. The release checks pass the submission's own time so a re-derivation
-    reaches the same answer as the stamp it is checking.
+    Only the open month bound depends on `now`.
     """
     now = now or datetime.now(timezone.utc)
 
@@ -459,14 +538,25 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
     content_type = authored.get("type")
     if not listing_id:
         raise StampError("the authored document carries no id")
+    if not valid_id(listing_id):
+        raise StampError(
+            f"the id '{listing_id}' does not satisfy the id rules of RFC 0031"
+        )
     if content_type not in ("mod", "mod-loader"):
         raise StampError(f"type '{content_type}' has no generated release file")
+    if authored.get("spec_version") != SPEC_VERSION:
+        raise StampError(
+            f"the authored document claims spec_version "
+            f"{authored.get('spec_version')!r}, and this stamper implements "
+            f"{SPEC_VERSION}"
+        )
 
     version = normalize_version(release.get("tag"))
     handle = open_archive(archive)
 
     install = install_object(
-        handle, listing_id, content_type, authored.get("install")
+        handle, listing_id, content_type, authored.get("install"),
+        provides=authored.get("provides"),
     )
     root = (install or {}).get("root", "")
 
@@ -484,6 +574,11 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
     game_max, game_max_revision = resolve_bound(
         compatibility.get("game_max"), "game_max", game_versions, now
     )
+    if game_max_revision is not None and game_max_revision < game_min_revision:
+        raise StampError(
+            f"game_max resolves to revision {game_max_revision}, below game_min's "
+            f"{game_min_revision}: the compatibility range is empty"
+        )
 
     if not release.get("release_date"):
         raise StampError("the host reports no release date")
@@ -577,18 +672,24 @@ def main(argv=None):
     parser.add_argument("--out", type=Path, help="write here instead of to stdout")
     arguments = parser.parse_args(argv)
 
-    with arguments.listing.open("rb") as handle:
-        authored = tomllib.load(handle)
-    release = json.loads(arguments.release.read_text(encoding="utf-8"))
-    game_versions = json.loads(
-        arguments.game_versions.read_text(encoding="utf-8")
-    )["versions"]
+    try:
+        with arguments.listing.open("rb") as handle:
+            authored = tomllib.load(handle)
+        release = json.loads(arguments.release.read_text(encoding="utf-8"))
+        game_versions = json.loads(
+            arguments.game_versions.read_text(encoding="utf-8")
+        )["versions"]
+        archive = arguments.archive.read_bytes()
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError,
+            json.JSONDecodeError, KeyError, TypeError) as error:
+        print(f"cannot read the inputs: {error}", file=sys.stderr)
+        return 1
 
     try:
         document = stamp(
             authored,
             release,
-            arguments.archive.read_bytes(),
+            archive,
             game_versions,
             mirrors=arguments.mirror,
         )

@@ -22,10 +22,12 @@ from stamp_release import (
     derived_dependencies,
     merge_dependencies,
     normalize_version,
+    relative_path,
     release_status,
     resolve_bound,
     serialize,
     stamp,
+    valid_id,
 )
 
 GAME_VERSIONS = [
@@ -271,6 +273,15 @@ class Stamp(unittest.TestCase):
         listing = dict(LISTING, compatibility={"game_min": "2026.8.3.5117", "game_max": "2026.8"})
         self.assertNotIn("game_max", self.stamp(listing=listing))
 
+    def test_an_empty_compatibility_range_is_an_error(self):
+        # A max that resolves below the min stamps a range no game version can
+        # ever satisfy, so it is the author's mistake to fix, not a file to ship.
+        listing = dict(
+            LISTING, compatibility={"game_min": "2026.8.3.5117", "game_max": "2026.7"}
+        )
+        with self.assertRaises(StampError):
+            self.stamp(listing=listing)
+
     def test_the_os_list_is_carried_when_authored(self):
         listing = dict(
             LISTING, compatibility={"game_min": "2026.8.3.5117", "os": ["windows"]}
@@ -327,7 +338,10 @@ class Stamp(unittest.TestCase):
         self.assertEqual(document["install_size"], 30)
 
         # With an authored descriptor, the resolved destination is stamped.
+        # `standalone` needs a launch (RFC 0035, rule 4), and the launch has to
+        # exist in this release's archive (rule 3).
         listing["install"] = {"target": "standalone"}
+        listing["provides"] = {"launch": "StarMap.exe"}
         document = stamp(
             listing, dict(RELEASE, tag="0.4.6"), data, GAME_VERSIONS, now=NOW
         )
@@ -357,6 +371,123 @@ class Stamp(unittest.TestCase):
 
     def test_stamping_twice_gives_the_same_bytes(self):
         self.assertEqual(serialize(self.stamp()), serialize(self.stamp()))
+
+    def test_a_foreign_spec_version_is_refused(self):
+        # A document claiming a format this stamper does not implement must not
+        # be silently stamped as spec_version 1.
+        with self.assertRaises(StampError):
+            self.stamp(listing=dict(LISTING, spec_version=2))
+
+    def test_a_duplicate_authored_dependency_id_is_an_error(self):
+        listing = dict(
+            LISTING,
+            dependencies=[
+                {"id": "KittenExtensions", "kind": "required", "min": "0.4.0"},
+                {"id": "kittenextensions", "kind": "suggests"},
+            ],
+        )
+        with self.assertRaises(StampError):
+            self.stamp(listing=listing)
+
+
+class Ids(unittest.TestCase):
+    def test_the_id_rules_of_rfc_0031(self):
+        for good in ("A", "AutoStage", "My.Mod-2_x", "a" * 64):
+            self.assertTrue(valid_id(good), good)
+        for bad in (None, "", ".Mod", "Mod.", "-Mod", "My Mod", "My/Mod",
+                    "..", "../Evil", "a" * 65, "CON", "con.mod", "Core", "COM1"):
+            self.assertFalse(valid_id(bad), repr(bad))
+
+    def test_an_invalid_id_rejects_the_stamp(self):
+        listing = dict(LISTING, id="../AutoStage")
+        with self.assertRaises(StampError):
+            stamp(listing, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW)
+
+
+class Rfc0035(unittest.TestCase):
+    """The release-time rules of the install descriptor."""
+
+    def loader_listing(self, install=None, provides=None):
+        listing = {
+            "spec_version": 1,
+            "id": "StarMap",
+            "type": "mod-loader",
+            "name": "StarMap",
+            "authors": ["KlaasWhite"],
+            "abstract": "Mod loader that runs code mods.",
+            "license": "MIT",
+            "links": {"forums": "https://forums.ahwoo.com/threads/starmap-mod-loader.384/"},
+            "compatibility": {"game_min": "2026.8.3.5117"},
+        }
+        if install is not None:
+            listing["install"] = install
+        if provides is not None:
+            listing["provides"] = provides
+        return listing
+
+    def loader_archive(self):
+        return archive({"StarMap.exe": "x" * 10, "StarMap.dll": "y" * 20})
+
+    def stamp_loader(self, install=None, provides=None):
+        return stamp(
+            self.loader_listing(install, provides),
+            dict(RELEASE, tag="0.4.6"),
+            self.loader_archive(),
+            GAME_VERSIONS,
+            now=NOW,
+        )
+
+    def test_paths_must_be_relative_and_contained(self):
+        # Rule 1: absolute, home-relative, and escaping paths are invalid.
+        for bad in ("/etc/x", "~x/y", "..", "../x", "a/../../x", "C:/x", "a\\b"):
+            with self.assertRaises(StampError, msg=bad):
+                relative_path(bad, "test")
+        # A `..` that stays inside its anchor is contained, and the published
+        # value is the normalized form, so no client normalizes its own way.
+        self.assertEqual(relative_path("a/../b", "test"), "b")
+        self.assertEqual(relative_path("./tools", "test"), "tools")
+        self.assertEqual(relative_path("build/AutoStage", "test"), "build/AutoStage")
+
+    def test_an_escaping_install_path_rejects_the_release(self):
+        with self.assertRaises(StampError):
+            self.stamp_loader(
+                install={"target": "standalone", "path": "../outside"},
+                provides={"launch": "StarMap.exe"},
+            )
+
+    def test_a_mod_cannot_author_a_target_or_path(self):
+        # The folder name is the identity the game sees, so a mod's location is
+        # a default, not an authorable field.
+        for install in ({"target": "game-root"}, {"path": "sub"}):
+            listing = dict(LISTING, install=install)
+            with self.assertRaises(StampError, msg=install):
+                stamp(listing, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW)
+
+    def test_a_loader_install_section_needs_a_target(self):
+        # The type has no default to fall back on.
+        with self.assertRaises(StampError):
+            self.stamp_loader(install={"path": "somewhere"})
+
+    def test_provides_is_loader_only(self):
+        listing = dict(LISTING, provides={"launch": "AutoStage.dll"})
+        with self.assertRaises(StampError):
+            stamp(listing, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW)
+
+    def test_a_launch_absent_from_the_archive_rejects_the_release(self):
+        with self.assertRaises(StampError):
+            self.stamp_loader(provides={"launch": "Missing.exe"})
+
+    def test_a_launch_present_in_the_archive_passes(self):
+        document = self.stamp_loader(provides={"launch": "StarMap.exe"})
+        self.assertNotIn("install", document)
+
+    def test_standalone_requires_a_launch(self):
+        with self.assertRaises(StampError):
+            self.stamp_loader(install={"target": "standalone"})
+
+    def test_an_unknown_content_dir_is_an_error(self):
+        with self.assertRaises(StampError):
+            self.stamp_loader(provides={"launch": "StarMap.exe", "content-dir": "somewhere"})
 
 
 if __name__ == "__main__":
