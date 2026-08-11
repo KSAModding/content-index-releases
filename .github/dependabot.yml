@@ -1,0 +1,17 @@
+# Keeps the actions the scheduled jobs run on current. Same shape as the file
+# in KSAModding/Borea, so one convention covers every repository in the org.
+#
+# It matters more here than elsewhere: the game versions job and the watcher run
+# unattended, so an action that goes stale is not something a person walks into.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    # Dependabot reads .github/workflows/ from here.
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # Minor and patch bumps as one pull request instead of one each. A major
+      # bump stays on its own, because that is the one that can break a job.
+      minor-and-patch:
+        update-types: ["minor", "patch"]
