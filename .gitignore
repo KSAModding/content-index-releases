@@ -5,4 +5,7 @@
 # from the repository and the hosts, so it is never committed.
 /.watcher/
 
+# The built snapshot.
+/_site/
+
 __pycache__/
