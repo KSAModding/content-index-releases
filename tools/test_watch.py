@@ -894,10 +894,30 @@ class TheStampedFrontier(WatcherCase):
     def test_a_backfill_does_not_poll_with_the_stored_etag(self):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
-            state = {"etag": "W/\"abc\""}
-            self.assertEqual(self.watcher(folder).poll_etag(state), "W/\"abc\"")
+            state = {"etag": "W/\"abc\"", "authored": "d"}
+            self.assertEqual(self.watcher(folder).poll_etag(state, "d"), "W/\"abc\"")
             self.assertIsNone(
-                self.watcher(folder, ["--backfill", "--listing", "M"]).poll_etag(state)
+                self.watcher(folder, ["--backfill", "--listing", "M"]).poll_etag(state, "d")
+            )
+
+    def test_an_edited_listing_drops_the_stored_etag(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder)
+            state = {"etag": "W/\"abc\"", "authored": watcher.authored_digest({"id": "M"})}
+            self.assertIsNotNone(
+                watcher.poll_etag(state, watcher.authored_digest({"id": "M"}))
+            )
+            self.assertIsNone(
+                watcher.poll_etag(state, watcher.authored_digest({"id": "M", "x": 1}))
+            )
+
+    def test_the_authored_digest_ignores_key_order(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.watcher(Path(name))
+            self.assertEqual(
+                watcher.authored_digest({"a": 1, "b": 2}),
+                watcher.authored_digest({"b": 2, "a": 1}),
             )
 
     def test_the_frontier_is_read_off_the_stamped_files(self):

@@ -600,8 +600,19 @@ class Watcher:
             return {}
         return {path.stem: path for path in sorted(folder.glob("*.json"))}
 
-    def poll_etag(self, host_state):
-        return None if self.options.backfill else host_state.get("etag")
+    def poll_etag(self, host_state, authored_digest):
+        """The ETag says the host's answer is unchanged, not that a release the
+        tick rejected would be rejected again, so an edited authored document
+        drops it. A backfill drops it too, because history counts as settled."""
+        if self.options.backfill or host_state.get("authored") != authored_digest:
+            return None
+        return host_state.get("etag")
+
+    @staticmethod
+    def authored_digest(authored):
+        return hashlib.sha256(
+            json.dumps(authored, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
 
     def stamped_frontier(self, stamped, errors):
         newest = None
@@ -843,8 +854,9 @@ class Watcher:
         # Keyed per listing, not per host: two listings naming the same
         # repository must not blind each other through a shared ETag.
         host_state = self.cache.section("hosts", f"{listing_id}/{authority.key}")
+        digest = self.authored_digest(authored)
         try:
-            releases, etag = authority.releases(self.poll_etag(host_state))
+            releases, etag = authority.releases(self.poll_etag(host_state, digest))
         except HostError as error:
             self.unreachable(listing_id, state, str(error))
             return
@@ -882,6 +894,7 @@ class Watcher:
             # a fixed tag is picked up at once.
             if etag:
                 host_state["etag"] = etag
+            host_state["authored"] = digest
             host_state["checked"] = iso(now())
         else:
             host_state.pop("etag", None)
