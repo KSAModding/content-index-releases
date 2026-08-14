@@ -1,0 +1,32 @@
+name: notify-failure
+
+on:
+  workflow_run:
+    workflows: ["snapshot", "watcher", "game versions", "checks"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  notify:
+    name: notify
+    if: >-
+      github.event.workflow_run.conclusion == 'failure'
+      && github.event.workflow_run.event != 'pull_request'
+      && github.event.workflow_run.event != 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+    steps:
+      - name: Post the failure to Discord
+        if: env.WEBHOOK_URL != ''
+        env:
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW: ${{ github.event.workflow_run.name }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+        run: |
+          # The title comes from a commit message, so @everyone would ping.
+          payload=$(jq -n --arg content \
+            "content-index-releases: ${WORKFLOW} failed: ${TITLE} ${RUN_URL}" \
+            '{content: $content, allowed_mentions: {parse: []}}')
+          curl -sf -H "Content-Type: application/json" -d "$payload" "$WEBHOOK_URL"
