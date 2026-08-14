@@ -40,7 +40,9 @@ That poll only ever sees the build that is current when it runs, so a build supe
 ## The watcher
 
 `.github/workflows/watcher.yml` runs every ten minutes as the org App.
-Each tick asks every listing's authority host for its releases and stamps every release that has no file under `releases/<id>/` yet, so a release published out of version order is stamped too.
+Each tick asks every listing's authority host for its releases and stamps every release that appeared after the newest one already stamped, so a patch for an older line, tagged after a newer version exists, is stamped too.
+
+A listing's first tick stamps its newest release only, and its back catalogue stays unstamped.
 
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
@@ -81,6 +83,14 @@ python3 tools/build_snapshot.py --authored ../content-index --out _site/v1/index
 ```
 
 The `sources` block naming the two commits is omitted unless both repositories and both commits are given, so a local build does not claim a provenance it does not have.
+
+### An unchanged index is not published again
+
+A deployment issues a new ETag whether or not the bytes changed, so republishing an unchanged snapshot is a full re-download for every client.
+
+The build reads what is published today as `--previous`. Unchanged content keeps that copy's `sources` rather than restamping whatever HEAD the run saw, so an unrelated commit does not move the bytes, and the workflow then skips the deploy when the two are equal.
+
+A build fails closed: nothing is published, and clients keep the last good snapshot.
 
 ## A published release is immutable
 
