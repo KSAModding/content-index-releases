@@ -4,9 +4,13 @@
 """
 
 import argparse
+import contextlib
+import io
 import json
+import os
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 from build_snapshot import (
@@ -15,6 +19,7 @@ from build_snapshot import (
     precedence,
     serialize,
     sources_from,
+    warn,
 )
 
 GAME_VERSIONS = {
@@ -591,6 +596,25 @@ class Provenance(unittest.TestCase):
                     generated_commit="3a77b21",
                 )
             )
+
+
+class Notes(unittest.TestCase):
+    def run_warn(self, actions):
+        environment = dict(os.environ)
+        environment.pop("GITHUB_ACTIONS", None)
+        if actions is not None:
+            environment["GITHUB_ACTIONS"] = actions
+        stream = io.StringIO()
+        with unittest.mock.patch.dict(os.environ, environment, clear=True):
+            with contextlib.redirect_stderr(stream):
+                warn("a release folder belongs to no listing")
+        return stream.getvalue()
+
+    def test_a_note_on_actions_is_a_warning_annotation(self):
+        self.assertTrue(self.run_warn("true").startswith("::warning::"))
+
+    def test_a_note_off_actions_stays_readable(self):
+        self.assertTrue(self.run_warn(None).startswith("note: "))
 
 
 class Malformed(Fixture):
