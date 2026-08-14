@@ -6,6 +6,7 @@
 import argparse
 import datetime
 import json
+import os
 import sys
 import tomllib
 from pathlib import Path
@@ -21,6 +22,22 @@ STATUS_FIELDS = ("state", "since", "reason")
 
 class SnapshotError(Exception):
     """The snapshot cannot be built. Failing loud keeps the last good one served."""
+
+
+def warn(message):
+    """A note on stderr, and a warning annotation on Actions.
+
+    Every note here is a quiet failure, so none should need the log opened.
+    """
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        print(f"::warning::{message}", file=sys.stderr)
+    else:
+        print(f"note: {message}", file=sys.stderr)
+
+
+def info(message):
+    """What the run did, which is not a warning about anything."""
+    print(message, file=sys.stderr)
 
 
 def precedence(version, what):
@@ -281,7 +298,7 @@ def check_states_resolve(whole, versioned, names, listings, packs, log):
             )
         if whole.get(key, {}).get("state") == "delisted":
             log(
-                f"note: '{names[key]}' is delisted, so retracting its version "
+                f"'{names[key]}' is delisted, so retracting its version "
                 f"{version} changes nothing"
             )
 
@@ -319,7 +336,7 @@ def pack_entry(pack, status, versioned):
 
 def build(authored, releases, game_versions, sources=None, log=None):
     """The snapshot document for the state of the two repositories on disk."""
-    log = log or (lambda message: print(message, file=sys.stderr))
+    log = log or warn
 
     require_directory(authored, "the authored checkout")
     require_directory(authored / "listings", "the authored listings folder")
@@ -355,7 +372,7 @@ def build(authored, releases, game_versions, sources=None, log=None):
     for key in sorted(set(folders) - set(listings)):
         # The snapshot carries the release files of listed entries only.
         log(
-            f"note: {folders[key]} belongs to no listing, so its releases are not "
+            f"{folders[key]} belongs to no listing, so its releases are not "
             f"in the snapshot"
         )
 
@@ -434,16 +451,13 @@ def sources_from(arguments):
 def main(argv=None):
     arguments = parse_arguments(argv)
 
-    def log(message):
-        print(message, file=sys.stderr)
-
     try:
         document = build(
             arguments.authored,
             arguments.releases,
             arguments.game_versions,
             sources=sources_from(arguments),
-            log=log,
+            log=warn,
         )
         rendered = serialize(document)
     except SnapshotError as error:
@@ -454,7 +468,7 @@ def main(argv=None):
         arguments.out.parent.mkdir(parents=True, exist_ok=True)
         with arguments.out.open("w", encoding="utf-8", newline="\n") as handle:
             handle.write(rendered)
-        log(
+        info(
             f"wrote {arguments.out}: {len(document['listings'])} listing(s), "
             f"{len(document['packs'])} pack(s), "
             f"{len(rendered.encode('utf-8'))} bytes"
