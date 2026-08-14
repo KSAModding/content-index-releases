@@ -2,10 +2,15 @@
 # SPDX-License-Identifier: MIT
 """One tick of the watcher (RFC 0033).
 
-Scan every authored listing's authority host, stamp every release that has no
-file under `releases/<id>/` yet, commit it, keep one error issue per listing
-current on the authored repository, and sweep that repository's open pull
-requests.
+Scan every authored listing's authority host, stamp every release that appeared
+after the newest one already stamped, commit it, keep one error issue per
+listing current on the authored repository, and sweep that repository's open
+pull requests.
+
+Older releases are left alone, and a listing's first tick takes its newest
+release only. RFC 0031 freezes the authored facts "current at release time", and
+an amendment can only narrow a published release, so a `game_min` stamped too
+high can never be lowered again. `--backfill` opts out.
 
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
@@ -35,6 +40,7 @@ from stamp_release import (
     GAME_MONTH,
     StampError,
     month_is_over,
+    normalize_version,
     resolve_bound,
     serialize,
     stamp,
@@ -56,6 +62,8 @@ WAITING_MARKER = "<!-- watcher:waiting={sha} -->"
 # The same marker read back, to find which listing an open issue belongs to.
 MARKED_LISTING = re.compile(r"<!-- watcher:listing=(\S+) -->")
 
+BACKTICKED = re.compile(r"`([^`]+)`")
+
 # A check run conclusion that is neither a pass nor a reject: the check could
 # not run to a verdict, which never auto-merges and never auto-rejects, and is
 # what the sweep re-dispatches.
@@ -75,9 +83,20 @@ def iso(moment):
 
 def parse_iso(text):
     try:
-        return datetime.fromisoformat((text or "").replace("Z", "+00:00"))
+        moment = datetime.fromisoformat((text or "").replace("Z", "+00:00"))
     except (TypeError, ValueError):
         return None
+    return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
+
+
+def is_history(date, frontier, newest):
+    """Whether a release is older than this listing's stamping starts.
+    """
+    if date is None:
+        return False
+    if frontier is None:
+        return newest is not None and date < newest
+    return date < frontier
 
 
 class Cache:
@@ -260,7 +279,7 @@ class Issues:
         the per-listing guard and take the rest of the tick with it.
         """
         try:
-            self._report(listing_id, errors, cache)
+            self._report(listing_id, list(dict.fromkeys(errors)), cache)
         except (urllib.error.HTTPError, HostError) as error:
             self.log(f"  could not keep the issue for {listing_id} current: {error}")
 
@@ -351,6 +370,18 @@ class Issues:
         self.api.send("PATCH", f"/issues/{number}", {"state": "closed"})
         cache.section("listings", listing_id).pop("issue", None)
         self.log(f"  closed {self.api.repository}#{number}")
+
+    def attempted(self, listing_id, cache):
+        """The versions the listing's open issue already names.
+        """
+        body = (self.find(listing_id, cache) or {}).get("body") or ""
+        found = set()
+        for token in BACKTICKED.findall(body):
+            try:
+                found.add(normalize_version(token))
+            except StampError:
+                continue  # A digest, a bound, a tag that never parsed.
+        return found
 
     def resolve_if(self, listing_id, signature, cache):
         """Close the listing's issue only when it reports exactly `signature`.
@@ -568,6 +599,40 @@ class Watcher:
         if not folder.is_dir():
             return {}
         return {path.stem: path for path in sorted(folder.glob("*.json"))}
+
+    def poll_etag(self, host_state, authored_digest):
+        """The ETag says the host's answer is unchanged, not that a release the
+        tick rejected would be rejected again, so an edited authored document
+        drops it. A backfill drops it too, because history counts as settled."""
+        if self.options.backfill or host_state.get("authored") != authored_digest:
+            return None
+        return host_state.get("etag")
+
+    @staticmethod
+    def authored_digest(authored):
+        return hashlib.sha256(
+            json.dumps(authored, sort_keys=True, default=str).encode("utf-8")
+        ).hexdigest()
+
+    def stamped_frontier(self, stamped, errors):
+        newest = None
+        complete = True
+        for path in stamped.values():
+            document = self.read_release(path, errors)
+            if document is None:
+                complete = False
+                continue
+            date = parse_iso(document.get("release_date"))
+            if date is None:
+                errors.append(
+                    f"the stamped file releases/{path.parent.name}/{path.name} "
+                    "carries no usable release_date"
+                )
+                complete = False
+                continue
+            if newest is None or date > newest:
+                newest = date
+        return newest, complete
 
     def read_release(self, path, errors):
         """A stamped release file, or None with the corruption reported.
@@ -789,8 +854,9 @@ class Watcher:
         # Keyed per listing, not per host: two listings naming the same
         # repository must not blind each other through a shared ETag.
         host_state = self.cache.section("hosts", f"{listing_id}/{authority.key}")
+        digest = self.authored_digest(authored)
         try:
-            releases, etag = authority.releases(host_state.get("etag"))
+            releases, etag = authority.releases(self.poll_etag(host_state, digest))
         except HostError as error:
             self.unreachable(listing_id, state, str(error))
             return
@@ -815,19 +881,20 @@ class Watcher:
                     "needs a human"
                 )
             settled = self.stamp_pass(
-                listing_id, authored, authority, mirrors, releases, errors
+                listing_id, authored, authority, mirrors, releases, errors,
+                self.issues.attempted(listing_id, self.cache),
             )
 
         self.mirror_pass(listing_id, mirrors, errors)
 
         if settled:
-            # The ETag stands for "every release behind this answer is either
-            # stamped or reported", so a tick that ran out of budget or could
-            # not reach the host always refetches, while a release that will
-            # never be stampable costs no request per tick. A payload that
-            # changes changes the ETag, so a fixed tag is picked up at once.
+            # The ETag stands for "every release behind this answer is
+            # settled", so a tick that ran out of budget or could not reach the
+            # host always refetches. A payload that changes changes the ETag, so
+            # a fixed tag is picked up at once.
             if etag:
                 host_state["etag"] = etag
+            host_state["authored"] = digest
             host_state["checked"] = iso(now())
         else:
             host_state.pop("etag", None)
@@ -840,15 +907,27 @@ class Watcher:
         elif releases is not None and settled:
             self.issues.resolve(listing_id, self.cache)
 
-    def stamp_pass(self, listing_id, authored, authority, mirror_hosts, releases, errors):
-        """Stamp every release with no file yet.
+    def stamp_pass(
+        self, listing_id, authored, authority, mirror_hosts, releases, errors, attempted=()
+    ):
+        """Stamp every release that appeared after the stamped frontier.
 
-        Returns whether every release behind this answer is now settled, which
-        means stamped or reported. A rejected release is settled: nothing about
-        it will change until the host's answer does, and that changes the ETag.
-        A host that could not be reached and a budget that ran out are not.
+        Returns whether every release behind this answer is settled, which means
+        stamped, reported, or left as history. A host that could not be reached
+        and a budget that ran out are not.
         """
         stamped = self.stamped_versions(listing_id)
+        backfill = self.options.backfill
+        frontier, complete = (None, True)
+        if not backfill:
+            frontier, complete = self.stamped_frontier(stamped, errors)
+            if not complete:
+                self.log("    the stamped history could not be read in full, stamping nothing")
+                return False
+        newest = max(
+            (date for date in (parse_iso(item.release_date) for item in releases) if date),
+            default=None,
+        )
         cutoff = (
             now() - timedelta(days=self.options.lookback_days)
             if self.options.lookback_days
@@ -856,11 +935,36 @@ class Watcher:
         )
         settled = True
         outside_lookback = 0
+        history = 0
 
         # Oldest first, so a budget that runs out leaves a monotone history and
         # the next tick simply carries on.
         ordered = sorted(releases, key=lambda release: (release.release_date or "", release.tag))
         for release in ordered:
+            date = parse_iso(release.release_date)
+
+            if release.version is not None and release.version in stamped:
+                if not self.check_for_a_swap(
+                    listing_id, authority, release, stamped[release.version], errors
+                ):
+                    settled = False
+                continue
+
+            if cutoff and date and date < cutoff:
+                # Skipped, not settled: a later tick with a wider window has
+                # to see these again.
+                outside_lookback += 1
+                settled = False
+                continue
+
+            if (
+                not backfill
+                and release.version not in attempted
+                and is_history(date, frontier, newest)
+            ):
+                history += 1
+                continue
+
             if release.version is None:
                 errors.append(
                     f"the tag `{release.tag}` does not parse as a version, so the release "
@@ -868,23 +972,11 @@ class Watcher:
                 )
                 continue
 
-            if release.version in stamped:
-                if not self.check_for_a_swap(
-                    listing_id, authority, release, stamped[release.version], errors
-                ):
-                    settled = False
-                continue
-
-            date = parse_iso(release.release_date)
-            if cutoff and date and date < cutoff:
-                # Skipped, not settled: the ETag must not claim these are done,
-                # or a later backfill dispatch takes the 304 path over them.
-                outside_lookback += 1
-                settled = False
-                continue
-
             if self.stamp_budget <= 0:
-                self.log("    the stamp budget is spent, the next tick carries on")
+                carries_on = (
+                    "a further --backfill dispatch" if backfill else "the next tick"
+                )
+                self.log(f"    the stamp budget is spent, {carries_on} carries on")
                 return False
 
             try:
@@ -901,6 +993,11 @@ class Watcher:
             self.log(
                 f"    {outside_lookback} release(s) outside the lookback window, "
                 "left for a wider tick"
+            )
+        if history:
+            self.log(
+                f"    {history} release(s) older than the stamped history, left "
+                "unstamped (--backfill stamps them)"
             )
         return settled
 
@@ -1237,6 +1334,11 @@ def parse_arguments(argv):
         help="ignore releases older than this. 0 scans the host's whole list",
     )
     parser.add_argument(
+        "--backfill", action="store_true",
+        help="also stamp releases older than what is stamped, with today's "
+        "authored facts rather than the ones they shipped under",
+    )
+    parser.add_argument(
         "--stamp-budget", type=int, default=20,
         help="how many releases one tick stamps at most; the next tick carries on",
     )
@@ -1272,6 +1374,8 @@ def parse_arguments(argv):
         "broken listing is an issue on the authored repository and not a red tick",
     )
     options = parser.parse_args(argv)
+    if options.backfill and not options.listing:
+        parser.error("--backfill needs --listing: it is not an every-listing operation")
     options.token = os.environ.get("GITHUB_TOKEN") or os.environ.get("INDEX_TOKEN")
     return options
 
