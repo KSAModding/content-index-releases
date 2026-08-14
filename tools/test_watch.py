@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hosts import HostRelease
-from watch import Cache, Issues, Sweep, Watcher, parse_arguments
+from watch import Cache, Issues, Sweep, Watcher, is_history, parse_arguments
 
 GAME_VERSIONS = {"spec_version": 1, "versions": ["2026.8.3.5117"]}
 
@@ -659,6 +659,280 @@ class SwapsAndMirrors(WatcherCase):
             found = watcher.mirrors_for([host], release("1.0.0", "x"), b"bytes")
             self.assertEqual(found, [])
             self.assertEqual(host.downloads, 0)
+
+
+def moment(text):
+    return datetime.fromisoformat(text.replace("Z", "+00:00"))
+
+
+class WhatCountsAsHistory(unittest.TestCase):
+    """The selection rule on its own."""
+
+    OLD = moment("2025-11-01T00:00:00Z")
+    MID = moment("2026-03-01T00:00:00Z")
+    NEW = moment("2026-08-01T00:00:00Z")
+
+    def test_the_first_tick_keeps_only_the_newest(self):
+        self.assertTrue(is_history(self.OLD, None, self.NEW))
+        self.assertFalse(is_history(self.NEW, None, self.NEW))
+
+    def test_a_frontier_keeps_everything_after_it(self):
+        self.assertTrue(is_history(self.OLD, self.MID, self.NEW))
+        self.assertFalse(is_history(self.NEW, self.MID, self.NEW))
+
+    def test_a_shared_timestamp_is_not_history(self):
+        self.assertFalse(is_history(self.MID, self.MID, self.NEW))
+        self.assertFalse(is_history(self.NEW, None, self.NEW))
+
+    def test_a_release_with_no_date_is_never_history(self):
+        self.assertFalse(is_history(None, self.NEW, self.NEW))
+        self.assertFalse(is_history(None, None, self.NEW))
+
+
+class TheStampedFrontier(WatcherCase):
+    """A back catalogue is not stamped with facts that were not true then."""
+
+    def setup(self, folder, stamped=(), argv=()):
+        """A watcher whose stamp_one only records, so this tests selection."""
+        for version, date, url in stamped:
+            path = folder / "releases" / "M"
+            path.mkdir(parents=True, exist_ok=True)
+            (path / f"{version}.json").write_text(
+                json.dumps(
+                    {
+                        "id": "M",
+                        "version": version,
+                        "release_date": date,
+                        "download": {"url": url},
+                    }
+                )
+            )
+        watcher = self.watcher(folder, ["--no-commit", *argv])
+        picked = []
+        watcher.stamp_one = lambda *arguments: picked.append(arguments[-1].version)
+        return watcher, picked
+
+    def test_the_first_tick_stamps_the_newest_release_only(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(folder)
+            errors = []
+            settled = watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("1.0.0", "http://a", date="2025-11-01T00:00:00Z"),
+                    release("1.1.0", "http://b", date="2026-03-01T00:00:00Z"),
+                    release("1.2.0", "http://c", date="2026-08-01T00:00:00Z"),
+                ],
+                errors,
+            )
+            self.assertEqual(picked, ["1.2.0"])
+            self.assertEqual(errors, [])
+            self.assertTrue(settled)
+
+    def test_only_releases_after_the_frontier_are_stamped(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder, stamped=[("1.1.0", "2026-03-01T00:00:00Z", "http://b")]
+            )
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("1.0.0", "http://a", date="2025-11-01T00:00:00Z"),
+                    release("1.1.0", "http://b", date="2026-03-01T00:00:00Z"),
+                    release("1.2.0", "http://c", date="2026-08-01T00:00:00Z"),
+                ],
+                [],
+            )
+            self.assertEqual(picked, ["1.2.0"])
+
+    def test_every_release_after_the_frontier_is_stamped(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder, stamped=[("1.1.0", "2026-03-01T00:00:00Z", "http://b")]
+            )
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("1.1.0", "http://b", date="2026-03-01T00:00:00Z"),
+                    release("1.2.0", "http://c", date="2026-06-01T00:00:00Z"),
+                    release("1.3.0", "http://d", date="2026-08-01T00:00:00Z"),
+                ],
+                [],
+            )
+            self.assertEqual(picked, ["1.2.0", "1.3.0"])
+
+    def test_a_version_the_open_issue_names_stays_in_scope(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(folder)
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("1.0.0", "http://a", date="2026-01-01T00:00:00Z"),
+                    release("1.1.0", "http://b", date="2026-02-01T00:00:00Z"),
+                ],
+                [],
+                attempted={"1.0.0"},
+            )
+            self.assertEqual(picked, ["1.0.0", "1.1.0"])
+
+    def test_a_frontier_that_could_not_be_read_stamps_nothing(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            path = folder / "releases" / "M"
+            path.mkdir(parents=True)
+            (path / "0.1.0.json").write_text(
+                json.dumps({"id": "M", "version": "0.1.0", "release_date": "2025-01-01T00:00:00Z"})
+            )
+            (path / "0.7.2.json").write_text("{trunc")
+            watcher, picked = self.setup(folder)
+            errors = []
+            settled = watcher.stamp_pass(
+                "M", {}, None, [],
+                [release("0.5.0", "http://e", date="2026-05-01T00:00:00Z")],
+                errors,
+            )
+            self.assertEqual(picked, [])
+            self.assertFalse(settled)
+            self.assertTrue(errors)
+
+    def test_a_stamp_without_a_release_date_is_reported(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            path = folder / "releases" / "M"
+            path.mkdir(parents=True)
+            (path / "0.1.0.json").write_text(json.dumps({"id": "M", "version": "0.1.0"}))
+            watcher, _ = self.setup(folder)
+            errors = []
+            _, complete = watcher.stamped_frontier(watcher.stamped_versions("M"), errors)
+            self.assertFalse(complete)
+            self.assertIn("release_date", errors[0])
+
+    def test_a_backfill_has_to_name_its_listing(self):
+        with self.assertRaises(SystemExit):
+            parse_arguments(["--backfill"])
+        self.assertTrue(parse_arguments(["--backfill", "--listing", "M"]).backfill)
+
+    def test_a_patch_for_an_older_line_is_still_stamped(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder, stamped=[("2.0.0", "2026-03-01T00:00:00Z", "http://b")]
+            )
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("2.0.0", "http://b", date="2026-03-01T00:00:00Z"),
+                    release("1.9.1", "http://c", date="2026-08-01T00:00:00Z"),
+                ],
+                [],
+            )
+            self.assertEqual(picked, ["1.9.1"])
+
+    def test_an_old_unparseable_tag_is_not_reported(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(folder)
+            errors = []
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    HostRelease(
+                        host="github", tag="rc", version=None,
+                        release_date="2025-12-26T00:00:00Z", url="http://rc",
+                    ),
+                    release("1.2.0", "http://c", date="2026-08-01T00:00:00Z"),
+                ],
+                errors,
+            )
+            self.assertEqual(picked, ["1.2.0"])
+            self.assertEqual(errors, [])
+
+    def test_a_new_unparseable_tag_is_still_reported(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, _ = self.setup(
+                folder, stamped=[("1.0.0", "2026-01-01T00:00:00Z", "http://a")]
+            )
+            errors = []
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("1.0.0", "http://a", date="2026-01-01T00:00:00Z"),
+                    HostRelease(
+                        host="github", tag="latest", version=None,
+                        release_date="2026-08-01T00:00:00Z", url="http://l",
+                    ),
+                ],
+                errors,
+            )
+            self.assertEqual(len(errors), 1)
+            self.assertIn("`latest`", errors[0])
+
+    def test_backfill_stamps_the_history_too(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder,
+                stamped=[("1.1.0", "2026-03-01T00:00:00Z", "http://b")],
+                argv=["--backfill", "--listing", "M"],
+            )
+            watcher.stamp_pass(
+                "M", {}, None, [],
+                [
+                    release("1.0.0", "http://a", date="2025-11-01T00:00:00Z"),
+                    release("1.1.0", "http://b", date="2026-03-01T00:00:00Z"),
+                    release("1.2.0", "http://c", date="2026-08-01T00:00:00Z"),
+                ],
+                [],
+            )
+            self.assertEqual(picked, ["1.0.0", "1.2.0"])
+
+    def test_a_backfill_does_not_poll_with_the_stored_etag(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            state = {"etag": "W/\"abc\""}
+            self.assertEqual(self.watcher(folder).poll_etag(state), "W/\"abc\"")
+            self.assertIsNone(
+                self.watcher(folder, ["--backfill", "--listing", "M"]).poll_etag(state)
+            )
+
+    def test_the_frontier_is_read_off_the_stamped_files(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, _ = self.setup(
+                folder,
+                stamped=[
+                    ("1.0.0", "2025-11-01T00:00:00Z", "http://a"),
+                    ("1.2.0", "2026-08-01T00:00:00Z", "http://c"),
+                ],
+            )
+            errors = []
+            frontier, complete = watcher.stamped_frontier(
+                watcher.stamped_versions("M"), errors
+            )
+            self.assertEqual(frontier, moment("2026-08-01T00:00:00Z"))
+            self.assertTrue(complete)
+            self.assertEqual(errors, [])
+
+    def test_a_corrupt_stamp_is_reported_and_sets_no_frontier(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            path = folder / "releases" / "M"
+            path.mkdir(parents=True)
+            (path / "1.0.0.json").write_text("{not json")
+            watcher = self.watcher(folder, ["--no-commit"])
+            errors = []
+            frontier, complete = watcher.stamped_frontier(
+                watcher.stamped_versions("M"), errors
+            )
+            self.assertIsNone(frontier)
+            self.assertFalse(complete)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("1.0.0.json", errors[0])
 
 
 class TheLookback(WatcherCase):

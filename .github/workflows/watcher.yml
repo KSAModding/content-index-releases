@@ -1,5 +1,6 @@
 # Ask every listing's authority host for its releases and stamp every release
-# that has no file under releases/<id>/ yet (RFC 0033).
+# that appeared after the newest one already stamped (RFC 0033). A back
+# catalogue is left alone; the backfill input asks for it anyway.
 #
 # The tick holds no state. What is stamped in the repository is the state, so a
 # dropped run costs latency and not data, and a re-run stamps nothing twice.
@@ -19,6 +20,10 @@ on:
         description: "Ignore releases older than this many days. 0 scans the whole list."
         required: false
         default: "0"
+      backfill:
+        description: "Also stamp releases older than what is stamped, with today's authored facts. Needs a listing."
+        type: boolean
+        default: false
       dry_run:
         description: "Derive everything, write and open nothing."
         type: boolean
@@ -80,6 +85,7 @@ jobs:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           LISTING: ${{ inputs.listing }}
           LOOKBACK_DAYS: ${{ inputs.lookback_days || '0' }}
+          BACKFILL: ${{ inputs.backfill }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -99,6 +105,9 @@ jobs:
           )
           if [ -n "$LISTING" ]; then
             arguments+=(--listing "$LISTING")
+          fi
+          if [ "$BACKFILL" = "true" ]; then
+            arguments+=(--backfill)
           fi
           if [ "$DRY_RUN" = "true" ]; then
             arguments+=(--dry-run)
