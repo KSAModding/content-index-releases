@@ -1,0 +1,84 @@
+# Merge both halves of the index into the one document clients fetch, and publish
+# it at /v1/index.json, the fetch contract of RFC 0033.
+name: snapshot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - releases/**
+      - game-versions.json
+      - tools/build_snapshot.py
+      - tools/stamp_release.py
+      - .github/workflows/snapshot.yml
+  repository_dispatch:
+    types: [index-changed]
+  schedule:
+    - cron: "41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: snapshot
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            content-index-releases
+            content-index
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/content-index
+          ref: main
+          path: .authored
+          token: ${{ steps.app-token.outputs.token }}
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          python3 tools/build_snapshot.py \
+            --authored .authored \
+            --out _site/v1/index.json \
+            --authored-repo "${{ github.repository_owner }}/content-index" \
+            --authored-commit "$(git -C .authored rev-parse HEAD)" \
+            --generated-repo "${{ github.repository }}" \
+            --generated-commit "$(git rev-parse HEAD)"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Pages serves the strong ETag and answers If-None-Match
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5
+        id: deploy
