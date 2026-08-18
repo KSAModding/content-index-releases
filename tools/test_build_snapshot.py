@@ -15,11 +15,15 @@ from pathlib import Path
 
 from build_snapshot import (
     SnapshotError,
+    body,
     build,
+    carry_forward,
     precedence,
+    read_previous,
     serialize,
     sources_from,
     warn,
+    with_sources,
 )
 
 GAME_VERSIONS = {
@@ -596,6 +600,134 @@ class Provenance(unittest.TestCase):
                     generated_commit="3a77b21",
                 )
             )
+
+
+SOURCES = {
+    "authored": {"repository": "KSAModding/content-index", "commit": "9fe1c0f"},
+    "generated": {"repository": "KSAModding/content-index-releases", "commit": "3a77b21"},
+}
+
+LATER = {
+    "authored": {"repository": "KSAModding/content-index", "commit": "aaaaaaa"},
+    "generated": {"repository": "KSAModding/content-index-releases", "commit": "bbbbbbb"},
+}
+
+
+class CarryForward(Fixture):
+    """`sources` must not turn an unrelated commit into a re-download for everyone."""
+
+    def published(self, sources=SOURCES):
+        """A snapshot of the index as it stands, as the published copy would be."""
+        return json.loads(serialize(self.index.build(sources=sources)))
+
+    def test_an_unchanged_index_keeps_the_published_provenance(self):
+        self.index.listing("AutoStage")
+        previous = self.published()
+        built = self.index.build(sources=LATER)
+        self.assertEqual(carry_forward(built, previous, self.index.notes.append)["sources"], SOURCES)
+
+    def test_an_unchanged_index_keeps_identical_bytes(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "0.4.3")
+        previous = self.published()
+        built = carry_forward(self.index.build(sources=LATER), previous, self.index.notes.append)
+        self.assertEqual(serialize(built), serialize(previous))
+
+    def test_changed_content_takes_the_new_provenance(self):
+        self.index.listing("AutoStage")
+        previous = self.published()
+        self.index.listing("DeltaVMap")
+        built = carry_forward(self.index.build(sources=LATER), previous, self.index.notes.append)
+        self.assertEqual(built["sources"], LATER)
+
+    def test_a_published_copy_without_a_provenance_is_reproduced_exactly(self):
+        self.index.listing("AutoStage")
+        previous = self.published(sources=None)
+        built = carry_forward(self.index.build(sources=LATER), previous, self.index.notes.append)
+        self.assertNotIn("sources", built)
+        self.assertEqual(serialize(built), serialize(previous))
+
+    def test_the_carried_document_keeps_the_field_order_of_the_format(self):
+        self.index.listing("AutoStage")
+        previous = self.published()
+        built = carry_forward(self.index.build(sources=LATER), previous, self.index.notes.append)
+        self.assertEqual(
+            list(built), ["snapshot_version", "sources", "listings", "packs", "game_versions"]
+        )
+
+    def test_no_published_copy_leaves_the_document_alone(self):
+        self.index.listing("AutoStage")
+        built = self.index.build(sources=LATER)
+        self.assertIs(carry_forward(built, None, self.index.notes.append), built)
+
+    def test_a_key_order_change_inside_a_listing_is_a_content_change(self):
+        """Parsed equality would call this unchanged, and the bytes are not."""
+        self.index.listing("AutoStage")
+        previous = self.published()
+        authored = previous["listings"][0]["authored"]
+        previous["listings"][0]["authored"] = {key: authored[key] for key in reversed(list(authored))}
+        built = carry_forward(self.index.build(sources=LATER), previous, self.index.notes.append)
+        self.assertEqual(built["sources"], LATER)
+
+    def test_the_published_copy_read_back_from_its_own_bytes_is_unchanged(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "0.4.3")
+        self.index.pack("Pack", "1.0.0")
+        built = self.index.build(sources=SOURCES)
+        previous = json.loads(serialize(built))
+        carried = carry_forward(built, previous, self.index.notes.append)
+        self.assertEqual(serialize(carried), serialize(previous))
+
+    def test_body_leaves_out_the_provenance_and_nothing_else(self):
+        document = self.index.build(sources=SOURCES)
+        self.assertNotIn("sources", body(document))
+        self.assertEqual(sorted(body(document)), ["game_versions", "listings", "packs", "snapshot_version"])
+
+    def test_with_sources_can_remove_the_block(self):
+        document = self.index.build(sources=SOURCES)
+        self.assertNotIn("sources", with_sources(document, None))
+
+
+class Previous(unittest.TestCase):
+    """Reading the published copy is a network fetch, so nothing here may raise."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.notes = []
+
+    def write(self, text):
+        path = self.root / "published.json"
+        path.write_text(text, encoding="utf-8")
+        return path
+
+    def test_no_path_at_all_reads_as_nothing_published(self):
+        self.assertIsNone(read_previous(None, self.notes.append))
+        self.assertEqual(self.notes, [])
+
+    def test_a_missing_file_reads_as_nothing_published_and_is_not_worth_a_note(self):
+        self.assertIsNone(read_previous(self.root / "absent.json", self.notes.append))
+        self.assertEqual(self.notes, [])
+
+    def test_a_body_that_does_not_parse_is_a_note_and_not_an_error(self):
+        self.assertIsNone(read_previous(self.write("{oops"), self.notes.append))
+        self.assertEqual(len(self.notes), 1)
+
+    def test_a_document_that_is_not_an_object_is_a_note_and_not_an_error(self):
+        self.assertIsNone(read_previous(self.write("[]"), self.notes.append))
+        self.assertEqual(len(self.notes), 1)
+
+    def test_a_nan_literal_is_a_note_and_not_an_error(self):
+        # Python reads it, JSON has no such literal, and serialize refuses it.
+        self.assertIsNone(read_previous(self.write('{"snapshot_version": NaN}'), self.notes.append))
+        self.assertEqual(len(self.notes), 1)
+
+    def test_a_published_snapshot_reads_back(self):
+        self.assertEqual(
+            read_previous(self.write('{"snapshot_version": 1}'), self.notes.append),
+            {"snapshot_version": 1},
+        )
 
 
 class Notes(unittest.TestCase):
