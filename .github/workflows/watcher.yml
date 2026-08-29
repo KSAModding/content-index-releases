@@ -97,9 +97,8 @@ jobs:
             --authored-repo "${{ github.repository_owner }}/content-index"
             --cache .watcher/cache.json
             --lookback-days "$LOOKBACK_DAYS"
-            # The workflow the sweep re-dispatches, and the check whose verdict
-            # it reads. Both belong to KSAModding/content-index#4, which has to
-            # accept a pull_request input and report under this check name.
+            # The workflow the sweep re-runs, and the check whose verdict it
+            # reads. Both live in KSAModding/content-index.
             --sweep-workflow checks.yml
             --verdict-check validate
           )
