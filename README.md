@@ -76,6 +76,41 @@ The one narrow exception is an amendment, which can only make a release claim le
 
 A release file can never become more permissive after publish, and a check enforces that mechanically.
 
+## Amendments
+
+An amendment is a small edit to a release file that is already published, and it can only ever make the release claim less.
+Only the author knows that a release broke, and everything after that is arithmetic.
+
+There are three ways to make the edit.
+
+- **By hand.** Open the release file, make the change, and open a pull request. Fine for a one-line yank.
+- **With `tools/amend.py`.** You name the change, it writes the files, and it re-checks its own output before it reaches disk.
+- **From a content manager.** A manager such as [Borea](https://github.com/KSAModding/Borea) can produce the same pull request from a button. It needs no trust, because the checks re-measure the result.
+
+`tools/amend.py` covers the common cases:
+
+```text
+python3 tools/amend.py --listing AdvancedFlightComputer --up-to 0.7.2 --game-max 2026.8.19.5261
+```
+
+That takes every stamped release at or below `0.7.2` by SemVer precedence, resolves the bound against the game release list, and writes the files.
+
+| Tool | What it does |
+|---|---|
+| `tools/amend.py` | Writes an amendment, and re-checks its own output before it reaches disk. |
+| `tools/check_amendment.py` | The invariant, per file: the published version against the proposed one. |
+| `tools/check_scope.py` | Whether the change is narrow enough to merge itself, which is release files of one listing and nothing else. |
+| `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
+| `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
+
+`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: `os` is immutable, and a dependency entry's `source` moves from `derived` to `authored` only together with a bound.
+
+To measure a change before opening anything:
+
+```text
+python3 tools/validate.py --changed releases/<id>/<version>.json --base-ref main
+```
+
 ## License
 
 Metadata is dedicated to the public domain under [CC0 1.0](LICENSE).
