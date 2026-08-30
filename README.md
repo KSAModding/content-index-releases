@@ -52,6 +52,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 | `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
+| `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
 
 A release the watcher cannot stamp, a tag that does not parse or an archive whose install root is neither derivable nor authored, becomes one open issue per listing on the authored repository, kept current rather than reopened every tick.
 
@@ -66,6 +67,22 @@ To run a tick by hand, dispatch the workflow: `listing` narrows it to one id, an
 ```text
 python3 tools/watch.py --authored ../content-index --dry-run
 ```
+
+## The snapshot
+
+`.github/workflows/snapshot.yml` merges both halves of the index and the game release list into the one document clients fetch, and publishes it to GitHub Pages at `/v1/index.json`.
+
+The `v1` segment carries the snapshot format version, so a future break can be served next to the version it replaces. The fields are specified in [spec/snapshot.md](https://github.com/KSAModding/content-manager-design/blob/main/spec/snapshot.md).
+
+A build runs on every change to either half: this repository triggers it on a push, and the authored half asks for it through a `repository_dispatch`, so a steward writing `index-status.toml` reaches clients in one build rather than at the next scheduled one.
+
+To build one by hand, against a checkout of the authored half:
+
+```text
+python3 tools/build_snapshot.py --authored ../content-index --out _site/v1/index.json
+```
+
+The `sources` block naming the two commits is omitted unless both repositories and both commits are given, so a local build does not claim a provenance it does not have.
 
 ## A published release is immutable
 
