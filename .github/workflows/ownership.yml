@@ -1,0 +1,100 @@
+# The privileged half of the amendment flow (RFC 0033).
+#
+# It reads the verdict `checks` left, checks that the author controls the listing being amended, and arms auto-merge or hands the pull request to a steward.
+# The `validate` status it posts is the required check.
+name: ownership
+
+on:
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    ownership-${{ github.event.workflow_run.head_repository.full_name }}-${{
+    github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+jobs:
+  decide:
+    name: decide
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read # the verdict artifact of the triggering run
+      statuses: write # the commit status the branch ruleset requires
+    steps:
+      - uses: actions/checkout@v7
+
+      # The same code as the listing flow
+      - name: Check out the authored half
+        uses: actions/checkout@v7
+        with:
+          repository: KSAModding/content-index
+          path: .authored
+
+      - uses: actions/download-artifact@v8
+        id: verdict
+        continue-on-error: true
+        with:
+          name: validation-verdict
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      # GITHUB_TOKEN would arm a merge that starts no snapshot build.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: content-index-releases
+
+      - name: Decide
+        id: decide
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          GITHUB_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event.workflow_run.event }}
+          HEAD_REPOSITORY: ${{ github.event.workflow_run.head_repository.full_name }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          python3 tools/decide.py \
+            --verdict verdict.json \
+            --authored .authored \
+            --event "$EVENT" \
+            --head-repository "$HEAD_REPOSITORY" \
+            --head-branch "$HEAD_BRANCH" \
+            --head-sha "$HEAD_SHA" \
+            --repository "$REPOSITORY" \
+            --run-url "$RUN_URL"
+
+      - name: Say so when the job failed before it decided
+        if: failure() && steps.decide.outcome != 'failure'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+        run: |
+          set -euo pipefail
+          payload=$(jq -n --arg url "$RUN_URL" \
+            '{state: "error", context: "validate",
+              description: "the ownership workflow failed before it could decide",
+              target_url: $url}')
+          curl -sf -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            -d "$payload" \
+            "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/statuses/$HEAD_SHA"
