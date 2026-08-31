@@ -151,23 +151,34 @@ def main(argv=None):
         print(f"could not read the examples: {error}", file=sys.stderr)
         return 2
 
-    game_versions = json.loads(
-        arguments.game_versions.read_text(encoding="utf-8")
-    )["versions"]
+    try:
+        game_versions = json.loads(
+            arguments.game_versions.read_text(encoding="utf-8")
+        )["versions"]
+    except (OSError, ValueError, KeyError) as error:
+        print(f"could not read {arguments.game_versions}: {error}", file=sys.stderr)
+        return 2
 
     failures = 0
-    for (listing_id, version), expected in sorted(examples.items()):
+    for (listing_id, version), raw in sorted(examples.items()):
+        listing = listings.get(listing_id)
+        if listing is None:
+            print(f"{listing_id} {version}: no example listing carries this id")
+            failures += 1
+            continue
+
+        # A KeyError from the stamper is a defect in it, not an example failure.
         try:
+            expected = json.loads(raw)
             rendered = _restamp(
-                http, listings[listing_id], version, game_versions,
-                json.loads(expected), arguments.check_mirrors,
+                http, listing, version, game_versions, expected, arguments.check_mirrors,
             )
-        except (StampError, hosts.HostError, KeyError, urllib.error.HTTPError) as error:
+        except (StampError, hosts.HostError, ValueError, urllib.error.HTTPError) as error:
             print(f"{listing_id} {version}: {error}")
             failures += 1
             continue
 
-        want = archive_facts(json.loads(expected), arguments.check_mirrors)
+        want = archive_facts(expected, arguments.check_mirrors)
         got = archive_facts(rendered, arguments.check_mirrors)
         if got == want:
             print(f"{listing_id} {version}: the archive facts match")
