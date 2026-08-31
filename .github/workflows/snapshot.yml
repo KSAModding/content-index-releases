@@ -24,13 +24,17 @@ concurrency:
   group: snapshot
   cancel-in-progress: false
 
+env:
+  PUBLISHED: https://ksamodding.github.io/content-index-releases/v1/index.json
+
 jobs:
   build:
     name: build
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      changed: ${{ steps.compare.outputs.changed }}
     steps:
-      # Both halves are public and this job only reads, so no App token.
       - uses: actions/checkout@v7
         with:
           ref: main
@@ -41,24 +45,44 @@ jobs:
           ref: main
           path: .authored
 
+      - name: Fetch the published snapshot
+        run: |
+          set -euo pipefail
+          curl -fsS --max-time 30 -H 'Cache-Control: no-cache' \
+            "$PUBLISHED" -o published.json || rm -f published.json
+
       - name: Build
         run: |
           set -euo pipefail
           python3 tools/build_snapshot.py \
             --authored .authored \
+            --previous published.json \
             --out _site/v1/index.json \
             --authored-repo "${{ github.repository_owner }}/content-index" \
             --authored-commit "$(git -C .authored rev-parse HEAD)" \
             --generated-repo "${{ github.repository }}" \
             --generated-commit "$(git rev-parse HEAD)"
 
-      - uses: actions/upload-pages-artifact@v5
+      - name: Compare against what is published
+        id: compare
+        run: |
+          set -euo pipefail
+          if [ -f published.json ] && cmp -s published.json _site/v1/index.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "the published snapshot is already current, so nothing is deployed"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - if: steps.compare.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v5
         with:
           path: _site
 
   deploy:
     name: deploy
     needs: build
+    if: needs.build.outputs.changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Pages serves the strong ETag and answers If-None-Match

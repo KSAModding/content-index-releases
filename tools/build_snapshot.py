@@ -394,6 +394,61 @@ def serialize(document):
     return json.dumps(document, indent=2, ensure_ascii=False, allow_nan=False) + "\n"
 
 
+def body(document):
+    """The document without its provenance, which is what "unchanged" means."""
+    return {key: value for key, value in document.items() if key != "sources"}
+
+
+def with_sources(document, sources):
+    """`document` with its provenance replaced, in the field order of the format."""
+    rebuilt = {"snapshot_version": document["snapshot_version"]}
+    if sources is not None:
+        rebuilt["sources"] = sources
+    for key, value in document.items():
+        if key not in ("snapshot_version", "sources"):
+            rebuilt[key] = value
+    return rebuilt
+
+
+def read_previous(path, log=warn):
+    """The snapshot published today, or None. Never raises: it comes over the network.
+
+    `NaN` and `Infinity` are refused for the reason load_json refuses them.
+    """
+    if path is None:
+        return None
+
+    def reject(literal):
+        raise ValueError(f"{literal} is not valid JSON")
+
+    try:
+        document = json.loads(Path(path).read_text(encoding="utf-8"), parse_constant=reject)
+    except FileNotFoundError:
+        return None
+    except (OSError, ValueError) as error:
+        log(f"{path} could not be read, so the provenance is not carried forward: {error}")
+        return None
+    if not isinstance(document, dict):
+        log(f"{path} is not an object, so the provenance is not carried forward")
+        return None
+    return document
+
+
+def carry_forward(document, previous, log=info):
+    """Keep the published provenance while the content is unchanged.
+
+    Otherwise an unrelated commit moves the bytes and every client re-downloads.
+    The test is the bytes, because that is what the publish step compares.
+    """
+    if previous is None:
+        return document
+    candidate = with_sources(document, previous.get("sources"))
+    if serialize(candidate) != serialize(previous):
+        return document
+    log("the content is unchanged, so the published provenance is kept and the bytes stay identical")
+    return candidate
+
+
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(
         description="Merge both halves of the index into one snapshot document."
@@ -405,6 +460,11 @@ def parse_arguments(argv):
     )
     parser.add_argument("--releases", default="releases", type=Path)
     parser.add_argument("--game-versions", default="game-versions.json", type=Path)
+    parser.add_argument(
+        "--previous", type=Path,
+        help="the snapshot published today. Unchanged content keeps its provenance, "
+        "so the bytes stay identical and the deploy can be skipped",
+    )
     parser.add_argument(
         "--out", type=Path,
         help="write here instead of to stdout. Never inside this repository: the "
@@ -459,6 +519,7 @@ def main(argv=None):
             sources=sources_from(arguments),
             log=warn,
         )
+        document = carry_forward(document, read_previous(arguments.previous))
         rendered = serialize(document)
     except SnapshotError as error:
         print(f"cannot build the snapshot: {error}", file=sys.stderr)
