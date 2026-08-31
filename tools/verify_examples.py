@@ -5,6 +5,9 @@
 examples/ in content-manager-design was stamped by hand from the same archives,
 so it is an expectation this repository did not write itself.
 
+Only the half the archive and its host decide is compared. The rest is frozen
+from the authored listing (RFC 0031) and drifts when it is edited.
+
     python3 tools/verify_examples.py
     python3 tools/verify_examples.py --examples ../content-manager-design/examples
     python3 tools/verify_examples.py --check-mirrors
@@ -28,6 +31,35 @@ from stamp_release import StampError, serialize, stamp
 DESIGN = "KSAModding/content-manager-design"
 RAW = "https://raw.githubusercontent.com/{repository}/main/{path}"
 TREE = "https://api.github.com/repos/{repository}/git/trees/main?recursive=1"
+
+# What the archive and its host decide, plus the identity.
+ARCHIVE_FACTS = (
+    "spec_version",
+    "id",
+    "type",
+    "version",
+    "version_scheme",
+    "release_status",
+    "release_date",
+    "download",
+    "install_size",
+    "changelog",
+)
+
+# The rest, frozen from the listing. Both halves add up to a full document.
+AUTHORED_FACTS = (
+    "game_min",
+    "game_min_revision",
+    "game_max",
+    "game_max_revision",
+    "os",
+    "loader",
+    "dependencies",
+    "listing",
+)
+
+# Only when the root was derived. An authored root and the anchor are listing facts.
+INSTALL_ARCHIVE_FACTS = ("root", "derived")
 
 
 def from_disk(folder):
@@ -57,6 +89,37 @@ def from_github(http, repository):
         if path.startswith("examples/releases/") and path.endswith(".json")
     }
     return listings, releases
+
+
+def archive_facts(document, with_mirrors=True):
+    """The half of a release file the archive and its host decide.
+
+    An allowlist, so a field the format grows later stays out until it is classified.
+    `dependencies` is out: merge_dependencies drops a derived entry once an authored
+    one names the same id, so the stamped list is a joint product.
+    """
+    facts = {key: document[key] for key in ARCHIVE_FACTS if key in document}
+
+    install = document.get("install")
+    derived_root = install is None or bool(install.get("derived"))
+
+    if install is not None:
+        facts["install"] = (
+            {key: install[key] for key in INSTALL_ARCHIVE_FACTS if key in install}
+            if derived_root
+            else {"derived": False}
+        )
+
+    if not derived_root:
+        # Measured under a root the listing chose.
+        facts.pop("install_size", None)
+
+    if not with_mirrors and "download" in facts:
+        # Without the flag these went into the stamp, so it would compare them to itself.
+        facts["download"] = {
+            key: value for key, value in facts["download"].items() if key != "mirrors"
+        }
+    return facts
 
 
 def main(argv=None):
@@ -104,15 +167,17 @@ def main(argv=None):
             failures += 1
             continue
 
-        if rendered == expected:
-            print(f"{listing_id} {version}: identical")
+        want = archive_facts(json.loads(expected), arguments.check_mirrors)
+        got = archive_facts(rendered, arguments.check_mirrors)
+        if got == want:
+            print(f"{listing_id} {version}: the archive facts match")
             continue
 
         failures += 1
-        print(f"{listing_id} {version}: differs from the hand-stamped example")
+        print(f"{listing_id} {version}: an archive fact differs from the example")
         sys.stdout.writelines(
             difflib.unified_diff(
-                expected.splitlines(True), rendered.splitlines(True),
+                serialize(want).splitlines(True), serialize(got).splitlines(True),
                 "hand-stamped", "stamper", n=1,
             )
         )
@@ -146,11 +211,10 @@ def _restamp(http, listing_toml, version, game_versions, expected, check_mirrors
     # watcher's month pass corrects a stamp once its game_max month completes,
     # so re-deriving with the current time matches the corrected state an
     # example is expected to hold.
-    document = stamp(
+    return stamp(
         authored, facts, archive, game_versions,
         mirrors=mirrors, now=datetime.now(timezone.utc),
     )
-    return serialize(document)
 
 
 def _mirrors(mirror_hosts, version, archive):
