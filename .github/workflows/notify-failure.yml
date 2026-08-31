@@ -2,7 +2,7 @@ name: notify-failure
 
 on:
   workflow_run:
-    workflows: ["snapshot", "watcher", "game versions", "checks"]
+    workflows: ["snapshot", "watcher", "game versions", "checks", "ownership"]
     types: [completed]
 
 permissions: {}
