@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from stamp_release import StampError, normalize_version
 
 GITHUB_API = "https://api.github.com"
+GITHUB_API_HOST = urllib.parse.urlsplit(GITHUB_API).hostname
 SPACEDOCK = "https://spacedock.info"
 
 USER_AGENT = "KSAModding-content-index-watcher"
@@ -47,7 +48,7 @@ class HostError(Exception):
 
 
 class OversizeError(HostError):
-    """The response blew the size limit. Permanent for an archive, so `_download`
+    """The response blew the size limit. Permanent for an archive, so `download`
     turns it into a StampError."""
 
 
@@ -339,7 +340,7 @@ class GitHubHost(Host):
         return None, names
 
     def download(self, release):
-        return _download(self.http, release)
+        return download(self.http, release)
 
 
 class SpaceDockHost(Host):
@@ -398,10 +399,15 @@ class SpaceDockHost(Host):
         return releases, None
 
     def download(self, release):
-        return _download(self.http, release)
+        return download(self.http, release)
 
 
-def _download(http, release):
+def download(http, release):
+    """The archive of `release`, as (bytes, content type).
+
+    Shared with the release pull request check, which downloads from the URL a
+    submission names rather than from a host it polled.
+    """
     if not release.url:
         if release.candidates:
             raise StampError(
@@ -416,8 +422,9 @@ def _download(http, release):
             f"the archive is {release.size} bytes, above the "
             f"{MAX_ARCHIVE_BYTES} byte limit"
         )
+    api = urllib.parse.urlsplit(release.url).hostname == GITHUB_API_HOST
     try:
-        answer = http.get(release.url, api=release.url.startswith(GITHUB_API))
+        answer = http.get(release.url, api=api)
     except OversizeError as error:
         # Permanent, unlike the transient failures HostError stands for: the
         # release stays too large next tick too, so the author hears about it
