@@ -11,7 +11,6 @@ import base64
 import json
 import os
 import sys
-import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,6 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import check_scope
+from check_release import DEFAULT_AUTHORED, authored_document, authored_root  # noqa: F401
 
 GITHUB_API = "https://api.github.com"
 GRAPHQL = "https://api.github.com/graphql"
@@ -37,16 +37,9 @@ PASS = "pass"
 REJECT = "reject"
 COULD_NOT_EVALUATE = "could-not-evaluate"
 
-DEFAULT_AUTHORED = Path(__file__).resolve().parent.parent.parent / "content-index"
-
 
 class Unavailable(Exception):
     """The ownership code could not be loaded, so nothing can be decided."""
-
-
-def authored_root(authored=None):
-    """The authored checkout: the argument, the environment, then the sibling."""
-    return Path(authored or os.environ.get("CONTENT_INDEX") or DEFAULT_AUTHORED)
 
 
 def load_ownership(authored=None):
@@ -107,7 +100,9 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
         return Decision("error", "the validation could not reach a verdict", comment=body + tail)
 
     if not candidate:
-        reason = verdict.get("scope_reason") or "the change is not an amendment"
+        reason = verdict.get("scope_reason") or (
+            "the change is neither an amendment nor a release pull request"
+        )
         return Decision(
             "success",
             "validated, and a steward decides",
@@ -136,7 +131,8 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
         comment=(
             "Validated, and ownership is not verified, so a steward decides.\n\n"
             f"{ownership_result.reason}.\n\n"
-            "An amendment is made by the verified owner of the listing or by a steward. "
+            "A release file is submitted or amended by the verified owner of the listing, "
+            "or by a steward. "
             "The proof is something only you can put on the release repository: either "
             f"set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on "
             f"it, or commit `{ownership.MARKER_PATH}` naming your username."
@@ -426,20 +422,6 @@ def changed_paths(api, number):
         if len(batch) < 100:
             return changes
         page += 1
-
-
-def authored_document(root, listing_id):
-    """The listing this amendment belongs to, from the content-index checkout."""
-    path = Path(root) / "listings" / f"{listing_id}.toml"
-    if not path.is_file():
-        return None, (
-            f"the listing '{listing_id}' is not in content-index, so there is no "
-            "release host to bind ownership to"
-        )
-    try:
-        return tomllib.loads(path.read_text(encoding="utf-8")), ""
-    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
-        return None, f"listings/{listing_id}.toml does not parse: {error}"
 
 
 def read_verdict(path):
