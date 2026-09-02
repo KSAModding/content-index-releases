@@ -8,6 +8,8 @@
   "release_date": "2026-08-28T08:20:31Z",
   "game_min": "2026.8.19.5261",
   "game_min_revision": 5261,
+  "game_max": "2026.8.22.5348",
+  "game_max_revision": 5348,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/download/v0.7.3/AdvancedFlightComputer.zip",
     "sha256": "B402D01154DD735781A17FD805E03211B61A7B336DA37EFF5D2EC3890B520F21",
