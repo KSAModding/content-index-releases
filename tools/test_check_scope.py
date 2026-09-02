@@ -112,12 +112,30 @@ class Statuses(unittest.TestCase):
     def evaluate(self, path, status):
         return check_scope.evaluate([check_scope.Change(path, status)])
 
-    def test_an_added_release_does_not_merge_itself(self):
-        # A release is stamped by the watcher from its host, not submitted.
+    def test_an_added_release_merges_itself(self):
+        # RFC 0033: a release pull request adds exactly one new file.
         candidate, paths, reason = self.evaluate("releases/Mod/1.0.0.json", "added")
+        self.assertTrue(candidate)
+        self.assertEqual(paths, ["releases/Mod/1.0.0.json"])
+        self.assertEqual(reason, "")
+
+    def test_two_added_releases_wait_for_a_steward(self):
+        candidate, _, reason = check_scope.evaluate(
+            check_scope.changes(["releases/Mod/1.0.0.json", "releases/Mod/1.1.0.json"], "added")
+        )
+        self.assertFalse(candidate)
+        self.assertIn("exactly one", reason)
+
+    def test_an_added_release_next_to_anything_else_waits(self):
+        candidate, paths, reason = check_scope.evaluate(
+            [
+                check_scope.Change("releases/Mod/1.0.0.json", "added"),
+                check_scope.Change("tools/amend.py", "modified"),
+            ]
+        )
         self.assertFalse(candidate)
         self.assertEqual(paths, ["releases/Mod/1.0.0.json"])
-        self.assertIn("added", reason)
+        self.assertIn("tools/amend.py", reason)
 
     def test_a_deleted_release_does_not_merge_itself(self):
         candidate, _, reason = self.evaluate("releases/Mod/1.0.0.json", "removed")
@@ -142,6 +160,20 @@ class Statuses(unittest.TestCase):
         )
         self.assertFalse(candidate)
         self.assertIn("1.1.0", reason)
+        self.assertIn("next to an amendment", reason)
+
+
+class Added(unittest.TestCase):
+    def test_the_added_release_files_are_read_off_the_statuses(self):
+        changes = [
+            check_scope.Change("releases/Mod/1.0.0.json", "added"),
+            check_scope.Change("releases/Mod/0.9.0.json", "modified"),
+            check_scope.Change("tools/amend.py", "added"),
+        ]
+        self.assertEqual(check_scope.added(changes), ["releases/Mod/1.0.0.json"])
+
+    def test_nothing_added_is_an_empty_list(self):
+        self.assertEqual(check_scope.added(check_scope.changes(["releases/Mod/1.0.0.json"])), [])
 
 
 if __name__ == "__main__":
