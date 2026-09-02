@@ -124,7 +124,7 @@ That takes every stamped release at or below `0.7.2` by SemVer precedence, resol
 |---|---|
 | `tools/amend.py` | Writes an amendment, and re-checks its own output before it reaches disk. |
 | `tools/check_amendment.py` | The invariant, per file: the published version against the proposed one. |
-| `tools/check_scope.py` | Whether the change is narrow enough to merge itself, which is release files of one listing and nothing else. |
+| `tools/check_scope.py` | Whether the change is narrow enough to merge itself, which is release files of one listing, or one new release file, and nothing else. |
 | `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
 | `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
 
@@ -135,6 +135,23 @@ To measure a change before opening anything:
 ```text
 python3 tools/validate.py --changed releases/<id>/<version>.json --base-ref main
 ```
+
+## A release by pull request
+
+A listing without a `[releases]` section has nothing the watcher can poll, so its releases enter by pull request with one new file under `releases/<id>/<version>.json`, produced by the same stamper the watcher uses.
+
+The checks do not trust the file.
+They download the archive from its `download.url`, stamp the release again, and reject the pull request when any field disagrees: the checksum, the sizes, the install root, the dependency merge against the authored document, and the compatibility bounds.
+The release date, the pre-release flag and the changelog link are the author's , because no archive carries them.
+
+When it validates and the author's ownership of the listing verifies, through the repository the listing links to the way the listing flow does, it merges itself.
+A listing that names a release host is refused here, because the watcher stamps its releases from that host.
+
+| Tool | What it does |
+|---|---|
+| `tools/check_release.py` | The submitted file against its own archive, field by field. |
+
+`validate.py` needs the authored half for this, as a checkout beside this repository or named by `--authored` or `CONTENT_INDEX`.
 
 ## License
 
