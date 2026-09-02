@@ -6,15 +6,80 @@ The published version comes from git, so these run against a real repository bui
 """
 
 import copy
+import io
 import json
+import os
 import subprocess
 import tempfile
+import tomllib
 import unittest
+import unittest.mock
+import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
+import hosts
 import validate
+from stamp_release import stamp
 
 PATH = "releases/Mod/1.0.0.json"
+NEW = "releases/Mod/2.0.0.json"
+URL = "https://example.invalid/Mod-2.0.0.zip"
+
+GAME_VERSIONS = {
+    "spec_version": 1,
+    "source": "test",
+    "versions": ["2026.8.3.5117", "2026.8.19.5261"],
+}
+
+NOW = datetime(2026, 8, 20, tzinfo=timezone.utc)
+
+LISTING_TOML = """\
+spec_version = 1
+id = "Mod"
+type = "mod"
+name = "Mod"
+authors = ["Maxi"]
+abstract = "A mod."
+license = "MIT"
+
+[links]
+forums = "https://forums.ahwoo.com/threads/mod.1/"
+repository = "https://github.com/someone/Mod"
+
+[compatibility]
+game_min = "2026.8.3.5117"
+"""
+
+FACTS = {
+    "tag": "v2.0.0",
+    "release_date": "2026-08-19T10:00:00Z",
+    "url": URL,
+    "content_type": "application/zip",
+    "prerelease": False,
+    "changelog": "https://example.invalid/changes",
+}
+
+
+def archive():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as handle:
+        handle.writestr("Mod/Mod.dll", "x" * 10)
+        handle.writestr("Mod/mod.toml", 'name = "Mod"\n')
+    return buffer.getvalue()
+
+
+class FakeHttp:
+    """Serves bytes by URL and refuses anything else."""
+
+    def __init__(self, routes):
+        self.routes = routes
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        if url not in self.routes:
+            raise AssertionError(f"unexpected URL {url}")
+        return hosts.Response(200, {"Content-Type": "application/octet-stream"}, self.routes[url])
+
 
 RELEASE = {
     "spec_version": 1,
@@ -55,8 +120,14 @@ class Repository(unittest.TestCase):
         self.git("config", "user.email", "test@example.invalid")
         self.git("config", "user.name", "Test")
         self.write(PATH, RELEASE)
+        self.write("game-versions.json", GAME_VERSIONS)
         self.git("add", "-A")
         self.git("commit", "-m", "Stamp Mod 1.0.0")
+
+        # The authored half beside it, with the one listing.
+        self.authored = self.root / "content-index"
+        (self.authored / "listings").mkdir(parents=True)
+        (self.authored / "listings" / "Mod.toml").write_text(LISTING_TOML, encoding="utf-8")
 
     def restore(self):
         validate.ROOT = self.original
@@ -167,10 +238,9 @@ class RunAmendment(Repository):
         self.assertEqual(check.outcome, validate.REJECT)
 
     def test_a_new_release_file_is_not_an_amendment(self):
-        # It waits for a steward through the scope rule rather than failing the check, because nothing here re-derives a submitted release yet.
-        new = "releases/Mod/2.0.0.json"
-        self.write(new, self.amended(version="2.0.0"))
-        check = validate.run_amendment([new], base_ref="main")
+        # `main` routes a new file to the release check; a caller that hands one here gets a note and no verdict on it.
+        self.write(NEW, self.amended(version="2.0.0"))
+        check = validate.run_amendment([NEW], base_ref="main")
         self.assertEqual(check.outcome, validate.PASS)
         self.assertTrue(any("new release file" in message for message in check.messages))
 
@@ -188,6 +258,155 @@ class RunAmendment(Repository):
         (self.root / PATH).write_text("{ not json", encoding="utf-8")
         check = validate.run_amendment([PATH], base_ref="main")
         self.assertEqual(check.outcome, validate.REJECT)
+
+
+class RunRelease(Repository):
+    """A submitted release, against a fake host serving its archive."""
+
+    def setUp(self):
+        super().setUp()
+        self.archive = archive()
+        self.http = FakeHttp({URL: self.archive})
+
+    def stamped(self, **changes):
+        document = stamp(
+            tomllib.loads(LISTING_TOML), FACTS, self.archive, GAME_VERSIONS["versions"], now=NOW
+        )
+        document.update(changes)
+        return document
+
+    def measure(self, paths, **changes):
+        options = {"base_ref": "main", "authored": self.authored, "http": self.http, "now": NOW}
+        options.update(changes)
+        return validate.run_release(paths, **options)
+
+    def test_a_file_the_stamper_wrote_passes(self):
+        self.write(NEW, self.stamped())
+        check = self.measure([NEW])
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertEqual(check.name, "release")
+        self.assertTrue(all(message.startswith(NEW) for message in check.messages))
+
+    def test_a_field_the_archive_contradicts_is_rejected(self):
+        self.write(NEW, self.stamped(install_size=1))
+        check = self.measure([NEW])
+        self.assertEqual(check.outcome, validate.REJECT)
+        self.assertTrue(any("install_size" in message for message in check.messages))
+
+    def test_a_version_that_is_already_published_is_rejected_before_any_download(self):
+        self.write(PATH, self.stamped(version="1.0.0"))
+        check = self.measure([PATH], http=FakeHttp({}))
+        self.assertEqual(check.outcome, validate.REJECT)
+        self.assertTrue(any("stamped exactly once" in message for message in check.messages))
+
+    def test_a_head_that_does_not_parse_is_rejected(self):
+        (self.root / NEW).write_text("{ not json", encoding="utf-8")
+        check = self.measure([NEW], http=FakeHttp({}))
+        self.assertEqual(check.outcome, validate.REJECT)
+
+    def test_a_missing_authored_checkout_reaches_no_verdict(self):
+        self.write(NEW, self.stamped())
+        with tempfile.TemporaryDirectory() as folder:
+            check = self.measure([NEW], authored=folder)
+        self.assertEqual(check.outcome, validate.COULD_NOT_EVALUATE)
+        self.assertIn("content-index", check.messages[0])
+
+    def test_a_base_that_does_not_resolve_reaches_no_verdict(self):
+        self.write(NEW, self.stamped())
+        check = self.measure([NEW], base_ref="no-such-ref")
+        self.assertEqual(check.outcome, validate.COULD_NOT_EVALUATE)
+
+    def test_a_missing_game_release_list_reaches_no_verdict(self):
+        self.write(NEW, self.stamped())
+        (self.root / "game-versions.json").unlink()
+        check = self.measure([NEW])
+        self.assertEqual(check.outcome, validate.COULD_NOT_EVALUATE)
+        self.assertIn("game release list", check.messages[0])
+
+    def test_a_published_file_that_does_not_parse_reaches_no_verdict(self):
+        self.write(PATH, None)
+        (self.root / PATH).write_text("{ not json", encoding="utf-8")
+        self.git("add", "-A")
+        self.git("commit", "-m", "Break it")
+        check = self.measure([PATH], http=FakeHttp({}))
+        self.assertEqual(check.outcome, validate.COULD_NOT_EVALUATE)
+
+    def fake_http(self):
+        original = hosts.Http
+        self.http_options = []
+        hosts.Http = lambda **options: (self.http_options.append(options), self.http)[1]
+        self.addCleanup(setattr, hosts, "Http", original)
+
+    def test_the_release_check_carries_no_token(self):
+        # The URL is the author's, so the job's token stays off this path.
+        self.write(NEW, self.stamped())
+        self.fake_http()
+        with unittest.mock.patch.dict(os.environ, {"GITHUB_TOKEN": "secret"}):
+            check = self.measure([NEW], http=None)
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertEqual(self.http_options, [{}])
+
+    def test_two_added_files_fetch_nothing(self):
+        other = "releases/Mod/2.1.0.json"
+        self.write(NEW, self.stamped())
+        self.write(other, self.stamped(version="2.1.0"))
+        self.fake_http()
+        self.http.routes = {}
+        output = self.root / "verdict.json"
+        code = validate.main(
+            ["--changed", NEW, other, "--base-ref", "main", "--authored", str(self.authored),
+             "--output", str(output)]
+        )
+        verdict = json.loads(output.read_text(encoding="utf-8"))
+        self.assertEqual(code, 1)
+        self.assertEqual(verdict["verdict"], validate.REJECT)
+        self.assertFalse(verdict["auto_merge_candidate"])
+        release = next(check for check in verdict["checks"] if check["name"] == "release")
+        self.assertIn("exactly one", release["messages"][0])
+
+    def local_run(self, path):
+        self.fake_http()
+        output = self.root / "verdict.json"
+        code = validate.main(
+            ["--changed", path, "--base-ref", "main", "--authored", str(self.authored),
+             "--output", str(output)]
+        )
+        return code, json.loads(output.read_text(encoding="utf-8"))
+
+    def test_a_local_run_reads_a_file_main_lacks_as_a_submitted_release(self):
+        self.write(NEW, self.stamped())
+        code, verdict = self.local_run(NEW)
+        self.assertEqual(code, 0)
+        self.assertEqual(verdict["verdict"], validate.PASS)
+        self.assertTrue(verdict["auto_merge_candidate"])
+        self.assertEqual([check["name"] for check in verdict["checks"]], ["release"])
+        self.assertEqual(verdict["documents"], [NEW])
+
+    def test_a_local_run_still_measures_a_published_file_as_an_amendment(self):
+        self.write(PATH, self.amended(yanked=True))
+        code, verdict = self.local_run(PATH)
+        self.assertEqual(code, 0)
+        self.assertEqual([check["name"] for check in verdict["checks"]], ["amendment"])
+        self.assertTrue(verdict["auto_merge_candidate"])
+
+    def test_a_rejected_release_leaves_a_non_zero_exit(self):
+        self.write(NEW, self.stamped(install_size=1))
+        code, verdict = self.local_run(NEW)
+        self.assertEqual(code, 1)
+        self.assertEqual(verdict["verdict"], validate.REJECT)
+
+
+class LocalChanges(Repository):
+    def test_a_release_file_main_lacks_is_added(self):
+        changes = validate.local_changes([NEW, PATH, "tools/amend.py"], "main")
+        self.assertEqual(
+            [change.status for change in changes],
+            [validate.check_scope.ADDED, validate.check_scope.MODIFIED, validate.check_scope.MODIFIED],
+        )
+
+    def test_a_base_that_does_not_resolve_reads_everything_as_modified(self):
+        changes = validate.local_changes([NEW], "no-such-ref")
+        self.assertEqual(changes[0].status, validate.check_scope.MODIFIED)
 
 
 class Verdict(Repository):

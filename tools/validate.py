@@ -3,7 +3,7 @@
 """Validate a pull request and leave a verdict for the ownership workflow.
 
 The published version comes from git.
-A `pull_request` checkout has a merge commit at its head, so `HEAD^1` is the file the amendment is measured against.
+A `pull_request` checkout has a merge commit at its head, so `HEAD^1` is the file an amendment is measured against, and a release file it does not have is a submitted release, measured against its own archive.
 """
 
 import argparse
@@ -18,7 +18,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import check_amendment
+import check_release
 import check_scope
+import hosts
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -165,6 +167,86 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF):
     return Check("amendment", worst(outcomes), messages)
 
 
+def load_game_versions():
+    """The game release list a month bound resolves against, or Unavailable."""
+    path = ROOT / "game-versions.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))["versions"]
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as error:
+        raise Unavailable(f"the game release list at {path} is not readable: {error}") from error
+
+
+def run_release(paths, base_ref=DEFAULT_BASE_REF, authored=None, http=None, now=None):
+    """The submitted release files, each measured against its own archive.
+
+    A version is stamped exactly once, so a path the base branch already has is rejected before anything is downloaded.
+    """
+    try:
+        commit = resolve_base(base_ref)
+        game_versions = load_game_versions()
+    except Unavailable as error:
+        return Check("release", COULD_NOT_EVALUATE, [str(error)])
+
+    root = check_release.authored_root(authored)
+    if not (root / "listings").is_dir():
+        return Check(
+            "release",
+            COULD_NOT_EVALUATE,
+            [
+                f"content-index is not checked out at {root}: point --authored or "
+                "CONTENT_INDEX at a checkout of KSAModding/content-index, which holds "
+                "the listing a release belongs to"
+            ],
+        )
+    # No token on this path: the URL is the author's, and a release archive
+    # needs no credential to download.
+    http = http or hosts.Http()
+
+    outcomes, messages = [], []
+    for path in paths:
+        base, problem = base_document(commit, path)
+        if problem:
+            outcomes.append(COULD_NOT_EVALUATE)
+            messages.append(problem)
+            continue
+        if base is not None:
+            outcomes.append(REJECT)
+            messages.append(
+                f"{path} is already published, and a version is stamped exactly once: "
+                "a broken release is yanked, and a corrected one gets a new version"
+            )
+            continue
+        try:
+            head = head_document(path)
+        except ValueError as error:
+            outcomes.append(REJECT)
+            messages.append(str(error))
+            continue
+        if head is None:
+            outcomes.append(REJECT)
+            messages.append(f"{path} is not in the pull request's tree")
+            continue
+        outcome = check_release.check(path, head, root, game_versions, http, now=now)
+        outcomes.append(outcome.outcome)
+        messages.extend(f"{path}: {message}" for message in outcome.messages)
+    return Check("release", worst(outcomes), messages)
+
+
+def local_changes(paths, base_ref):
+    """The changes of a local run, with a release file the base lacks read as added."""
+    try:
+        commit = resolve_base(base_ref)
+    except Unavailable:
+        return check_scope.changes(paths)
+    changes = []
+    for path in paths:
+        status = check_scope.MODIFIED
+        if check_scope.is_release(path) and base_document(commit, path) == (None, None):
+            status = check_scope.ADDED
+        changes.append(check_scope.Change(path, status))
+    return changes
+
+
 def changed_paths(repository, number, token):
     """What a pull request does to each path it touches."""
     changes = []
@@ -252,14 +334,20 @@ def main(argv=None):
     )
     parser.add_argument(
         "--base-ref", default=DEFAULT_BASE_REF,
-        help="what the amendment is measured against, defaults to the merge commit's first parent",
+        help="what the change is measured against, defaults to the merge commit's first parent",
+    )
+    parser.add_argument(
+        "--authored",
+        help="a checkout of KSAModding/content-index, else CONTENT_INDEX, else the sibling directory",
     )
     parser.add_argument("--output", type=Path, help="where to write the verdict as JSON")
     arguments = parser.parse_args(argv)
 
     token = os.environ.get("GITHUB_TOKEN")
     sha = None
-    changes = None if arguments.changed is None else check_scope.changes(arguments.changed)
+    changes = None
+    if arguments.changed is not None:
+        changes = local_changes(arguments.changed, arguments.base_ref)
 
     if changes is None:
         if not (arguments.pull_request and arguments.repository):
@@ -278,14 +366,34 @@ def main(argv=None):
             return 0
 
     candidate, paths, reason = check_scope.evaluate(changes)
+    new = check_scope.added(changes)
+    amended = [path for path in paths if path not in new]
 
     try:
-        checks = [run_amendment(paths, arguments.base_ref)]
+        checks = []
+        if amended or not new:
+            checks.append(run_amendment(amended, arguments.base_ref))
+        if len(new) == 1:
+            checks.append(run_release(new, arguments.base_ref, arguments.authored))
+        elif new:
+            # Every added file names a URL of the author's choosing, so nothing
+            # is fetched for a shape that can never merge.
+            checks.append(
+                Check(
+                    "release",
+                    REJECT,
+                    [
+                        f"{len(new)} release files are added and none was measured: a "
+                        "release pull request adds exactly one, so open one pull request "
+                        "per release"
+                    ],
+                )
+            )
     except Exception as error:
         traceback.print_exc(file=sys.stderr)
         checks = [
             Check(
-                "amendment",
+                "checks",
                 COULD_NOT_EVALUATE,
                 [f"the check itself raised {error!r}, which is a defect in tools/, "
                  "not something this pull request did"],
