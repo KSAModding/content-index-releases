@@ -60,6 +60,43 @@ When it validates and your ownership of the listing verifies, it merges itself.
 The authored document in [content-index](https://github.com/KSAModding/content-index) is a separate file, and an amendment does not touch it.
 A bound that applies to future releases belongs there too, or the next release is stamped without it.
 
+## A release
+
+A listing without a `[releases]` section gets its releases by pull request, one new file per release.
+
+`tools/stamp_release.py` derives it from the authored document and the archive, and the checks derive it again.
+
+Write the facts of the release the way your host shows them into a small JSON file:
+
+```json
+{
+  "tag": "v1.2.0",
+  "release_date": "2026-09-02T09:48:05Z",
+  "url": "https://example.org/downloads/MyMod-1.2.0.zip",
+  "content_type": "application/zip",
+  "prerelease": false,
+  "changelog": "https://example.org/mymod/changes"
+}
+```
+
+Then stamp, with a checkout of [content-index](https://github.com/KSAModding/content-index) beside this repository:
+
+```sh
+python3 tools/stamp_release.py --listing ../content-index/listings/<id>.toml --archive MyMod-1.2.0.zip --release release.json --out releases/<id>/1.2.0.json
+```
+
+Validate it the way the checks will, which downloads the archive from the URL the file names:
+
+```sh
+python3 tools/validate.py --changed releases/<id>/1.2.0.json --base-ref main
+```
+
+Open a pull request with that one file and nothing else.
+When it validates and your ownership of the listing verifies, through the repository the listing links to, it merges itself.
+
+A version is stamped exactly once and a release that turns out to be broken is yanked, and a corrected one gets a new version.
+A listing that names a release host under `[releases]` does not use this path, because the watcher stamps its releases, and a dispatch with `backfill` stamps older ones.
+
 ## Tooling and workflows
 
 Ordinary code review applies.
