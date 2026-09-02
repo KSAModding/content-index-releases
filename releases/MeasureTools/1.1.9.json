@@ -1,0 +1,50 @@
+{
+  "spec_version": 1,
+  "id": "MeasureTools",
+  "type": "mod",
+  "version": "1.1.9",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-02T09:06:58Z",
+  "game_min": "2026.9.4.5400",
+  "game_min_revision": 5400,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/download/v1.1.9/MeasureTools.zip",
+    "sha256": "0367A612BD8D0A3A2225A92AB8A9292F7EF4FF47238E159301D8F514BA87E04C",
+    "size": 41783,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4319/MeasureTools/download/1.1.9"
+    ]
+  },
+  "install_size": 88128,
+  "install": {
+    "root": "MeasureTools",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.5",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/tag/v1.1.9",
+  "listing": {
+    "name": "MeasureTools",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Click-to-measure ruler and protractor tools for Kitten Space Agency.",
+    "description": "Click-to-measure ruler and protractor tools for Kitten Space Agency.\n\n### Features\n\n- **Ruler**, click two points to measure the straight-line distance. Snaps to bodies, to body surfaces (the edge of a planet's disc), and to points on orbit lines; clicks on empty space place free points.\n- **Protractor**, click three points (arm, apex, arm) to read the true 3D angle plus both arm lengths, for example the phase angle between two planets around their star.\n- **Part-level measuring**, when the camera is close to a vehicle, points snap to individual parts with centimeter precision: attach nodes and part centers first, then mesh vertices (tank rims, panel corners), and everywhere else the exact hull point under the cursor. Anchors stick to their part, so measurements stay correct while the vehicle moves and rotates, including between parts of two vehicles flying side by side. Engine nozzles measure at their neutral position (gimbal deflection is visual only). Anchors follow their part across staging and docking; only destroying the part removes the measurement.\n- **CAD-style snapping**, beyond attach nodes and vertices, points snap to mesh feature edges (slide along a tank rim between its vertices), edge midpoints, fitted rim centers, and the mirror of the previous point across the part's axis for exact antipodal pairs. Same-vehicle ruler measurements additionally report axial and radial components along the stack axis.\n- **Circle**, one click on a circular part edge (tank rim, engine bell exit) reads diameter, radius, and circumference from a fitted circle that tracks the part.\n- **Face angle**, two clicks on part surfaces read the angle between the surface normals (engine cant, fin alignment), live while the vehicle rotates.\n- **Surface**, pin two points to a planet's surface for the great-circle distance, chord, and initial bearing; pins track the body's rotation like ground markers.\n- **Editor measuring**, the ruler and protractor also work inside the vehicle editor, with the same part-level snapping over the craft being built, including parts currently held in the hand. Anchors follow parts as they are dragged, and part measurements carry across the editor boundary in both directions.\n- **Live preview** with snap highlighting, hover-sync between the list and the map, and click-to-copy values.\n- **Color palettes**, every overlay color has a color picker, organized into named palettes: four shipped ones (Red, Green, Blue, Contrast) plus your own, all editable and persisted across sessions.\n\n### Usage\n\nIn the map view or the default flight view, open **View -> Measure**; in the vehicle editor, open **Measure -> Show Window** from the menu bar. Pick a tool and click in the view to place points. Ctrl and left-click places a free point on the ecliptic plane through the reference body, a short right-click cancels the current point or pauses measuring, and clicking a list row copies the measurement to the clipboard.\n\nThe free-fly and IVA cameras steer with the left mouse button, so the tool stays inactive there. While the tool is armed it owns left clicks, so editor part placement is suspended; pause the tool or close the window to build normally. Measurements are not saved to the save file.\n",
+    "license": "MIT",
+    "tags": [
+      "information"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/measuretools.992/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools",
+      "spacedock": "https://spacedock.info/mod/4319/MeasureTools",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/issues"
+    }
+  }
+}
