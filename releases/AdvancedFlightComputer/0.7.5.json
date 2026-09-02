@@ -1,0 +1,57 @@
+{
+  "spec_version": 1,
+  "id": "AdvancedFlightComputer",
+  "type": "mod",
+  "version": "0.7.5",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-02T09:48:03Z",
+  "game_min": "2026.9.4.5400",
+  "game_min_revision": 5400,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/download/v0.7.5/AdvancedFlightComputer.zip",
+    "sha256": "AD14E4FE8111F4DAE8406D50459B7E5C42D58F1E01F549636946922CF72AE9E6",
+    "size": 129696,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4253/AdvancedFlightComputer/download/0.7.5"
+    ]
+  },
+  "install_size": 327401,
+  "install": {
+    "root": "AdvancedFlightComputer",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.5",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "KittenExtensions",
+      "kind": "optional",
+      "source": "derived"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/tag/v0.7.5",
+  "listing": {
+    "name": "Advanced Flight Computer",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Extra maneuver planning tools for Kitten Space Agency.",
+    "description": "Adds quick-tools to the Transfer Planner, flyby targeting so a Hohmann transfer arrives as a flyby instead of an impact, multi-pass burn splitting for Oberth-efficient departures, RCS-only burn execution, and it lets the planner target interstellar comets on hyperbolic orbits.\n\n### Maneuver Quick-Tools\n\nNew plan types in the stock Transfer Planner dropdown: **Set Periapsis** and **Set Apoapsis**, a single burn at the opposite apse to raise or lower one apse to a target altitude, plus **Match Inclination** and **Set Inclination**, plane-change burns at AN or DN. The reference plane for Set Inclination is selectable between Ecliptic and Equatorial, which differ by the obliquity of the parent body.\n\n### Flyby Targeting\n\nThe stock planner aims every transfer at the target body's center, so a well-timed Hohmann arrives as an impact. Tick **Target flyby periapsis** and the departure burn is aimed at a periapsis you choose instead, entered against a Surface, Center or Atmosphere reference, on a selectable flyby side. Works for moon flybys and for interplanetary targets.\n\n### Multi-Pass Burns\n\nAny of the plan types above, and the stock Hohmann and circularize transfers, can be split across successive orbits. The engine fires in shorter bursts near periapsis on each orbit instead of one long burn that sweeps a large arc, which cuts finite-burn loss.\n\n### RCS Translation Burns\n\nExecute a planned burn with RCS thrusters only. Useful for small corrections, where rotating the whole vehicle for the main engine can cost more than translating, and for vehicles with no active main engine. Two attitude strategies, Hold and Align, with an Auto mode that compares propellant estimates and picks the cheaper one. Execution is closed loop against the game's own delta-V accounting, and the engine autopilot is suppressed for the whole run.\n\n### Hyperbolic Targets\n\nThe stock Transfer Planner filters out bodies with eccentricity of 1 or more. This mod lets it target interstellar comets such as Oumuamua, 2I/Borisov and 3I/ATLAS by patching the planner's time-of-flight and alignment math to handle unbound orbits. It needs KittenExtensions, which applies the XML patch the mod ships for it.\n",
+    "license": "MIT",
+    "tags": [
+      "control"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/advanced-flight-computer.783/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer",
+      "spacedock": "https://spacedock.info/mod/4253/AdvancedFlightComputer",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/issues",
+      "discussions": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/discussions"
+    }
+  }
+}
