@@ -8,6 +8,8 @@
   "release_date": "2026-08-28T08:23:56Z",
   "game_min": "2026.8.19.5261",
   "game_min_revision": 5261,
+  "game_max": "2026.8.22.5348",
+  "game_max_revision": 5348,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/download/v1.1.8/MeasureTools.zip",
     "sha256": "2F771AEC246B055FF47E539CA849AB075123D5D2D3C67D803932D8AB328E5820",
