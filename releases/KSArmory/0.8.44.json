@@ -1,0 +1,53 @@
+{
+  "spec_version": 1,
+  "id": "KSArmory",
+  "type": "mod",
+  "version": "0.8.44",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-08-11T08:23:45Z",
+  "game_min": "2026.8.19.5261",
+  "game_min_revision": 5261,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSArmory/releases/download/v0.8.44/KSArmory-0.8.44.zip",
+    "sha256": "96C287D59FC871EEB3D3481C358E0321B18E8C11A7277FCDA308DB05B594B305",
+    "size": 985743,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4460/KSArmory/download/0.8.44"
+    ]
+  },
+  "install_size": 2223377,
+  "install": {
+    "root": "KSArmory",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSArmory/releases/tag/v0.8.44",
+  "listing": {
+    "name": "KSArmory",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "Weapon systems for Kitten Space Agency: point defence, guided and unguided munitions, targeting sights and a ballistic computer.",
+    "description": "Adds working weapon systems to Kitten Space Agency. Every launcher searches, tracks, decides and shoots on its own, and the rounds are simulated by the mod rather than by the vehicle physics, so guidance runs at sub-frame accuracy and cannot corrupt a save.\n\n### Launchers\n\nA **Pantsir-S1** on an 8x8 chassis: search radar, twelve proportional-navigation interceptors in two pods of six, twin cannon, and a turret that traverses and elevates. A **Mk 15 Phalanx CIWS** that stacks on any 3 m node and carries no missiles at all. Three rails that surface-attach to anything: **LAU-7** with an AIM-9J, **LAU-128** with an AIM-120C, and **LAU-118** with an AGM-88 HARM, which homes on radar emissions and cannot engage an aircraft. A **B61 rack** that neither aims nor fires - it lets a bomb go and the ground does the rest.\n\n### Sights\n\nAn **electro-optical director** on a mast and a **Rafael LITENING pod** whose whole nose rolls about its centreline while the sight nods within it. Both drive the main view, magnify by rewriting the field of view, and work on a craft carrying no weapons at all - a hull with one director on it is an observation post.\n\n### Fire control\n\nThreat classification is by closest point of approach rather than closing speed, so targets passing by are engageable and not only ones flying straight at you. IFF is per installation, so two sites can be on opposite sides. A radar can be told to go silent, which is a trade rather than a free defence: a silent set cannot be homed on and cannot see. Rounds can themselves be shot down.\n\n### Ballistic computer\n\nAim a multiple-warhead ballistic missile at a point on any body and it flies itself: ascent, guided cutoff on velocity-to-be-gained, post-boost trim, and a warhead bus that releases each round along the same line. It picks up from wherever the vehicle already is - on the pad, mid-ascent, or in orbit, where it also decides *when* to leave.\n\n### Effects\n\nDetonations, nuclear fireballs and mushroom clouds standing in the world, motor plumes and smoke trails, tracers, muzzle flashes and spatialised gunfire, all through the engine's own renderers.\n",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "weapons",
+      "physics"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kessler-systems-armory-ksarmory.1131/",
+      "homepage": "https://ksarmory.com",
+      "repository": "https://github.com/LaurensDeV/KSArmory",
+      "spacedock": "https://spacedock.info/mod/4460/KSArmory",
+      "bugtracker": "https://github.com/LaurensDeV/KSArmory/issues"
+    }
+  }
+}
