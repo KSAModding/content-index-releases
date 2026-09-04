@@ -58,6 +58,7 @@ CACHE_VERSION = 2
 LISTING_MARKER = "<!-- watcher:listing={id} -->"
 SIGNATURE_MARKER = "<!-- watcher:signature={signature} -->"
 WAITING_MARKER = "<!-- watcher:waiting={sha} -->"
+NO_RUN_MARKER = "<!-- watcher:no-run={sha} -->"
 
 # The same marker read back, to find which listing an open issue belongs to.
 MARKED_LISTING = re.compile(r"<!-- watcher:listing=(\S+) -->")
@@ -66,11 +67,14 @@ BACKTICKED = re.compile(r"`([^`]+)`")
 
 # A check run conclusion that is neither a pass nor a reject: the check could
 # not run to a verdict, which never auto-merges and never auto-rejects, and is
-# what the sweep re-dispatches.
+# what the sweep re-runs.
 COULD_NOT_EVALUATE = frozenset(
     {"cancelled", "timed_out", "stale", "neutral", "skipped", "action_required"}
 )
 PENDING = frozenset({"queued", "in_progress", "waiting", "requested", "pending"})
+
+# Grace for a finished run to get its verdict posted.
+SETTLING_MINUTES = 5
 
 
 def now():
@@ -417,10 +421,9 @@ class Issues:
 class Sweep:
     """The event-driven half, swept once per tick.
 
-    GitHub drops event-driven triggers with nothing to retry them, so every tick
-    re-dispatches the validation of an open pull request whose head commit has
-    no check suite or whose latest run ended in could-not-evaluate, and pings a
-    steward for a run waiting for approval, which a dispatch cannot release.
+    GitHub drops triggers and retries nothing, so a pull request with no verdict
+    has its validation re-run. A re-run replays the event; a dispatch would carry
+    the branch it ran on and name no pull request.
     """
 
     def __init__(self, api, cache, options, log=print):
@@ -431,7 +434,7 @@ class Sweep:
 
     def run(self):
         try:
-            pulls = self.api.get_paged("/pulls", state="open")[: self.options.sweep_limit]
+            pulls = self.api.get_paged("/pulls", state="open")
         except urllib.error.HTTPError as error:
             self.log(f"  could not list pull requests: HTTP {error.code}")
             return
@@ -439,14 +442,13 @@ class Sweep:
             self.log(f"  could not list pull requests: {error}")
             return
 
-        for pull in pulls:
+        for pull in pulls[: self.options.sweep_limit]:
             try:
                 self._one(pull)
             except (urllib.error.HTTPError, HostError) as error:
                 self.log(f"  #{pull['number']}: {error}")
 
-        # The sweep section would otherwise keep a key per head commit forever,
-        # in a file the workflow uploads and downloads every ten minutes.
+        # Every open pull request, or the ones past the limit lose their count.
         open_shas = {pull["head"]["sha"] for pull in pulls}
         section = self.cache.data["sweep"]
         for sha in [key for key in section if key not in open_shas]:
@@ -469,20 +471,33 @@ class Sweep:
             self._ping(number, sha, state)
             return
 
-        suites = self.api.get(f"/commits/{sha}/check-suites") or {}
         if any(run.get("status") in PENDING for run in runs):
             return  # Something is still running; a verdict is on its way.
 
         verdict = self._verdict(sha)
-        if suites.get("total_count") and verdict == "pass":
-            return
-        if verdict == "reject":
-            return  # A reject is a verdict. It waits for the author, not for us.
+        if verdict in ("pass", "reject"):
+            return  # A verdict either way. It waits for the author, not for us.
 
-        reason = (
-            "no check suite" if not suites.get("total_count") else f"verdict {verdict}"
-        )
-        self._dispatch(number, sha, state, reason)
+        validation = self._validation_run(runs)
+        if validation is None:
+            self._ask_for_a_commit(number, sha, state)
+            return
+
+        # The ownership workflow runs elsewhere, so nothing here shows it working.
+        finished = parse_iso(validation.get("updated_at"))
+        if finished and now() - finished < timedelta(minutes=SETTLING_MINUTES):
+            return
+
+        self._rerun(number, sha, state, validation, f"verdict {verdict}")
+
+    def _validation_run(self, runs):
+        """The validation run a pull request started, the only one worth replaying."""
+        for run in runs:
+            if run.get("event") != "pull_request":
+                continue
+            if (run.get("path") or "").endswith("/" + self.options.sweep_workflow):
+                return run
+        return None
 
     def _verdict(self, sha):
         """`pass`, `reject`, `could-not-evaluate`, or `missing` for the required check."""
@@ -511,45 +526,69 @@ class Sweep:
             return "missing"
         return "missing"
 
-    def _dispatch(self, number, sha, state, reason):
-        attempts = state.get("attempts", 0)
+    def _within_the_clock(self, state):
+        """Whether a temporary wait is over. Attempts are terminal, so separate."""
         last = parse_iso(state.get("last"))
-        refused = parse_iso(state.get("refused"))
-        if attempts >= self.options.sweep_attempts:
-            return
         if last and now() - last < timedelta(minutes=self.options.sweep_cooldown):
+            return False
+        refused = parse_iso(state.get("refused"))
+        return not (
+            refused and now() - refused < timedelta(hours=self.options.sweep_refusal_hours)
+        )
+
+    def _rerun(self, number, sha, state, run, reason):
+        if state.get("attempts", 0) >= self.options.sweep_attempts:
+            self._ask_for_a_commit(number, sha, state)
             return
-        if refused and now() - refused < timedelta(hours=self.options.sweep_refusal_hours):
+        if not self._within_the_clock(state):
             return
 
-        self.log(f"  #{number}: re-dispatching validation ({reason})")
+        self.log(f"  #{number}: re-running validation ({reason})")
         try:
-            self.api.send(
-                "POST",
-                f"/actions/workflows/{self.options.sweep_workflow}/dispatches",
-                {"ref": self.options.sweep_ref, "inputs": {"pull_request": str(number)}},
-            )
+            self.api.send("POST", f"/actions/runs/{run['id']}/rerun", {})
         except urllib.error.HTTPError as error:
-            # A validation workflow that does not accept a dispatch yet is the
-            # authored repository's business, and never fails a tick. The
-            # refusal is retried on a clock rather than retired for good, so
-            # stuck pull requests recover the moment the workflow gains the
-            # input.
-            self.log(
-                f"  #{number}: {self.options.sweep_workflow} did not accept the dispatch "
-                f"(HTTP {error.code}); the sweep needs it to take a pull_request input"
-            )
+            self.log(f"  #{number}: run {run['id']} would not re-run (HTTP {error.code})")
             state["refused"] = iso(now())
+            self._ask_for_a_commit(number, sha, state)
             return
         state.pop("refused", None)
         state["last"] = iso(now())
-        state["attempts"] = attempts + 1
+        state["attempts"] = state.get("attempts", 0) + 1
+
+    def _ask_for_a_commit(self, number, sha, state):
+        """Every dead end ends here, because only the author can start a run."""
+        if state.get("asked"):
+            return
+        if not state.get("seen"):
+            state["seen"] = True
+            return
+
+        marker = NO_RUN_MARKER.format(sha=sha)
+        comments = self.api.get_paged(f"/issues/{number}/comments")
+        if any(marker in (comment.get("body") or "") for comment in comments):
+            state["asked"] = True
+            return
+
+        self.log(f"  #{number}: {sha[:7]} reached no verdict, asking for a commit")
+        try:
+            self.api.send(
+                "POST",
+                f"/issues/{number}/comments",
+                {
+                    "body": f"{marker}\nNo validation verdict reached this commit, and "
+                    "the watcher could not start one. Any new commit on this pull "
+                    "request runs the checks again."
+                },
+            )
+        except urllib.error.HTTPError as error:
+            self.log(f"  #{number}: the comment was refused (HTTP {error.code})")
+        state["asked"] = True
 
     def _ping(self, number, sha, state):
         if state.get("pinged"):
             return
         marker = WAITING_MARKER.format(sha=sha)
-        comments = self.api.get(f"/issues/{number}/comments", per_page=100) or []
+        comments = self.api.get_paged(f"/issues/{number}/comments")
         if any(marker in (comment.get("body") or "") for comment in comments):
             state["pinged"] = True
             return
@@ -559,8 +598,8 @@ class Sweep:
             f"/issues/{number}/comments",
             {
                 "body": f"{marker}\n{self.options.steward_team} this run is sitting in "
-                "GitHub's waiting-for-approval state, which the watcher cannot release "
-                "with a dispatch. It needs a steward to approve the workflow run."
+                "GitHub's waiting-for-approval state, which only a steward can release. "
+                "It needs a steward to approve the workflow run."
             },
         )
         state["pinged"] = True
@@ -1353,14 +1392,13 @@ def parse_arguments(argv):
     parser.add_argument("--issue-label", default="watcher")
     parser.add_argument("--steward-team", default="@KSAModding/content-manager-stewards")
     parser.add_argument("--sweep-workflow", default="checks.yml")
-    parser.add_argument("--sweep-ref", default="main")
     parser.add_argument("--verdict-check", default="validate")
     parser.add_argument("--sweep-limit", type=int, default=30)
     parser.add_argument("--sweep-attempts", type=int, default=3)
     parser.add_argument("--sweep-cooldown", type=int, default=30, help="minutes")
     parser.add_argument(
         "--sweep-refusal-hours", type=int, default=24,
-        help="hours before a dispatch the workflow refused is tried again",
+        help="hours before a re-run GitHub refused is tried again",
     )
     parser.add_argument("--no-sweep", action="store_true")
     parser.add_argument("--no-commit", action="store_true")

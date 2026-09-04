@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from hosts import HostRelease
-from watch import Cache, Issues, Sweep, Watcher, is_history, parse_arguments
+from watch import Cache, Issues, Sweep, Watcher, is_history, iso, now, parse_arguments
 
 GAME_VERSIONS = {"spec_version": 1, "versions": ["2026.8.3.5117"]}
 
@@ -159,12 +159,22 @@ class OneIssuePerListing(unittest.TestCase):
         self.assertEqual(len(api.writes("POST", path="/issues")), 1)
 
 
-def sweep_api(runs=(), suites=0, statuses=(), check_runs=(), comments=()):
+VALIDATION_RUN = {
+    "id": 77,
+    "path": ".github/workflows/checks.yml",
+    "event": "pull_request",
+    "status": "completed",
+    "conclusion": "success",
+}
+
+COULD_NOT_EVALUATE_STATUS = [{"context": "validate", "state": "error"}]
+
+
+def sweep_api(runs=(), statuses=(), check_runs=(), comments=()):
     return StubApi(
         {
             "/pulls": [{"number": 3, "head": {"sha": "abc"}}],
             "/actions/runs": {"workflow_runs": list(runs)},
-            "/commits/abc/check-suites": {"total_count": suites},
             "/commits/abc/status": {"statuses": list(statuses)},
             "/commits/abc/check-runs": {"check_runs": list(check_runs)},
             "/issues/3/comments": list(comments),
@@ -178,27 +188,66 @@ class TheSweep(unittest.TestCase):
         Sweep(api, store or cache(), options, log=lambda _: None).run()
         return api
 
-    def test_a_head_commit_with_no_check_suite_is_re_dispatched(self):
-        api = self.sweep(sweep_api(suites=0))
-        dispatched = api.writes("POST", contains="/dispatches")
-        self.assertEqual(len(dispatched), 1)
-        self.assertEqual(dispatched[0][2]["inputs"], {"pull_request": "3"})
+    def test_a_run_that_could_not_evaluate_is_re_run(self):
+        api = self.sweep(
+            sweep_api(runs=[VALIDATION_RUN], statuses=COULD_NOT_EVALUATE_STATUS)
+        )
+        self.assertEqual(len(api.writes("POST", path="/actions/runs/77/rerun")), 1)
 
-    def test_a_run_that_could_not_evaluate_is_re_dispatched(self):
+    def test_the_run_replayed_is_the_one_a_pull_request_started(self):
         api = self.sweep(
             sweep_api(
-                suites=1,
-                runs=[{"status": "completed", "conclusion": "success"}],
-                statuses=[{"context": "validate", "state": "error"}],
+                runs=[
+                    dict(VALIDATION_RUN, id=98, event="workflow_dispatch"),
+                    dict(VALIDATION_RUN, id=99, path=".github/workflows/other.yml"),
+                    dict(VALIDATION_RUN, id=97, path=".github/workflows/pre-checks.yml"),
+                    VALIDATION_RUN,
+                ],
+                statuses=COULD_NOT_EVALUATE_STATUS,
             )
         )
-        self.assertEqual(len(api.writes("POST", contains="/dispatches")), 1)
+        self.assertEqual(len(api.writes("POST", path="/actions/runs/77/rerun")), 1)
+
+    def test_a_head_commit_nothing_validated_asks_the_author_for_a_commit(self):
+        store = cache()
+        # An unregistered run looks the same, so one tick passes.
+        self.assertEqual(self.sweep(sweep_api(), store).sent, [])
+
+        api = self.sweep(sweep_api(), store)
+        self.assertEqual(api.writes("POST", contains="/rerun"), [])
+        comments = api.writes("POST", path="/issues/3/comments")
+        self.assertEqual(len(comments), 1)
+        self.assertIn("Any new commit", comments[0][2]["body"])
+
+    def test_the_author_is_asked_once_per_head_commit(self):
+        store = cache()
+        self.sweep(sweep_api(), store)
+        self.sweep(sweep_api(), store)
+        again = self.sweep(sweep_api(), store)
+        self.assertEqual(again.sent, [])
+
+    def test_an_existing_ask_is_not_repeated_after_the_cache_is_gone(self):
+        store = cache()
+        store.section("sweep", "abc")["seen"] = True
+        api = self.sweep(
+            sweep_api(comments=[{"body": "<!-- watcher:no-run=abc -->\nalready said"}]),
+            store,
+        )
+        self.assertEqual(api.sent, [])
+
+    def test_a_run_that_just_finished_keeps_its_time_to_post_a_verdict(self):
+        api = self.sweep(
+            sweep_api(
+                runs=[dict(VALIDATION_RUN, updated_at=iso(now()))],
+                statuses=COULD_NOT_EVALUATE_STATUS,
+            )
+        )
+        self.assertEqual(api.sent, [])
 
     def test_a_pass_is_left_alone(self):
         api = self.sweep(
             sweep_api(
-                suites=1,
-                runs=[{"status": "completed", "conclusion": "success"}],
+                runs=[VALIDATION_RUN],
                 statuses=[{"context": "validate", "state": "success"}],
             )
         )
@@ -206,23 +255,29 @@ class TheSweep(unittest.TestCase):
 
     def test_a_reject_is_a_verdict_and_waits_for_the_author(self):
         api = self.sweep(
-            sweep_api(suites=1, statuses=[{"context": "validate", "state": "failure"}])
+            sweep_api(
+                runs=[VALIDATION_RUN],
+                statuses=[{"context": "validate", "state": "failure"}],
+            )
         )
         self.assertEqual(api.sent, [])
 
     def test_a_check_run_conclusion_counts_as_the_verdict(self):
         api = self.sweep(
-            sweep_api(suites=1, check_runs=[{"name": "validate", "conclusion": "neutral"}])
+            sweep_api(
+                runs=[VALIDATION_RUN],
+                check_runs=[{"name": "validate", "conclusion": "neutral"}],
+            )
         )
-        self.assertEqual(len(api.writes("POST", contains="/dispatches")), 1)
+        self.assertEqual(len(api.writes("POST", contains="/rerun")), 1)
 
     def test_a_run_still_going_is_left_alone(self):
-        api = self.sweep(sweep_api(suites=1, runs=[{"status": "in_progress"}]))
+        api = self.sweep(sweep_api(runs=[{"status": "in_progress"}]))
         self.assertEqual(api.sent, [])
 
     def test_waiting_for_approval_pings_a_steward_instead(self):
         api = self.sweep(sweep_api(runs=[{"status": "waiting"}]))
-        self.assertEqual(len(api.writes("POST", contains="/dispatches")), 0)
+        self.assertEqual(api.writes("POST", contains="/rerun"), [])
         comments = api.writes("POST", path="/issues/3/comments")
         self.assertEqual(len(comments), 1)
         self.assertIn("stewards", comments[0][2]["body"])
@@ -242,17 +297,21 @@ class TheSweep(unittest.TestCase):
         )
         self.assertEqual(api.sent, [])
 
-    def test_a_dispatch_is_not_repeated_within_the_cooldown(self):
+    def test_a_re_run_is_not_repeated_within_the_cooldown(self):
         store = cache()
-        self.sweep(sweep_api(suites=0), store)
-        again = self.sweep(sweep_api(suites=0), store)
+        stuck = dict(runs=[VALIDATION_RUN], statuses=COULD_NOT_EVALUATE_STATUS)
+        self.sweep(sweep_api(**stuck), store)
+        again = self.sweep(sweep_api(**stuck), store)
         self.assertEqual(again.sent, [])
 
-    def test_dispatches_give_up_after_the_attempt_limit(self):
+    def test_running_out_of_attempts_tells_the_author_instead_of_going_quiet(self):
         store = cache()
-        store.section("sweep", "abc").update({"attempts": 3})
-        api = self.sweep(sweep_api(suites=0), store)
-        self.assertEqual(api.sent, [])
+        store.section("sweep", "abc").update({"attempts": 3, "seen": True})
+        api = self.sweep(
+            sweep_api(runs=[VALIDATION_RUN], statuses=COULD_NOT_EVALUATE_STATUS), store
+        )
+        self.assertEqual(api.writes("POST", contains="/rerun"), [])
+        self.assertEqual(len(api.writes("POST", path="/issues/3/comments")), 1)
 
 
 class WatcherCase(unittest.TestCase):
@@ -1049,9 +1108,9 @@ class IssueRobustness(unittest.TestCase):
         self.assertEqual(api.sent, [])
 
 
-class DispatchRefusingApi(StubApi):
+class RerunRefusingApi(StubApi):
     def send(self, method, path, payload):
-        if "/dispatches" in path:
+        if "/rerun" in path:
             raise http_error(404)
         return super().send(method, path, payload)
 
@@ -1065,30 +1124,36 @@ class SweepRefusals(unittest.TestCase):
     def routes(self):
         return {
             "/pulls": [{"number": 3, "head": {"sha": "abc"}}],
-            "/actions/runs": {"workflow_runs": []},
-            "/commits/abc/check-suites": {"total_count": 0},
-            "/commits/abc/status": {"statuses": []},
+            "/actions/runs": {"workflow_runs": [VALIDATION_RUN]},
+            "/commits/abc/status": {"statuses": COULD_NOT_EVALUATE_STATUS},
             "/commits/abc/check-runs": {"check_runs": []},
             "/issues/3/comments": [],
         }
 
-    def test_a_refused_dispatch_is_retried_on_a_clock_not_never(self):
+    def test_a_refused_re_run_is_retried_on_a_clock_not_never(self):
         store = Cache(None)
-        api = DispatchRefusingApi(self.routes())
+        api = RerunRefusingApi(self.routes())
         self.sweep(api, store)
         state = store.section("sweep", "abc")
         self.assertIn("refused", state)
 
         # Within the refusal window nothing is tried again.
-        again = DispatchRefusingApi(self.routes())
+        again = RerunRefusingApi(self.routes())
         self.sweep(again, store)
-        self.assertEqual(again.writes("POST", contains="/dispatches"), [])
+        self.assertEqual(again.writes("POST", contains="/rerun"), [])
 
         # Once the window has passed, the pull request recovers.
         state["refused"] = "2020-01-01T00:00:00Z"
         recovered = StubApi(self.routes())
         self.sweep(recovered, store)
-        self.assertEqual(len(recovered.writes("POST", contains="/dispatches")), 1)
+        self.assertEqual(len(recovered.writes("POST", contains="/rerun")), 1)
+
+    def test_a_refused_re_run_tells_the_author(self):
+        store = Cache(None)
+        store.section("sweep", "abc")["seen"] = True
+        api = RerunRefusingApi(self.routes())
+        self.sweep(api, store)
+        self.assertEqual(len(api.writes("POST", path="/issues/3/comments")), 1)
 
     def test_stale_sweep_state_is_pruned(self):
         store = Cache(None)
@@ -1096,6 +1161,19 @@ class SweepRefusals(unittest.TestCase):
         self.sweep(StubApi(self.routes()), store)
         self.assertNotIn("zzz", store.data["sweep"])
         self.assertIn("abc", store.data["sweep"])
+
+    def test_state_survives_a_pull_request_past_the_sweep_limit(self):
+        """Pruning counts every open pull request, not just the ones swept."""
+        store = Cache(None)
+        store.section("sweep", "zzz")["attempts"] = 1
+        routes = self.routes()
+        # Past the limit, so it is pruned unless every open pull counts.
+        routes["/pulls"] = [
+            {"number": n, "head": {"sha": f"s{n}"}} for n in range(40)
+        ] + [{"number": 9, "head": {"sha": "zzz"}}]
+        options = parse_arguments([])
+        Sweep(StubApi(routes), store, options, log=lambda _: None).run()
+        self.assertIn("zzz", store.data["sweep"])
 
 
 if __name__ == "__main__":
