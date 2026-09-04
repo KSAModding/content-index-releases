@@ -1,4 +1,4 @@
-# The tooling's own tests, and the validation in front of an amendment.
+# The tooling's own tests, and the validation in front of an amendment or a release pull request.
 #
 # The validation only reports.
 # The required check is the `validate` commit status the ownership workflow posts, so no job may carry that name.
@@ -65,9 +65,17 @@ jobs:
           # The head is a merge commit, so its first parent is the published version.
           fetch-depth: 2
 
+      # A submitted release is derived against the listing it belongs to.
+      - name: Check out the authored half
+        uses: actions/checkout@v7
+        with:
+          repository: KSAModding/content-index
+          path: .authored
+
       - name: Validate
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          CONTENT_INDEX: ${{ github.workspace }}/.authored
           PULL_REQUEST: ${{ github.event.pull_request.number }}
           REPOSITORY: ${{ github.repository }}
         run: |

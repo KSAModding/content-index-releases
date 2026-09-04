@@ -3,6 +3,7 @@
 """Tests for the privileged half.
 """
 
+import importlib.util
 import json
 import os
 import tempfile
@@ -60,9 +61,14 @@ class LoadOwnership(unittest.TestCase):
         # The same two places load_ownership looks, so this runs wherever it can.
         # CI checks the authored half out and sets CONTENT_INDEX.
         root = Path(os.environ.get("CONTENT_INDEX") or decide.DEFAULT_AUTHORED)
-        if not (root / "tools" / "ownership.py").is_file():
+        path = root / "tools" / "ownership.py"
+        if not path.is_file():
             self.skipTest("content-index is not checked out next to this repository")
-        ownership = decide.load_ownership(root)
+        # Loaded under its own name: another test has put the stub into
+        # sys.modules as `ownership`, and load_ownership would hand that back.
+        spec = importlib.util.spec_from_file_location("real_ownership_under_test", path)
+        ownership = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(ownership)
         for name in ("VERIFIED", "UNVERIFIED", "COULD_NOT_EVALUATE", "TOPIC", "MARKER_PATH"):
             self.assertTrue(hasattr(ownership, name), name)
         self.assertTrue(callable(ownership.verify))
@@ -368,6 +374,31 @@ class Act(Ownership):
         self.assertEqual([status["state"] for status in statuses], ["pending", "success"])
         self.assertEqual({status["context"] for status in statuses}, {decide.STATUS_CONTEXT})
         self.assertTrue(any(method == "graphql" for method, _, _ in api.sent))
+
+    def test_a_verified_release_is_armed_for_merge(self):
+        # One added file is the release pull request shape, and ownership binds
+        # to the listing the folder names, the same as for an amendment.
+        self.write_verdict(documents=["releases/Mod/2.0.0.json"])
+        api = self.api()
+        api.files = [{"filename": "releases/Mod/2.0.0.json", "status": "added"}]
+        self.assertEqual(decide.act(api, self.ownership, self.arguments()), 0)
+
+        statuses = [payload for method, path, payload in api.sent
+                    if method == "POST" and path.startswith("/statuses/")]
+        self.assertEqual([status["state"] for status in statuses], ["pending", "success"])
+        self.assertTrue(any(method == "graphql" for method, _, _ in api.sent))
+
+    def test_two_added_releases_wait_for_a_steward(self):
+        self.write_verdict(documents=["releases/Mod/2.0.0.json", "releases/Mod/2.1.0.json"])
+        api = self.api()
+        api.files = [
+            {"filename": "releases/Mod/2.0.0.json", "status": "added"},
+            {"filename": "releases/Mod/2.1.0.json", "status": "added"},
+        ]
+        decide.act(api, self.ownership, self.arguments())
+        comments = [payload for method, path, payload in api.sent if "comments" in path]
+        self.assertTrue(any("exactly one" in payload["body"] for payload in comments))
+        self.assertNotIn("graphql", [method for method, _, _ in api.sent])
 
     def test_a_verdict_naming_another_pull_request_is_not_acted_on(self):
         self.write_verdict(pull_request=99)

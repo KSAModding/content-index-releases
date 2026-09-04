@@ -19,8 +19,8 @@ from hosts import (
     OversizeError,
     Response,
     SpaceDockHost,
-    _download,
     _utc,
+    download,
 )
 from stamp_release import StampError
 
@@ -59,28 +59,55 @@ def release(url, candidates=(), size=None):
     )
 
 
+class Recording(FakeHttp):
+    """Answers every URL and keeps the `api` flag each request carried."""
+
+    def __init__(self):
+        super().__init__({})
+        self.flags = []
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        self.flags.append(api)
+        return Response(200, {}, b"zip")
+
+
 class Downloads(unittest.TestCase):
+    def test_the_token_goes_to_the_github_api_host_only(self):
+        # The flag is what sends the bearer token, and a URL a submission names
+        # is the author's, so a look-alike host or a userinfo part must not
+        # collect it.
+        http = Recording()
+        for url in (
+            "https://api.github.com.attacker.example/x.zip",
+            "https://api.github.com@attacker.example/x.zip",
+            "https://github.com/o/r/releases/download/x.zip",
+            "https://api.github.com/repos/o/r/releases/assets/1",
+            "https://API.GITHUB.COM:443/repos/o/r/releases/assets/1",
+        ):
+            download(http, release(url))
+        self.assertEqual(http.flags, [False, False, False, True, True])
+
     def test_a_gone_archive_is_a_stamp_error(self):
         # 404, 410 and 451 are facts about the release, reported to the author.
         for code in (404, 410, 451):
             http = FakeHttp({"https://github.com/": http_error(code)})
             with self.assertRaises(StampError, msg=code):
-                _download(http, release("https://github.com/o/r/releases/download/x.zip"))
+                download(http, release("https://github.com/o/r/releases/download/x.zip"))
 
     def test_any_other_http_error_is_a_host_error(self):
         http = FakeHttp({"https://github.com/": http_error(403)})
         with self.assertRaises(HostError):
-            _download(http, release("https://github.com/o/r/releases/download/x.zip"))
+            download(http, release("https://github.com/o/r/releases/download/x.zip"))
 
     def test_an_oversized_archive_is_a_stamp_error_not_a_retry(self):
         # Oversize is permanent: as a HostError the watcher would download and
         # discard the archive every tick and no issue would ever open.
         with self.assertRaises(StampError):
-            _download(FakeHttp({}), release("https://github.com/o/r/x.zip",
+            download(FakeHttp({}), release("https://github.com/o/r/x.zip",
                                             size=MAX_ARCHIVE_BYTES + 1))
         http = FakeHttp({"https://github.com/": OversizeError("too large")})
         with self.assertRaises(StampError):
-            _download(http, release("https://github.com/o/r/x.zip"))
+            download(http, release("https://github.com/o/r/x.zip"))
 
 
 class Pagination(unittest.TestCase):
