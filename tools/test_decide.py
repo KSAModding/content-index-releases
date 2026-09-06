@@ -9,6 +9,7 @@ import os
 import tempfile
 import textwrap
 import unittest
+import urllib.error
 from pathlib import Path
 
 import decide
@@ -234,7 +235,7 @@ class ReadVerdict(unittest.TestCase):
 class FakeApi:
     """Records what would be sent, and answers what the test set up."""
 
-    def __init__(self, pulls=(), files=()):
+    def __init__(self, pulls=(), files=(), labels=()):
         self.repository = "KSAModding/content-index-releases"
         self.token = "t"
         self.public_token = "t"
@@ -243,6 +244,7 @@ class FakeApi:
         self.unavailable = RuntimeError
         self.pulls = list(pulls)
         self.files = list(files)
+        self.labels = list(labels)
         self.sent = []
 
     def get(self, path, **query):
@@ -254,7 +256,7 @@ class FakeApi:
         if path.endswith("/files"):
             return self.files if query.get("page", 1) == 1 else []
         if path.endswith("/labels"):
-            return []
+            return [{"name": name} for name in self.labels]
         if path.endswith("/requested_reviewers"):
             return {"teams": []}
         if path.endswith("/comments"):
@@ -268,6 +270,53 @@ class FakeApi:
     def graphql(self, query, variables):
         self.sent.append(("graphql", query.strip().splitlines()[1].strip(), variables))
         return {}
+
+
+class MissingLabelApi(FakeApi):
+    """A repository that does not carry `missing` as a label yet."""
+
+    def __init__(self, missing, **keywords):
+        super().__init__(**keywords)
+        self.missing = missing
+
+    def send(self, method, path, payload, token=None):
+        if self.missing and payload and payload.get("labels") == [self.missing]:
+            self.missing = None
+            raise urllib.error.HTTPError(path, 404, "Not Found", None, None)
+        return super().send(method, path, payload, token)
+
+
+class Label(unittest.TestCase):
+    def test_the_steward_label_is_added_once(self):
+        api = FakeApi()
+        decide.add_steward_label(api, 5)
+        self.assertEqual(api.sent, [("POST", "/issues/5/labels",
+                                     {"labels": [decide.STEWARD_LABEL]})])
+
+    def test_the_steward_label_is_not_added_twice(self):
+        api = FakeApi(labels=[decide.STEWARD_LABEL])
+        decide.add_steward_label(api, 5)
+        self.assertEqual(api.sent, [])
+
+    def test_the_steward_label_is_removed_on_the_way_to_a_merge(self):
+        api = FakeApi(labels=[decide.STEWARD_LABEL])
+        decide.remove_steward_label(api, 5)
+        self.assertEqual(api.sent, [("DELETE", f"/issues/5/labels/{decide.STEWARD_LABEL}", None)])
+
+    def test_a_label_the_repository_does_not_have_is_created_first(self):
+        api = MissingLabelApi(decide.STEWARD_LABEL)
+        decide.add_steward_label(api, 5)
+        self.assertEqual(
+            api.sent,
+            [
+                ("POST", "/labels", {
+                    "name": decide.STEWARD_LABEL,
+                    "color": "d93f0b",
+                    "description": "waiting on a steward",
+                }),
+                ("POST", "/issues/5/labels", {"labels": [decide.STEWARD_LABEL]}),
+            ],
+        )
 
 
 class PullRequestFor(unittest.TestCase):

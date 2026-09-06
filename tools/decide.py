@@ -29,6 +29,10 @@ STATUS_CONTEXT = "validate"
 STEWARD_LABEL = "needs-steward"
 STEWARD_TEAM = "content-manager-stewards"
 
+LABELS = {
+    STEWARD_LABEL: ("d93f0b", "waiting on a steward"),
+}
+
 COMMENT_MARKER = "<!-- content-index-releases:verdict -->"
 
 PULL_REQUEST_EVENT = "pull_request"
@@ -316,23 +320,25 @@ def _labels(api, number):
     return {label.get("name") for label in api.get(f"/issues/{number}/labels") or []}
 
 
-def add_label(api, number):
-    if STEWARD_LABEL in _labels(api, number):
-        return
+def _put_label(api, number, name):
+    """Put one label on, and create it first when the repository has none."""
     try:
-        api.send("POST", f"/issues/{number}/labels", {"labels": [STEWARD_LABEL]})
+        api.send("POST", f"/issues/{number}/labels", {"labels": [name]})
     except urllib.error.HTTPError as error:
         if error.code != 404:
             raise
-        api.send(
-            "POST",
-            "/labels",
-            {"name": STEWARD_LABEL, "color": "d93f0b", "description": "waiting on a steward"},
-        )
-        api.send("POST", f"/issues/{number}/labels", {"labels": [STEWARD_LABEL]})
+        colour, description = LABELS[name]
+        api.send("POST", "/labels", {"name": name, "color": colour, "description": description})
+        api.send("POST", f"/issues/{number}/labels", {"labels": [name]})
 
 
-def remove_label(api, number):
+def add_steward_label(api, number):
+    if STEWARD_LABEL in _labels(api, number):
+        return
+    _put_label(api, number, STEWARD_LABEL)
+
+
+def remove_steward_label(api, number):
     """Only on the way to a merge, so a steward's own labelling survives a reject."""
     if STEWARD_LABEL in _labels(api, number):
         api.send("DELETE", f"/issues/{number}/labels/{STEWARD_LABEL}", None)
@@ -578,10 +584,10 @@ def act(api, ownership, arguments):
     upsert_comment(api, number, decision.comment)
 
     if decision.needs_steward:
-        add_label(api, number)
+        add_steward_label(api, number)
         request_stewards(api, number)
     elif decision.auto_merge:
-        remove_label(api, number)
+        remove_steward_label(api, number)
         withdraw_stewards(api, number)
 
     if not decision.auto_merge and pull.get("auto_merge"):
