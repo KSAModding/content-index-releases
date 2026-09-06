@@ -15,6 +15,11 @@ RELEASE = re.compile(r"^releases/([A-Za-z0-9][^/]*)/[^/]+\.[Jj][Ss][Oo][Nn](?![\
 ADDED = "added"
 MODIFIED = "modified"
 
+RELEASE_KIND = "release"
+AMENDMENT_KIND = "amendment"
+
+KINDS = (RELEASE_KIND, AMENDMENT_KIND)
+
 Change = namedtuple("Change", "path status")
 
 
@@ -34,6 +39,24 @@ def listing_of(path):
 def releases(changes):
     """The release file paths among `changes`, in the order given."""
     return [change.path for change in changes if is_release(change.path)]
+
+
+def kind_of(change):
+    """The kind of change this is, or None when it is neither shape.
+    """
+    if not is_release(change.path):
+        return None
+    if change.status == ADDED:
+        return RELEASE_KIND
+    if change.status == MODIFIED:
+        return AMENDMENT_KIND
+    return None
+
+
+def kinds(changes):
+    """The kinds `changes` holds, in the order KINDS names them."""
+    found = {kind_of(change) for change in changes}
+    return [kind for kind in KINDS if kind in found]
 
 
 def added(changes):

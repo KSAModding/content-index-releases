@@ -53,6 +53,57 @@ class ListingOf(unittest.TestCase):
         self.assertIsNone(check_scope.listing_of("tools/amend.py"))
 
 
+class Kinds(unittest.TestCase):
+    def change(self, path, status):
+        return check_scope.Change(path, status)
+
+    def kinds(self, *pairs):
+        return check_scope.kinds([self.change(path, status) for path, status in pairs])
+
+    def test_an_added_release_file_is_a_release(self):
+        self.assertEqual(
+            check_scope.kind_of(self.change("releases/Mod/1.0.0.json", "added")),
+            check_scope.RELEASE_KIND,
+        )
+
+    def test_a_modified_release_file_is_an_amendment(self):
+        self.assertEqual(
+            check_scope.kind_of(self.change("releases/Mod/1.0.0.json", "modified")),
+            check_scope.AMENDMENT_KIND,
+        )
+
+    def test_a_removal_is_neither(self):
+        self.assertIsNone(check_scope.kind_of(self.change("releases/Mod/1.0.0.json", "removed")))
+
+    def test_anything_outside_releases_is_neither(self):
+        self.assertIsNone(check_scope.kind_of(self.change("tools/amend.py", "modified")))
+
+    def test_a_change_beside_a_release_file_does_not_hide_the_shape(self):
+        # The shape says what the change touches, and the verdict says whether
+        # that may merge itself. A wide change is still an amendment.
+        self.assertEqual(
+            self.kinds(("releases/Mod/1.0.0.json", "modified"), ("tools/amend.py", "modified")),
+            ["amendment"],
+        )
+
+    def test_both_shapes_come_in_the_order_KINDS_names(self):
+        self.assertEqual(
+            self.kinds(("releases/Mod/1.0.0.json", "modified"),
+                       ("releases/Mod/2.0.0.json", "added")),
+            ["release", "amendment"],
+        )
+
+    def test_a_repeated_shape_is_reported_once(self):
+        self.assertEqual(
+            self.kinds(("releases/Mod/1.0.0.json", "modified"),
+                       ("releases/Mod/2.0.0.json", "modified")),
+            ["amendment"],
+        )
+
+    def test_a_change_without_a_release_file_reports_nothing(self):
+        self.assertEqual(self.kinds(("tools/amend.py", "modified")), [])
+
+
 class Evaluate(unittest.TestCase):
     def evaluate(self, paths, status="modified"):
         return check_scope.evaluate(check_scope.changes(paths, status))
