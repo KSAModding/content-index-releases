@@ -6,9 +6,8 @@ Every case here is one sentence from RFC 0031, RFC 0035 or RFC 0017 that the
 stamper has to keep. The archives are built in memory, so the fixtures are the
 tests.
 
-The other half of the stamper's test is the design repository's examples/, where
-every value was produced by this procedure by hand: `tools/verify_examples.py`
-re-derives all of them from their release hosts and diffs.
+This is the authored half of a stamp: the bounds, the loader, the dependency
+merge, the listing block. `tools/verify_examples.py` covers the archive half.
 """
 
 import io
