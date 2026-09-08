@@ -3,6 +3,7 @@
 Almost nothing here needs a human, and design discussion belongs in [content-manager-design](https://github.com/KSAModding/content-manager-design/discussions).
 
 There are few reasons to open a pull request.
+A pull request is labelled `release` or `amendment` once the checks finish, which says which of the two shapes it has, and one that holds both carries both labels.
 
 ## An amendment
 

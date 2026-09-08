@@ -9,6 +9,7 @@ import os
 import tempfile
 import textwrap
 import unittest
+import urllib.error
 from pathlib import Path
 
 import decide
@@ -234,7 +235,7 @@ class ReadVerdict(unittest.TestCase):
 class FakeApi:
     """Records what would be sent, and answers what the test set up."""
 
-    def __init__(self, pulls=(), files=()):
+    def __init__(self, pulls=(), files=(), labels=()):
         self.repository = "KSAModding/content-index-releases"
         self.token = "t"
         self.public_token = "t"
@@ -243,6 +244,7 @@ class FakeApi:
         self.unavailable = RuntimeError
         self.pulls = list(pulls)
         self.files = list(files)
+        self.labels = list(labels)
         self.sent = []
 
     def get(self, path, **query):
@@ -254,7 +256,7 @@ class FakeApi:
         if path.endswith("/files"):
             return self.files if query.get("page", 1) == 1 else []
         if path.endswith("/labels"):
-            return []
+            return [{"name": name} for name in self.labels]
         if path.endswith("/requested_reviewers"):
             return {"teams": []}
         if path.endswith("/comments"):
@@ -268,6 +270,73 @@ class FakeApi:
     def graphql(self, query, variables):
         self.sent.append(("graphql", query.strip().splitlines()[1].strip(), variables))
         return {}
+
+
+class MissingLabelApi(FakeApi):
+    """A repository that does not carry `missing` as a label yet."""
+
+    def __init__(self, missing, **keywords):
+        super().__init__(**keywords)
+        self.missing = missing
+
+    def send(self, method, path, payload, token=None):
+        if self.missing and payload and payload.get("labels") == [self.missing]:
+            self.missing = None
+            raise urllib.error.HTTPError(path, 404, "Not Found", None, None)
+        return super().send(method, path, payload, token)
+
+
+class Label(unittest.TestCase):
+    def test_the_steward_label_is_added_once(self):
+        api = FakeApi()
+        decide.add_steward_label(api, 5)
+        self.assertEqual(api.sent, [("POST", "/issues/5/labels",
+                                     {"labels": [decide.STEWARD_LABEL]})])
+
+    def test_the_steward_label_is_not_added_twice(self):
+        api = FakeApi(labels=[decide.STEWARD_LABEL])
+        decide.add_steward_label(api, 5)
+        self.assertEqual(api.sent, [])
+
+    def test_the_steward_label_is_removed_on_the_way_to_a_merge(self):
+        api = FakeApi(labels=[decide.STEWARD_LABEL])
+        decide.remove_steward_label(api, 5)
+        self.assertEqual(api.sent, [("DELETE", f"/issues/5/labels/{decide.STEWARD_LABEL}", None)])
+
+    def test_the_shape_is_named(self):
+        api = FakeApi()
+        decide.sync_document_labels(api, 5, ["amendment"])
+        self.assertEqual(api.sent, [("POST", "/issues/5/labels", {"labels": ["amendment"]})])
+
+    def test_the_shape_is_not_named_twice(self):
+        api = FakeApi(labels=["amendment"])
+        decide.sync_document_labels(api, 5, ["amendment"])
+        self.assertEqual(api.sent, [])
+
+    def test_a_shape_the_change_no_longer_has_is_taken_off(self):
+        api = FakeApi(labels=["release", "amendment"])
+        decide.sync_document_labels(api, 5, ["amendment"])
+        self.assertEqual(api.sent, [("DELETE", "/issues/5/labels/release", None)])
+
+    def test_a_label_this_workflow_does_not_own_is_left_alone(self):
+        api = FakeApi(labels=[decide.STEWARD_LABEL, "area:publishing"])
+        decide.sync_document_labels(api, 5, [])
+        self.assertEqual(api.sent, [])
+
+    def test_a_label_the_repository_does_not_have_is_created_first(self):
+        api = MissingLabelApi("release")
+        decide.sync_document_labels(api, 5, ["release"])
+        self.assertEqual(
+            api.sent,
+            [
+                ("POST", "/labels", {
+                    "name": "release",
+                    "color": "0e8a16",
+                    "description": "adds a release document",
+                }),
+                ("POST", "/issues/5/labels", {"labels": ["release"]}),
+            ],
+        )
 
 
 class PullRequestFor(unittest.TestCase):
@@ -446,6 +515,52 @@ class Act(Ownership):
         decide.act(api, self.ownership, self.arguments())
         comments = [payload for method, path, payload in api.sent if "comments" in path]
         self.assertTrue(any("not in content-index" in payload["body"] for payload in comments))
+
+    def labelled(self, api):
+        return [payload["labels"][0] for method, path, payload in api.sent
+                if method == "POST" and path == "/issues/7/labels"]
+
+    def test_an_amendment_reads_as_an_amendment(self):
+        self.write_verdict()
+        api = self.api()
+        decide.act(api, self.ownership, self.arguments())
+        self.assertEqual(self.labelled(api), ["amendment"])
+
+    def test_an_added_release_reads_as_a_release(self):
+        self.write_verdict(documents=["releases/Mod/2.0.0.json"])
+        api = self.api()
+        api.files = [{"filename": "releases/Mod/2.0.0.json", "status": "added"}]
+        decide.act(api, self.ownership, self.arguments())
+        self.assertEqual(self.labelled(api), ["release"])
+
+    def test_a_wide_change_carries_the_shape_next_to_the_steward_label(self):
+        self.write_verdict(scope_reason="the change also touches tools/amend.py")
+        api = self.api()
+        api.files = [
+            {"filename": "releases/Mod/1.0.0.json", "status": "modified"},
+            {"filename": "tools/amend.py", "status": "modified"},
+        ]
+        decide.act(api, self.ownership, self.arguments())
+        self.assertEqual(self.labelled(api), ["amendment", decide.STEWARD_LABEL])
+
+    def test_a_change_that_holds_both_shapes_carries_both(self):
+        self.write_verdict(
+            scope_reason="the change adds releases/Mod/2.0.0.json next to an amendment"
+        )
+        api = self.api()
+        api.files = [
+            {"filename": "releases/Mod/2.0.0.json", "status": "added"},
+            {"filename": "releases/Mod/1.0.0.json", "status": "modified"},
+        ]
+        decide.act(api, self.ownership, self.arguments())
+        self.assertEqual(self.labelled(api), ["release", "amendment", decide.STEWARD_LABEL])
+
+    def test_a_change_that_touches_no_release_file_carries_no_shape(self):
+        self.write_verdict(scope_reason="the change touches no release file")
+        api = self.api()
+        api.files = [{"filename": "tools/amend.py", "status": "modified"}]
+        decide.act(api, self.ownership, self.arguments())
+        self.assertEqual(self.labelled(api), [decide.STEWARD_LABEL])
 
     def test_a_run_that_belongs_to_no_pull_request_does_nothing(self):
         self.write_verdict()
