@@ -23,10 +23,22 @@ import re
 import sys
 import tomllib
 import zipfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 
 SPEC_VERSION = 1
+
+# The one entry the stamper decompresses. A mod.toml is a few hundred bytes,
+# and the declared size bounds what the zip reader unpacks.
+MOD_TOML_LIMIT = 1024 * 1024
+
+# What the zip reader raises for an entry it cannot unpack: a corrupt entry, an
+# encrypted one, a compression method it does not implement, a stream that
+# ends early. Each is a fact about the archive, so each is a StampError.
+UNREADABLE_ENTRY = (
+    zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, OSError, zlib.error
+)
 
 # SemVer 2.0.0, from semver.org, with the leading `v` a tag is allowed to carry.
 SEMVER = re.compile(
@@ -231,9 +243,18 @@ def read_mod_toml(handle, root):
     """
     name = f"{root}/{MOD_TOML}" if root else MOD_TOML
     try:
-        raw = handle.read(name)
+        info = handle.getinfo(name)
     except KeyError:
         return None
+    if info.file_size > MOD_TOML_LIMIT:
+        raise StampError(
+            f"the archive's {name} is {info.file_size} bytes, above the "
+            f"{MOD_TOML_LIMIT} byte limit"
+        )
+    try:
+        raw = handle.read(name)
+    except UNREADABLE_ENTRY as error:
+        raise StampError(f"the archive's {name} cannot be read, {error}") from error
     try:
         return tomllib.loads(raw.decode("utf-8"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:

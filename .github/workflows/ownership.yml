@@ -1,6 +1,6 @@
-# The privileged half of the amendment flow (RFC 0033).
+# The privileged half of the amendment and release pull request flows (RFC 0033).
 #
-# It reads the verdict `checks` left, checks that the author controls the listing being amended, and arms auto-merge or hands the pull request to a steward.
+# It reads the verdict `checks` left, checks that the author controls the listing the change belongs to, and arms auto-merge or hands the pull request to a steward.
 # The `validate` status it posts is the required check.
 name: ownership
 
