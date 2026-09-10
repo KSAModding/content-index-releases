@@ -127,6 +127,7 @@ class Decide(Ownership):
         self.assertEqual(decision.status, "failure")
         self.assertFalse(decision.auto_merge)
         self.assertIn("it widens", decision.comment)
+        self.assertIn("Push a fix", decision.comment)
 
     def test_a_verdict_that_could_not_be_reached_is_an_error(self):
         decision = decide.decide(
@@ -135,7 +136,7 @@ class Decide(Ownership):
         )
         self.assertEqual(decision.status, "error")
         self.assertFalse(decision.auto_merge)
-        self.assertIn("runs the checks again", decision.comment)
+        self.assertIn("run the checks again", decision.comment)
 
     def test_a_verified_owner_gets_auto_merge(self):
         decision = decide.decide(
@@ -143,7 +144,8 @@ class Decide(Ownership):
         )
         self.assertEqual(decision.status, "success")
         self.assertTrue(decision.auto_merge)
-        self.assertIsNone(decision.comment)
+        self.assertIn("merge automatically", decision.comment)
+        self.assertIn("snapshot rebuild", decision.comment)
 
     def test_an_unverified_author_waits_for_a_steward(self):
         decision = decide.decide(
@@ -173,6 +175,30 @@ class Decide(Ownership):
         )
         self.assertTrue(decision.needs_steward)
         self.assertIn("2 listings", decision.comment)
+
+    def test_a_passing_message_appears_in_the_comment_on_every_path(self):
+        passing_check = {"name": "scope", "outcome": "pass", "messages": ["one document"]}
+        cases = [
+            ("reject", True, self.result(self.ownership.VERIFIED)),
+            ("could-not-evaluate", True, self.result(self.ownership.VERIFIED)),
+            ("pass", False, self.result(self.ownership.VERIFIED)),
+            ("pass", True, self.result(self.ownership.VERIFIED)),
+            ("pass", True, self.result(self.ownership.COULD_NOT_EVALUATE, "host down")),
+            ("pass", True, self.result(self.ownership.UNVERIFIED, "no proof")),
+        ]
+
+        for outcome, candidate, result in cases:
+            with self.subTest(outcome=outcome, candidate=candidate, ownership=result.state):
+                verdict = self.verdict(outcome, checks=[passing_check])
+                decision = decide.decide(verdict, candidate, self.ownership, result)
+                self.assertIn("Notes:", decision.comment)
+                self.assertIn("- `scope`: one document", decision.comment)
+
+    def test_a_comment_without_messages_has_no_notes_section(self):
+        decision = decide.decide(
+            self.verdict("pass"), True, self.ownership, self.result(self.ownership.VERIFIED)
+        )
+        self.assertNotIn("Notes:", decision.comment)
 
     def test_the_status_description_fits_what_github_accepts(self):
         for outcome in ("pass", "reject", "could-not-evaluate"):
@@ -235,7 +261,7 @@ class ReadVerdict(unittest.TestCase):
 class FakeApi:
     """Records what would be sent, and answers what the test set up."""
 
-    def __init__(self, pulls=(), files=(), labels=()):
+    def __init__(self, pulls=(), files=(), labels=(), comments=()):
         self.repository = "KSAModding/content-index-releases"
         self.token = "t"
         self.public_token = "t"
@@ -245,6 +271,7 @@ class FakeApi:
         self.pulls = list(pulls)
         self.files = list(files)
         self.labels = list(labels)
+        self.comments = list(comments)
         self.sent = []
 
     def get(self, path, **query):
@@ -260,11 +287,19 @@ class FakeApi:
         if path.endswith("/requested_reviewers"):
             return {"teams": []}
         if path.endswith("/comments"):
-            return []
+            return self.comments
         return None
 
     def send(self, method, path, payload, token=None):
         self.sent.append((method, path, payload))
+        if method == "POST" and path.endswith("/comments"):
+            self.comments.append({"id": len(self.comments) + 1, "body": payload["body"]})
+        elif method == "PATCH" and path.startswith("/issues/comments/"):
+            comment_id = int(path.rsplit("/", 1)[1])
+            for comment in self.comments:
+                if comment["id"] == comment_id:
+                    comment["body"] = payload["body"]
+                    break
         return {}
 
     def graphql(self, query, variables):
@@ -443,6 +478,7 @@ class Act(Ownership):
         self.assertEqual([status["state"] for status in statuses], ["pending", "success"])
         self.assertEqual({status["context"] for status in statuses}, {decide.STATUS_CONTEXT})
         self.assertTrue(any(method == "graphql" for method, _, _ in api.sent))
+        self.assertTrue(any(path == "/issues/7/comments" for _, path, _ in api.sent))
 
     def test_a_verified_release_is_armed_for_merge(self):
         # One added file is the release pull request shape, and ownership binds
@@ -456,6 +492,39 @@ class Act(Ownership):
                     if method == "POST" and path.startswith("/statuses/")]
         self.assertEqual([status["state"] for status in statuses], ["pending", "success"])
         self.assertTrue(any(method == "graphql" for method, _, _ in api.sent))
+
+    def test_the_same_comment_is_updated_after_a_second_run(self):
+        self.write_verdict()
+        api = self.api()
+
+        decide.act(api, self.ownership, self.arguments())
+        self.write_verdict(
+            checks=[{"name": "amendment", "outcome": "pass", "messages": ["still valid"]}]
+        )
+        decide.act(api, self.ownership, self.arguments())
+
+        created = [path for method, path, _ in api.sent
+                   if method == "POST" and path == "/issues/7/comments"]
+        updated = [path for method, path, _ in api.sent
+                   if method == "PATCH" and path.startswith("/issues/comments/")]
+        self.assertEqual(len(created), 1)
+        self.assertEqual(len(updated), 1)
+        self.assertEqual(len(api.comments), 1)
+        self.assertIn("still valid", api.comments[0]["body"])
+
+    def test_an_auto_merge_failure_keeps_notes_and_the_run_link(self):
+        self.write_verdict(
+            checks=[{"name": "amendment", "outcome": "pass", "messages": ["one amendment"]}]
+        )
+        api = self.api()
+        api.graphql = lambda query, variables: {"errors": [{"message": "auto-merge is off"}]}
+
+        decide.act(api, self.ownership, self.arguments())
+
+        self.assertEqual(len(api.comments), 1)
+        self.assertIn("auto-merge could not be armed", api.comments[0]["body"])
+        self.assertIn("- `amendment`: one amendment", api.comments[0]["body"])
+        self.assertIn("https://example.invalid/run", api.comments[0]["body"])
 
     def test_two_added_releases_wait_for_a_steward(self):
         self.write_verdict(documents=["releases/Mod/2.0.0.json", "releases/Mod/2.1.0.json"])
