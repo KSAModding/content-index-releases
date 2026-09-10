@@ -590,6 +590,17 @@ def act(api, ownership, arguments):
                 Decision("error", f"the verdict does not match this run, {reason}"),
                 arguments.run_url,
             )
+            upsert_comment(
+                api,
+                number,
+                _comment(
+                    "The validation result does not match this run, so nothing is decided yet.",
+                    {},
+                    f"The saved verdict {reason}.",
+                    "Push a fix to run the checks again.",
+                    run_url=arguments.run_url,
+                ),
+            )
             return 0
 
     # Work this out again from the API. The verdict comes from code the pull

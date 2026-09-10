@@ -541,11 +541,17 @@ class Act(Ownership):
     def test_a_verdict_naming_another_pull_request_is_not_acted_on(self):
         self.write_verdict(pull_request=99)
         api = self.api()
+        api.comments = [
+            {"id": 1, "body": f"{decide.COMMENT_MARKER}\nValidation passed."}
+        ]
         # A race, but the status has to say so or the pull request sits pending.
         self.assertEqual(decide.act(api, self.ownership, self.arguments()), 0)
         statuses = [payload for method, path, payload in api.sent
                     if method == "POST" and path.startswith("/statuses/")]
         self.assertEqual([status["state"] for status in statuses], ["error"])
+        self.assertEqual(len(api.comments), 1)
+        self.assertIn("does not match this run", api.comments[0]["body"])
+        self.assertNotIn("Validation passed", api.comments[0]["body"])
         self.assertNotIn("graphql", [method for method, _, _ in api.sent])
 
     def test_an_armed_auto_merge_is_taken_back_off_when_a_steward_is_needed(self):
