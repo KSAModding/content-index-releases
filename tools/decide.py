@@ -80,11 +80,20 @@ class Decision:
 def _messages(verdict):
     lines = []
     for check in verdict.get("checks") or []:
-        if check.get("outcome") == PASS:
-            continue
         for message in check.get("messages") or []:
             lines.append(f"- `{check.get('name')}`: {message}")
     return lines
+
+
+def _comment(first, verdict, *paragraphs, run_url=""):
+    sections = [first]
+    messages = _messages(verdict)
+    if messages:
+        sections.append("\n".join(["Notes:"] + messages))
+    sections.extend(paragraph for paragraph in paragraphs if paragraph)
+    if run_url:
+        sections.append(f"[The validation run]({run_url})")
+    return "\n\n".join(sections)
 
 
 def decide(verdict, candidate, ownership, ownership_result, run_url=""):
@@ -93,19 +102,30 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
     Ownership is a separate axis, so an amendment that validates but cannot prove who made it is green and waits for a steward.
     """
     outcome = verdict.get("verdict")
-    tail = f"\n\n[The validation run]({run_url})" if run_url else ""
 
     if outcome == REJECT:
-        body = "\n".join(["The validation rejected this change.", ""] + _messages(verdict))
-        return Decision("failure", "the validation rejected this change", comment=body + tail)
+        return Decision(
+            "failure",
+            "the validation rejected this change",
+            comment=_comment(
+                "The validation rejected this change.",
+                verdict,
+                "Push a fix to run the checks again.",
+                run_url=run_url,
+            ),
+        )
 
     if outcome != PASS:
-        body = "\n".join(
-            ["The validation could not reach a verdict, so nothing is decided yet.", ""]
-            + _messages(verdict)
-            + ["", "A new commit on this pull request runs the checks again."]
+        return Decision(
+            "error",
+            "the validation could not reach a verdict",
+            comment=_comment(
+                "The validation could not reach a verdict, so nothing is decided yet.",
+                verdict,
+                "Push a fix to run the checks again.",
+                run_url=run_url,
+            ),
         )
-        return Decision("error", "the validation could not reach a verdict", comment=body + tail)
 
     if not candidate:
         reason = verdict.get("scope_reason") or (
@@ -115,20 +135,35 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
             "success",
             "validated, and a steward decides",
             needs_steward=True,
-            comment=f"Validated. A steward has to merge this one, because {reason}." + tail,
+            comment=_comment(
+                f"Validation passed, but a steward has to merge this one because {reason}.",
+                verdict,
+                run_url=run_url,
+            ),
         )
 
     if ownership_result.state == ownership.VERIFIED:
-        return Decision("success", "validated, arming auto-merge", auto_merge=True)
+        return Decision(
+            "success",
+            "validated, arming auto-merge",
+            auto_merge=True,
+            comment=_comment(
+                "Validation passed, so this pull request will merge automatically after the required checks finish, and the snapshot rebuild starts after the merge.",
+                verdict,
+                run_url=run_url,
+            ),
+        )
 
     if ownership_result.state == ownership.COULD_NOT_EVALUATE:
         return Decision(
             "success",
             "validated, ownership could not be checked",
             needs_steward=True,
-            comment=(
-                "Validated. The ownership check reached no verdict, so this waits for "
-                f"a steward: {ownership_result.reason}." + tail
+            comment=_comment(
+                "Validation passed, but the ownership check reached no verdict, so this pull request waits for a steward.",
+                verdict,
+                f"The ownership check reported: {ownership_result.reason}.",
+                run_url=run_url,
             ),
         )
 
@@ -136,15 +171,15 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
         "success",
         "validated, ownership not verified",
         needs_steward=True,
-        comment=(
-            "Validated, and ownership is not verified, so a steward decides.\n\n"
-            f"{ownership_result.reason}.\n\n"
-            "A release file is submitted or amended by the verified owner of the listing, "
-            "or by a steward. "
-            "The proof is something only you can put on the release repository: either "
-            f"set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on "
-            f"it, or commit `{ownership.MARKER_PATH}` naming your username."
-            + tail
+        comment=_comment(
+            "Validation passed, but ownership is not verified, so a steward decides.",
+            verdict,
+            f"The ownership check reported: {ownership_result.reason}.",
+            "A release file is submitted or amended by the verified owner of the listing, or by a steward. "
+            "The proof is something only you can put on the release repository. "
+            f"Set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on it, "
+            f"or commit `{ownership.MARKER_PATH}` naming your username.",
+            run_url=run_url,
         ),
     )
 
@@ -555,6 +590,17 @@ def act(api, ownership, arguments):
                 Decision("error", f"the verdict does not match this run, {reason}"),
                 arguments.run_url,
             )
+            upsert_comment(
+                api,
+                number,
+                _comment(
+                    "The validation result does not match this run, so nothing is decided yet.",
+                    {},
+                    f"The saved verdict {reason}.",
+                    "Push a fix to run the checks again.",
+                    run_url=arguments.run_url,
+                ),
+            )
             return 0
 
     # Work this out again from the API. The verdict comes from code the pull
@@ -592,8 +638,11 @@ def act(api, ownership, arguments):
                 decision.status,
                 "validated, and auto-merge could not be armed",
                 needs_steward=True,
-                comment="Validated and ownership verified, but auto-merge could not be armed, "
-                "so a steward has to merge this one.",
+                comment=_comment(
+                    "Validation and ownership passed, but auto-merge could not be armed, so a steward has to merge this pull request.",
+                    verdict,
+                    run_url=arguments.run_url,
+                ),
             )
 
     post_status(api, arguments.head_sha, decision, arguments.run_url)
