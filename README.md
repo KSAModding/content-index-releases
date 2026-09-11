@@ -8,6 +8,9 @@ The authored documents live in the other half, [content-index](https://github.co
 The index is defined by [RFC 0031](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0031-content-metadata-format.md) (the metadata format) and [RFC 0033](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0033-content-index.md) (the index itself), in [content-manager-design](https://github.com/KSAModding/content-manager-design).
 Design discussion belongs there, not here.
 
+Security problems in this repository, its tools, workflows, or published snapshot use [SECURITY.md](SECURITY.md).
+Problems with a listing or archive use the [content-index takedown and dispute policy](https://github.com/KSAModding/content-index/blob/main/POLICY.md).
+
 ## Nobody hand-writes a release file
 
 A watcher polls each listing's release host, downloads the archive, computes the checksum and the sizes, reads the code dependencies out of the archive, merges them with the authored document, and commits the result.
