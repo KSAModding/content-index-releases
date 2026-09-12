@@ -101,7 +101,7 @@ def load_toml(path):
             document = tomllib.load(handle)
     except tomllib.TOMLDecodeError as error:
         raise SnapshotError(f"{path}: not valid TOML, {error}") from error
-    except OSError as error:
+    except (OSError, UnicodeDecodeError) as error:
         raise SnapshotError(f"{path}: cannot be read, {error}") from error
     return jsonable(document, str(path))
 
@@ -382,6 +382,9 @@ def build(authored, releases, game_versions, sources=None, log=None):
     document["listings"] = rendered_listings
     document["packs"] = rendered_packs
     document["game_versions"] = load_json(game_versions)
+    tags = authored / "tags.toml"
+    if tags.is_file():
+        document["tags"] = load_toml(tags)
     return document
 
 
@@ -455,8 +458,8 @@ def parse_arguments(argv):
     )
     parser.add_argument(
         "--authored", default=".authored", type=Path,
-        help="a checkout of the authored repository, which holds listings/, packs/ "
-        "and index-status.toml",
+        help="a checkout of the authored repository, which holds listings/, packs/, "
+        "index-status.toml and optional tags.toml",
     )
     parser.add_argument("--releases", default="releases", type=Path)
     parser.add_argument("--game-versions", default="game-versions.json", type=Path)

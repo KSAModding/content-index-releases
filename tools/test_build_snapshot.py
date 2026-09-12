@@ -133,6 +133,9 @@ class Index:
             lines.append("")
         self.write(self.authored / "index-status.toml", "\n".join(lines) or "entries = []\n")
 
+    def tags(self, text):
+        self.write(self.authored / "tags.toml", text)
+
     def build(self, **kwargs):
         return build(
             self.authored,
@@ -208,6 +211,62 @@ class Document(Fixture):
 
     def test_the_game_release_list_is_embedded_verbatim(self):
         self.assertEqual(self.index.build()["game_versions"], GAME_VERSIONS)
+
+    def test_the_curated_tags_are_embedded_verbatim_as_json(self):
+        self.index.tags(
+            """\
+spec_version = 1
+
+[[mod]]
+tag = "parts"
+name = "Parts"
+meaning = "New parts, engines and vehicles built from them."
+forum_prefix = "Parts"
+
+[[mod]]
+tag = "library"
+name = "Library"
+meaning = "Code that other content depends on and that does nothing on its own."
+"""
+        )
+        tags = self.index.build()["tags"]
+        self.assertEqual(list(tags), ["spec_version", "mod"])
+        self.assertEqual(
+            tags,
+            {
+                "spec_version": 1,
+                "mod": [
+                    {
+                        "tag": "parts",
+                        "name": "Parts",
+                        "meaning": "New parts, engines and vehicles built from them.",
+                        "forum_prefix": "Parts",
+                    },
+                    {
+                        "tag": "library",
+                        "name": "Library",
+                        "meaning": "Code that other content depends on and that does nothing on its own.",
+                    },
+                ],
+            },
+        )
+        self.assertEqual(
+            list(tags["mod"][0]),
+            ["tag", "name", "meaning", "forum_prefix"],
+        )
+
+    def test_the_curated_tags_are_absent_when_tags_toml_is_absent(self):
+        self.assertNotIn("tags", self.index.build())
+
+    def test_invalid_curated_tags_name_tags_toml_in_the_error(self):
+        self.index.tags("spec_version = \n")
+        with self.assertRaisesRegex(SnapshotError, "tags[.]toml"):
+            self.index.build()
+
+    def test_invalid_utf8_in_curated_tags_names_tags_toml_in_the_error(self):
+        (self.index.authored / "tags.toml").write_bytes(b"spec_version = \xff\n")
+        with self.assertRaisesRegex(SnapshotError, "tags[.]toml"):
+            self.index.build()
 
     def test_a_game_release_list_that_is_missing_is_an_error(self):
         self.index.game_versions.unlink()
@@ -445,6 +504,10 @@ class Determinism(Fixture):
         self.index.listing("AutoStage")
         self.index.release("AutoStage", "0.4.3")
         self.index.pack("Pack", "1.0.0")
+        self.index.tags(
+            'spec_version = 1\n\n[[mod]]\ntag = "parts"\nname = "Parts"\n'
+            'meaning = "New parts, engines and vehicles built from them."\n'
+        )
         first, second = self.build_twice()
         self.assertEqual(first, second)
 
