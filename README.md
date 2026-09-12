@@ -19,7 +19,7 @@ For content the watcher does not watch, the same file arrives by pull request, a
 
 ## Clients do not read this repository
 
-A client fetches one snapshot artifact, which merges both halves of the index plus the game release list into a single document:
+A client fetches one snapshot artifact, which merges both halves of the index, the game release list and the curated tag vocabulary into a single document:
 
 ```text
 https://ksamodding.github.io/content-index-releases/v1/index.json
@@ -76,6 +76,8 @@ python3 tools/watch.py --authored ../content-index --dry-run
 `.github/workflows/snapshot.yml` merges both halves of the index and the game release list into the one document clients fetch, and publishes it to GitHub Pages at `/v1/index.json`.
 
 The `v1` segment carries the snapshot format version, so a future break can be served next to the version it replaces. The fields are specified in [spec/snapshot.md](https://github.com/KSAModding/content-manager-design/blob/main/spec/snapshot.md).
+
+When the authored checkout has `tags.toml`, the snapshot embeds it as the optional top-level `tags` field. When the file is absent, the field is absent.
 
 A build runs on every change to either half: this repository triggers it on a push, and the authored half asks for it through a `repository_dispatch`, so a steward writing `index-status.toml` reaches clients in one build rather than at the next scheduled one.
 
