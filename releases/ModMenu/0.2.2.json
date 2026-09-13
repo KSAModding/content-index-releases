@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "ModMenu",
+  "type": "mod",
+  "version": "0.2.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-02T22:08:53Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://github.com/MrJeranimo/ModMenu/releases/download/v0.2.2/ModMenu.zip",
+    "sha256": "6C3B149C82FFA5CCF187CE8A839D18295B238E22E88117FBDC723AB99E6086B6",
+    "size": 10497,
+    "content_type": "application/x-zip-compressed"
+  },
+  "install_size": 20657,
+  "install": {
+    "root": "ModMenu",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/MrJeranimo/ModMenu/releases/tag/v0.2.2",
+  "listing": {
+    "name": "ModMenu",
+    "authors": [
+      "MrJeranimo"
+    ],
+    "abstract": "This mod adds a \"Mods\" menu tab to the Main Menu Bar at the top of the screen for mods to put menu entries in.",
+    "description": "# ModMenu\n\nA modding framework for Kitten Space Agency that allows mods to easily add menu entries.\nThis mod will work standalone, but the \"Mods\" menu will have nothing inside it. This mod is intended as a dependency for other mods.\n\nSource Code: https://github.com/MrJeranimo/ModMenu/\n\nMod Loader (Required): StarMap https://github.com/StarMapLoader/StarMap\n\n## Example Mod\n\nTo see ModMenu in action, it is recommended to install [ModMenu.ExampleMod](https://spacedock.info/mod/4055/ModMenu%20ExampleMod) and put that mod in your KSA Content folder.\n\nFor developers it is also recommended to see how ModMenu.ExampleMod uses the ModMenu.\n\n## For Mod Developers\n\nCheck out the GitHub Page for more info: https://github.com/MrJeranimo/ModMenu\n\n## License\n\nMIT\n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/modmenu.562/",
+      "repository": "https://github.com/MrJeranimo/ModMenu",
+      "spacedock": "https://spacedock.info/mod/4054/ModMenu",
+      "bugtracker": "https://github.com/MrJeranimo/ModMenu/issues"
+    }
+  }
+}
