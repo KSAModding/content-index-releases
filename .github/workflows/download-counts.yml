@@ -1,0 +1,133 @@
+# Refresh download-counts.json (RFC 0052) and commit it when its bytes changed.
+name: download counts
+
+on:
+  schedule:
+    # Several slots because GitHub drops scheduled runs. The age check below keeps it to one refresh a day.
+    - cron: "9 4,10,16,22 * * *"
+  # Drops the counts of deleted listings without asking a host.
+  repository_dispatch:
+    types: [index-changed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Ask the hosts and print the document, write and commit nothing."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # The watcher's group, so the two never push to main at the same time.
+  group: watcher
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: refresh
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: content-index-releases
+          permission-contents: write
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+          # Full history, so git log finds the age of the counts.
+          fetch-depth: 0
+
+      - name: Decide what this run does
+        id: mode
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          mode=refresh
+          if [ "$EVENT" = "repository_dispatch" ]; then
+            mode=prune
+          elif [ "$EVENT" = "schedule" ]; then
+            last="$(git log -1 --format=%ct -- download-counts.json)"
+            if [ -n "$last" ] && [ "$(( $(date +%s) - last ))" -lt "$(( 20 * 3600 ))" ]; then
+              echo "the counts were committed less than 20 hours ago, so this run asks no host"
+              mode=skip
+            fi
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+
+      - if: steps.mode.outputs.mode != 'skip'
+        uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/content-index
+          ref: main
+          path: .authored
+
+      # Derived cache of GitHub ETags, keyed on the tools that produced it.
+      - name: Restore the derived cache
+        if: steps.mode.outputs.mode == 'refresh'
+        uses: actions/cache/restore@v6
+        with:
+          path: .download-counts
+          key: download-counts-${{ hashFiles('tools/hosts.py', 'tools/download_counts.py') }}-${{ github.run_id }}
+          restore-keys: download-counts-${{ hashFiles('tools/hosts.py', 'tools/download_counts.py') }}-
+
+      - name: Refresh
+        if: steps.mode.outputs.mode != 'skip'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MODE: ${{ steps.mode.outputs.mode }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          arguments=(--authored .authored)
+          if [ "$MODE" = "prune" ]; then
+            arguments+=(--prune-only)
+          else
+            arguments+=(--cache .download-counts/cache.json)
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            arguments+=(--dry-run)
+          fi
+          python3 tools/download_counts.py "${arguments[@]}"
+
+      - name: Commit and push
+        if: ${{ steps.mode.outputs.mode != 'skip' && inputs.dry_run != true }}
+        env:
+          MODE: ${{ steps.mode.outputs.mode }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- download-counts.json)" ]; then
+            echo "the counts are unchanged, so nothing is committed"
+            exit 0
+          fi
+          message="Refresh the download counts"
+          if [ "$MODE" = "prune" ]; then
+            message="Drop the download counts of removed listings"
+          fi
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git add download-counts.json
+          git commit -m "$message"
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            git pull --rebase
+          done
+          echo "could not push after three attempts; the next run tries again"
+          exit 1
+
+      - name: Save the derived cache
+        if: ${{ success() && steps.mode.outputs.mode == 'refresh' && inputs.dry_run != true }}
+        uses: actions/cache/save@v6
+        with:
+          path: .download-counts
+          key: download-counts-${{ hashFiles('tools/hosts.py', 'tools/download_counts.py') }}-${{ github.run_id }}
