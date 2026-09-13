@@ -11,13 +11,17 @@ import sys
 import tomllib
 from pathlib import Path
 
-from stamp_release import SEMVER, valid_id
+from stamp_release import SEMVER, StampError, normalize_version, valid_id
 
 SNAPSHOT_VERSION = 1
 
 STATES = ("delisted", "disputed", "retracted")
 
 STATUS_FIELDS = ("state", "since", "reason")
+
+DOWNLOAD_COUNTS_VERSION = 1
+
+DOWNLOAD_HOSTS = ("github", "spacedock")
 
 
 class SnapshotError(Exception):
@@ -303,7 +307,102 @@ def check_states_resolve(whole, versioned, names, listings, packs, log):
             )
 
 
-def listing_entry(document, status, releases):
+def check_count(value, where):
+    # JSON `true` is an int to Python, so a bool is refused explicitly.
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise SnapshotError(f"{where}: {value!r} is not a non-negative integer")
+
+
+def check_counted(item, where, keys):
+    """One object of a `total` and the `hosts` it is the sum of, with exactly `keys`."""
+    if not isinstance(item, dict):
+        raise SnapshotError(f"{where}: is not an object")
+    unknown = sorted(set(item) - set(keys))
+    if unknown:
+        raise SnapshotError(f"{where}: carries the unknown key(s) {', '.join(unknown)}")
+    missing = [key for key in keys if key not in item]
+    if missing:
+        raise SnapshotError(f"{where}: lacks {', '.join(missing)}")
+
+    counts = item["hosts"]
+    if not isinstance(counts, dict) or not counts:
+        raise SnapshotError(f"{where}: hosts has to be an object with at least one host")
+    for host, value in counts.items():
+        if host not in DOWNLOAD_HOSTS:
+            raise SnapshotError(f"{where}: '{host}' is not a host RFC 0052 defines")
+        check_count(value, f"{where} hosts.{host}")
+    check_count(item["total"], f"{where} total")
+    if item["total"] != sum(counts.values()):
+        raise SnapshotError(
+            f"{where}: total {item['total']} is not the sum of its hosts"
+        )
+
+
+def check_download_counts(document, where):
+    """download-counts.json checked against RFC 0052, its entries keyed by lowercased id."""
+    if sorted(document) != ["listings", "spec_version"]:
+        raise SnapshotError(f"{where}: the document carries exactly spec_version and listings")
+    version = document["spec_version"]
+    if isinstance(version, bool) or version != DOWNLOAD_COUNTS_VERSION:
+        raise SnapshotError(
+            f"{where}: spec_version {version!r} is not {DOWNLOAD_COUNTS_VERSION}"
+        )
+    if not isinstance(document["listings"], list):
+        raise SnapshotError(f"{where}: listings has to be an array")
+
+    entries = {}
+    previous = None
+    for position, entry in enumerate(document["listings"], start=1):
+        at = f"{where} listing {position}"
+        check_counted(entry, at, ("id", "total", "hosts", "releases"))
+        identifier = entry["id"]
+        if not isinstance(identifier, str) or not valid_id(identifier):
+            raise SnapshotError(f"{at}: names no id that satisfies the id rules of RFC 0031")
+        key = identifier.lower()
+        if previous is not None and key <= previous:
+            raise SnapshotError(
+                f"{at}: '{identifier}' is listed twice or out of order, and listings "
+                "are ascending by lowercased id"
+            )
+        previous = key
+
+        releases = entry["releases"]
+        if not isinstance(releases, list):
+            raise SnapshotError(f"{at}: releases has to be an array")
+        for index, release in enumerate(releases, start=1):
+            place = f"{at} release {index}"
+            check_counted(release, place, ("version", "total", "hosts"))
+            text = release["version"]
+            try:
+                normalized = normalize_version(text) if isinstance(text, str) else None
+            except StampError:
+                normalized = None
+            if normalized != text:
+                raise SnapshotError(
+                    f"{place}: version {text!r} is not a normalized SemVer 2.0.0 version"
+                )
+            stray = sorted(set(release["hosts"]) - set(entry["hosts"]))
+            if stray:
+                raise SnapshotError(
+                    f"{place}: counts {', '.join(stray)}, which the listing has no total for"
+                )
+        versions = [release["version"] for release in releases]
+        if len(set(versions)) != len(versions):
+            raise SnapshotError(f"{at}: a version is listed twice")
+        if releases != newest_first(releases, at):
+            raise SnapshotError(f"{at}: releases are not descending by SemVer precedence")
+        entries[key] = entry
+    return entries
+
+
+def read_download_counts(path):
+    """The download counts keyed by lowercased id, or nothing when the file is absent."""
+    if path is None or not Path(path).is_file():
+        return {}
+    return check_download_counts(load_json(Path(path)), str(path))
+
+
+def listing_entry(document, status, releases, downloads=None):
     """One entry of `listings`. Delisted becomes a tombstone: id and status only."""
     if status is not None and status["state"] == "delisted":
         return {"id": document["id"], "index_status": status}
@@ -311,6 +410,8 @@ def listing_entry(document, status, releases):
     entry = {"id": document["id"], "authored": document, "releases": releases}
     if status is not None:
         entry["index_status"] = status  # disputed ships whole, the client warns
+    if downloads is not None:
+        entry["downloads"] = {key: value for key, value in downloads.items() if key != "id"}
     return entry
 
 
@@ -334,7 +435,7 @@ def pack_entry(pack, status, versioned):
     return entry
 
 
-def build(authored, releases, game_versions, sources=None, log=None):
+def build(authored, releases, game_versions, sources=None, log=None, download_counts=None):
     """The snapshot document for the state of the two repositories on disk."""
     log = log or warn
 
@@ -356,6 +457,14 @@ def build(authored, releases, game_versions, sources=None, log=None):
     whole, versioned, names = read_index_status(authored)
     check_states_resolve(whole, versioned, names, listings, packs, log)
 
+    counts = read_download_counts(download_counts)
+    unjoinable = sorted(set(counts) - set(listings))
+    if unjoinable:
+        raise SnapshotError(
+            f"download-counts.json counts {', '.join(counts[key]['id'] for key in unjoinable)}, "
+            "which is not a listing"
+        )
+
     folders = release_folders(releases)
 
     rendered_listings = []
@@ -365,7 +474,7 @@ def build(authored, releases, game_versions, sources=None, log=None):
         delisted = status is not None and status["state"] == "delisted"
         folder = folders.get(key)
         files = [] if delisted or folder is None else read_releases(folder, document["id"])
-        rendered_listings.append(listing_entry(document, status, files))
+        rendered_listings.append(listing_entry(document, status, files, counts.get(key)))
 
     rendered_packs = [pack_entry(packs[key], whole.get(key), versioned) for key in sorted(packs)]
 
@@ -464,6 +573,10 @@ def parse_arguments(argv):
     parser.add_argument("--releases", default="releases", type=Path)
     parser.add_argument("--game-versions", default="game-versions.json", type=Path)
     parser.add_argument(
+        "--download-counts", default="download-counts.json", type=Path,
+        help="the download counts of RFC 0052, optional",
+    )
+    parser.add_argument(
         "--previous", type=Path,
         help="the snapshot published today. Unchanged content keeps its provenance, "
         "so the bytes stay identical and the deploy can be skipped",
@@ -521,6 +634,7 @@ def main(argv=None):
             arguments.game_versions,
             sources=sources_from(arguments),
             log=warn,
+            download_counts=arguments.download_counts,
         )
         document = carry_forward(document, read_previous(arguments.previous))
         rendered = serialize(document)
