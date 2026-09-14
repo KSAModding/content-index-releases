@@ -3,9 +3,9 @@
 """One tick of the watcher (RFC 0033).
 
 Scan every authored listing's authority host, stamp every release that appeared
-after the newest one already stamped, commit it, keep one error issue per
-listing current on the authored repository, and sweep that repository's open
-pull requests.
+after the newest one already stamped, commit it, fetch the listing's images
+again, keep one error issue per listing current on the authored repository, and
+sweep that repository's open pull requests.
 
 Older releases are left alone, and a listing's first tick takes its newest
 release only. RFC 0031 freezes the authored facts "current at release time", and
@@ -16,10 +16,13 @@ What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
 
 Per-release derivation is tools/stamp_release.py, the hosts are tools/hosts.py.
+The image fetch rules are tools/images.py of the authored checkout, the code the
+checks of RFC 0058 run, so the two cannot disagree.
 """
 
 import argparse
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -76,6 +79,11 @@ PENDING = frozenset({"queued", "in_progress", "waiting", "requested", "pending"}
 # Grace for a finished run to get its verdict posted.
 SETTLING_MINUTES = 5
 
+IMAGES_VERIFIED = (
+    "The images of this listing verify again and the watcher found no other error, "
+    "so this is done."
+)
+
 
 def now():
     return datetime.now(timezone.utc)
@@ -93,6 +101,20 @@ def parse_iso(text):
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
+def load_images(authored):
+    """`images.py` from the authored checkout: one implementation of the fetch rules, not two."""
+    path = Path(authored) / "tools" / "images.py"
+    if not path.is_file():
+        raise ImportError(
+            f"images.py is not at {path.parent}: point --authored at a checkout of "
+            "KSAModding/content-index, which holds the image fetch rules"
+        )
+    spec = importlib.util.spec_from_file_location("images", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def is_history(date, frontier, newest):
     """Whether a release is older than this listing's stamping starts.
     """
@@ -107,9 +129,9 @@ class Cache:
     """Derived cache, never state.
 
     It holds the per-listing ETags, the consecutive-failure counts, the issue
-    numbers, and what the mirror and sweep passes already tried. Every entry is
-    rebuildable from the repository and the hosts, so losing the whole file
-    costs one expensive tick and nothing else.
+    numbers, the last image check, and what the mirror and sweep passes already
+    tried. Every entry is rebuildable from the repository and the hosts, so
+    losing the whole file costs one expensive tick and nothing else.
     """
 
     def __init__(self, path, log=None):
@@ -126,7 +148,7 @@ class Cache:
                 loaded = {}
             if isinstance(loaded, dict) and loaded.get("version") == CACHE_VERSION:
                 self.data = loaded
-        for section in ("hosts", "listings", "mirrors", "swaps", "sweep"):
+        for section in ("hosts", "images", "listings", "mirrors", "swaps", "sweep"):
             self.data.setdefault(section, {})
 
     def section(self, name, key):
@@ -290,7 +312,7 @@ class Issues:
     def _report(self, listing_id, errors, cache):
         signature = self.signature_of(errors)
         body = self._body(listing_id, errors, signature)
-        title = f"{listing_id}: the watcher could not stamp a release"
+        title = f"{listing_id}: the watcher found a problem"
         issue = self.find(listing_id, cache)
 
         if issue is None:
@@ -387,7 +409,7 @@ class Issues:
                 continue  # A digest, a bound, a tag that never parsed.
         return found
 
-    def resolve_if(self, listing_id, signature, cache):
+    def resolve_if(self, listing_id, signature, cache, reason=None):
         """Close the listing's issue only when it reports exactly `signature`.
 
         The recovery from an unreachable host must not close an issue that
@@ -398,14 +420,14 @@ class Issues:
         if issue is None:
             return
         if SIGNATURE_MARKER.format(signature=signature) in (issue.get("body") or ""):
-            self.resolve(listing_id, cache)
+            self.resolve(listing_id, cache, reason)
 
     def _body(self, listing_id, errors, signature):
         return "\n".join(
             [
                 LISTING_MARKER.format(id=listing_id),
                 SIGNATURE_MARKER.format(signature=signature),
-                f"The watcher cannot stamp `{listing_id}`.",
+                f"The watcher found a problem with `{listing_id}`.",
                 "",
                 *[f"- {error}" for error in errors],
                 "",
@@ -619,6 +641,8 @@ class Watcher:
         )["versions"]
         self.stamp_budget = options.stamp_budget
         self.mirror_budget = options.mirror_budget
+        self.image_budget = options.image_budget
+        self.images = None
         self.stamped = []
         self.mirrored = []
         self.failed = []
@@ -865,6 +889,8 @@ class Watcher:
         errors = []
 
         self.month_pass(listing_id, authored, errors)
+        images = self.image_pass(listing_id, authored)
+        errors.extend(images or [])
 
         try:
             authority, mirrors = hosts.build(
@@ -872,20 +898,21 @@ class Watcher:
             )
         except StampError as error:
             self.failed.append(listing_id)
-            self.issues.report(listing_id, errors + [str(error)], self.cache)
+            self.report(listing_id, errors + [str(error)], state, images)
             return
         if authority is None:
             self.log("  no [releases] section, so releases enter by pull request")
             if errors:
                 self.failed.append(listing_id)
-                self.issues.report(listing_id, errors, self.cache)
-            else:
+                self.report(listing_id, errors, state, images)
+            elif images is not None:
                 # The listing left the watcher's half. Anything it reports here
                 # is about a host it no longer names.
                 self.issues.resolve(
                     listing_id,
                     self.cache,
-                    reason="This listing has no [releases] section any more, so the "
+                    reason=IMAGES_VERIFIED if state.pop("images_signature", None)
+                    else "This listing has no [releases] section any more, so the "
                     "watcher has nothing left to report here.",
                 )
             return
@@ -903,7 +930,7 @@ class Watcher:
             state["unreachable"] = 0
             state.pop("unreachable_signature", None)
             self.failed.append(listing_id)
-            self.issues.report(listing_id, errors + [str(error)], self.cache)
+            self.report(listing_id, errors + [str(error)], state, images)
             return
 
         self.recover(listing_id, state)
@@ -942,9 +969,124 @@ class Watcher:
             self.failed.append(listing_id)
             for error in errors:
                 self.log(f"    reporting: {error}")
-            self.issues.report(listing_id, errors, self.cache)
-        elif releases is not None and settled:
-            self.issues.resolve(listing_id, self.cache)
+            self.report(listing_id, errors, state, images)
+        elif releases is not None and settled and images is not None:
+            reason = IMAGES_VERIFIED if state.pop("images_signature", None) else None
+            self.issues.resolve(listing_id, self.cache, reason)
+        elif images == [] and "images_signature" in state:
+            # An unchanged host answer says nothing about any other error, so
+            # only an issue that reports exactly the image failure closes.
+            self.issues.resolve_if(
+                listing_id, state.pop("images_signature"), self.cache, IMAGES_VERIFIED
+            )
+
+    def report(self, listing_id, errors, state, images):
+        """Report `errors`, and keep their signature when they are the image failures alone."""
+        errors = list(dict.fromkeys(errors))
+        if images and errors == images:
+            state["images_signature"] = Issues.signature_of(errors)
+        else:
+            state.pop("images_signature", None)
+        self.issues.report(listing_id, errors, self.cache)
+
+    def image_rules(self):
+        """The images module of the authored checkout, or None when it does not load."""
+        if self.images is None:
+            try:
+                self.images = load_images(self.authored_root)
+            except Exception as error:  # noqa: BLE001 - no image check is not a failed tick
+                self.log(f"the images are not checked this tick: {error!r}")
+                self.images = False
+        return self.images or None
+
+    def image_pass(self, listing_id, authored):
+        """The image problems of a listing, fetched again once they are due.
+
+        None when they are not known yet, so a tick without a result closes no
+        issue. A result is kept for `--image-hours`, and a changed record is
+        fetched at once. The pass never writes a listing or `index_status`.
+        """
+        rules = self.image_rules()
+        if rules is None:
+            reported = "images_signature" in self.cache.section("listings", listing_id)
+            return None if reported else []
+        found = rules.records(authored)
+        section = self.cache.data["images"]
+        if not found:
+            section.pop(listing_id, None)
+            return []
+
+        entry = section.setdefault(listing_id, {})
+        records = json.dumps([record for _, _, record in found], sort_keys=True, default=str)
+        digest = hashlib.sha256(records.encode("utf-8")).hexdigest()
+        if entry.get("records") != digest:
+            entry.clear()
+            entry["records"] = digest
+
+        checked = parse_iso(entry.get("checked"))
+        if checked is None or now() - checked >= timedelta(hours=self.options.image_hours):
+            pending = found
+        else:
+            pending = [item for item in found if item[0] in entry.get("waiting", [])]
+        if pending and self.image_budget > 0:
+            self.image_budget -= len(pending)
+            self.check_images(rules, pending, entry)
+            if pending is found:
+                entry["checked"] = iso(now())
+        elif pending:
+            self.log("  the image budget is spent, the next tick carries on")
+
+        problems = entry.get("problems", {})
+        if "checked" not in entry or (entry.get("waiting") and not problems):
+            return None
+        return [problems[place] for place, _, _ in found if place in problems]
+
+    def check_images(self, rules, pending, entry):
+        """Fetch the `pending` images of one listing and keep what fails in `entry`.
+
+        An image that could not be fetched keeps its last result and is fetched
+        again on the next tick. It becomes a problem only after
+        `--unreachable-ticks` checks in a row, the patience a release host gets.
+        """
+        problems = entry.setdefault("problems", {})
+        unavailable = []
+        for place, role, record in pending:
+            try:
+                rules.verify(record, role)
+                problems.pop(place, None)
+            except rules.Invalid as error:
+                problems[place] = self.image_problem(place, record, str(error))
+            except rules.Unavailable as error:
+                unavailable.append((place, record, str(error)))
+            except Exception as error:  # noqa: BLE001 - one image never fails the listing
+                reason = f"the image check behaved unexpectedly: {error!r}"
+                unavailable.append((place, record, reason))
+
+        entry.pop("waiting", None)
+        if unavailable:
+            count = entry.get("unavailable", 0) + 1
+            entry["unavailable"] = count
+            self.log(
+                f"  {len(unavailable)} image(s) could not be fetched "
+                f"({count} check(s) in a row)"
+            )
+            for place, record, reason in unavailable:
+                if count >= self.options.unreachable_ticks:
+                    problems[place] = self.image_problem(
+                        place, record, f"it could not be fetched in consecutive checks: {reason}"
+                    )
+                else:
+                    entry.setdefault("waiting", []).append(place)
+        else:
+            entry.pop("unavailable", None)
+        self.log(f"  checked {len(pending)} image(s), {len(problems)} with a problem")
+
+    @staticmethod
+    def image_problem(place, record, reason):
+        return (
+            f"the image {place} at `{record.get('url')}`, expected sha256 "
+            f"`{record.get('sha256')}`: {reason}"
+        )
 
     def stamp_pass(
         self, listing_id, authored, authority, mirror_hosts, releases, errors, attempted=()
@@ -1384,6 +1526,14 @@ def parse_arguments(argv):
     parser.add_argument(
         "--mirror-budget", type=int, default=4,
         help="how many mirror candidates one tick verifies at most",
+    )
+    parser.add_argument(
+        "--image-hours", type=int, default=24,
+        help="hours before the images of a listing are fetched again",
+    )
+    parser.add_argument(
+        "--image-budget", type=int, default=20,
+        help="how many images one tick fetches at most; the next tick carries on",
     )
     parser.add_argument(
         "--unreachable-ticks", type=int, default=6,
