@@ -18,6 +18,7 @@ from build_snapshot import (
     body,
     build,
     carry_forward,
+    entry_dates,
     precedence,
     read_previous,
     serialize,
@@ -903,6 +904,127 @@ class DownloadCounts(Fixture):
             serialize(self.index.build()),
         )
         self.assertNotIn("downloads", self.entry(self.index.build(download_counts=absent), "AutoStage"))
+
+
+class Dates(Fixture):
+    def dated_pack(self, identifier, version, released_at):
+        text = PACK.format(identifier=identifier, version=version).replace(
+            'released_at = "2026-08-05T12:00:00Z"', f'released_at = "{released_at}"'
+        )
+        self.index.pack(identifier, version, body=text)
+
+    def test_the_first_and_the_newest_release_give_the_dates(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "1.0.0", release_date="2026-08-01T10:00:00Z")
+        self.index.release("AutoStage", "1.2.0", release_date="2026-08-20T10:00:00Z")
+        self.index.release("AutoStage", "1.1.0", release_date="2026-08-10T10:00:00Z")
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(list(entry)[:3], ["id", "published_at", "updated_at"])
+        self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
+        self.assertEqual(entry["updated_at"], "2026-08-20T10:00:00Z")
+
+    def test_a_yanked_newest_release_counts_only_for_published_at(self):
+        self.index.listing("AutoStage")
+        self.index.release(
+            "AutoStage", "1.0.0", release_date="2026-08-01T10:00:00Z", yanked=True
+        )
+        self.index.release("AutoStage", "1.1.0", release_date="2026-08-10T10:00:00Z")
+        self.index.release(
+            "AutoStage", "1.2.0", release_date="2026-08-20T10:00:00Z", yanked=True
+        )
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
+        self.assertEqual(entry["updated_at"], "2026-08-10T10:00:00Z")
+
+    def test_all_releases_yanked_leaves_only_published_at(self):
+        self.index.listing("AutoStage")
+        self.index.release(
+            "AutoStage", "1.0.0", release_date="2026-08-01T10:00:00Z", yanked=True
+        )
+        self.index.release(
+            "AutoStage", "1.1.0", release_date="2026-08-10T10:00:00Z", yanked=True
+        )
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
+        self.assertNotIn("updated_at", entry)
+
+    def test_a_retracted_pack_version_counts_only_for_published_at(self):
+        self.dated_pack("Pack", "1.0.0", "2026-08-01T10:00:00Z")
+        self.dated_pack("Pack", "1.1.0", "2026-08-10T10:00:00Z")
+        self.dated_pack("Pack", "1.2.0", "2026-08-20T10:00:00Z")
+        self.index.status({"id": "Pack", "state": "retracted", "version": "1.2.0"})
+        entry = self.entry(self.index.build(), "Pack")
+        self.assertEqual(list(entry)[:3], ["id", "published_at", "updated_at"])
+        self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
+        self.assertEqual(entry["updated_at"], "2026-08-10T10:00:00Z")
+
+    def test_a_pack_with_every_version_retracted_has_no_updated_at(self):
+        self.dated_pack("Pack", "1.0.0", "2026-08-01T10:00:00Z")
+        self.index.status({"id": "Pack", "state": "retracted", "version": "1.0.0"})
+        entry = self.entry(self.index.build(), "Pack")
+        self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
+        self.assertNotIn("updated_at", entry)
+
+    def test_a_listing_without_a_release_has_no_dates(self):
+        self.index.listing("AutoStage")
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertNotIn("published_at", entry)
+        self.assertNotIn("updated_at", entry)
+
+    def test_a_tombstone_has_no_dates(self):
+        self.index.listing("Gone")
+        self.index.release("Gone", "1.0.0")
+        self.index.pack("GonePack", "1.0.0")
+        self.index.status(
+            {"id": "Gone", "state": "delisted"}, {"id": "GonePack", "state": "delisted"}
+        )
+        document = self.index.build()
+        self.assertEqual(sorted(self.entry(document, "Gone")), ["id", "index_status"])
+        self.assertEqual(sorted(self.entry(document, "GonePack")), ["id", "index_status"])
+
+    def test_timestamps_compare_as_instants_and_are_copied_as_written(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "1.0.0", release_date="2026-08-01T18:00:00Z")
+        self.index.release("AutoStage", "1.1.0", release_date="2026-08-01T19:00:00+02:00")
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(entry["published_at"], "2026-08-01T19:00:00+02:00")
+        self.assertEqual(entry["updated_at"], "2026-08-01T18:00:00Z")
+
+    def test_a_disputed_listing_has_dates(self):
+        self.index.listing("Contested")
+        self.index.release("Contested", "1.0.0", release_date="2026-08-01T10:00:00Z")
+        self.index.status({"id": "Contested", "state": "disputed"})
+        entry = self.entry(self.index.build(), "Contested")
+        self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
+        self.assertEqual(entry["updated_at"], "2026-08-01T10:00:00Z")
+
+    def test_a_timestamp_without_an_offset_is_an_error(self):
+        self.dated_pack("Pack", "1.0.0", "2026-08-01T10:30:00")
+        with self.assertRaisesRegex(SnapshotError, "Pack/1.0.0.toml released_at"):
+            self.index.build()
+
+    def test_a_timestamp_that_does_not_parse_is_an_error(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "1.0.0", release_date="yesterday")
+        with self.assertRaisesRegex(SnapshotError, "AutoStage 1.0.0 release_date"):
+            self.index.build()
+
+    def test_the_same_dated_input_gives_the_same_bytes(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "1.0.0", release_date="2026-08-01T10:00:00Z")
+        self.index.release("AutoStage", "1.1.0", release_date="2026-08-01T12:00:00+02:00")
+        self.dated_pack("Pack", "1.0.0", "2026-08-01T10:00:00Z")
+        self.assertEqual(serialize(self.index.build()), serialize(self.index.build()))
+
+    def test_equal_instants_give_the_same_dates_in_either_order(self):
+        utc = ("2026-08-01T10:00:00Z", "a", False)
+        offset = ("2026-08-01T12:00:00+02:00", "b", False)
+        expected = {
+            "published_at": "2026-08-01T10:00:00Z",
+            "updated_at": "2026-08-01T12:00:00+02:00",
+        }
+        self.assertEqual(entry_dates([utc, offset]), expected)
+        self.assertEqual(entry_dates([offset, utc]), expected)
 
 
 class Malformed(Fixture):
