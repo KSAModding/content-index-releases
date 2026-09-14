@@ -8,14 +8,31 @@ The API is a stub that records what the watcher would send, which is what makes
 
 import hashlib
 import json
+import os
+import struct
 import tempfile
 import unittest
 import urllib.error
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
+import watch
+from check_release import DEFAULT_AUTHORED
 from hosts import HostRelease
-from watch import Cache, Issues, Sweep, Watcher, is_history, iso, now, parse_arguments
+from watch import (
+    IMAGES_VERIFIED,
+    Cache,
+    Issues,
+    Sweep,
+    Watcher,
+    is_history,
+    iso,
+    load_images,
+    now,
+    parse_arguments,
+)
 
 GAME_VERSIONS = {"spec_version": 1, "versions": ["2026.8.3.5117"]}
 
@@ -67,6 +84,7 @@ class RecorderIssues:
     def __init__(self, listings=None, degraded=False):
         self.reported = []
         self.resolved = []
+        self.reasons = []
         self.listings = listings or {}
         self.degraded = degraded
 
@@ -75,9 +93,14 @@ class RecorderIssues:
 
     def resolve(self, listing_id, cache, reason=None):
         self.resolved.append(listing_id)
+        self.reasons.append(reason)
 
-    def resolve_if(self, listing_id, signature, cache):
+    def resolve_if(self, listing_id, signature, cache, reason=None):
         self.resolved.append((listing_id, signature))
+        self.reasons.append(reason)
+
+    def attempted(self, listing_id, cache):
+        return set()
 
     def open_listings(self):
         return self.listings
@@ -1056,6 +1079,223 @@ class Unreachable(WatcherCase):
             self.assertEqual(watcher.issues.resolved, [("U", "abc123")])
             self.assertEqual(state["unreachable"], 0)
             self.assertNotIn("unreachable_signature", state)
+
+
+ICON_URL = "https://example.org/icon.png"
+EXPECTED = "aa" * 32
+
+
+def icon_listing(sha256=EXPECTED, size=1):
+    return (
+        'id = "Pic"\n\n[images.icon]\n'
+        f'url = "{ICON_URL}"\nsha256 = "{sha256}"\nwidth = 256\nheight = 256\nsize = {size}\n'
+    )
+
+
+def png(side):
+    def chunk(kind, body):
+        return struct.pack(">I", len(body)) + kind + body + b"\0\0\0\0"
+
+    header = struct.pack(">IIBBBBB", side, side, 8, 6, 0, 0, 0)
+    chunks = chunk(b"IHDR", header) + chunk(b"IDAT", b"\0") + chunk(b"IEND", b"")
+    return b"\x89PNG\r\n\x1a\n" + chunks
+
+
+class FakeImages:
+    """The shape of images.py in content-index, with a failure per URL."""
+
+    class Invalid(Exception):
+        pass
+
+    class Unavailable(Exception):
+        pass
+
+    def __init__(self, failures=None):
+        self.failures = failures or {}
+        self.fetched = []
+
+    def records(self, document):
+        images = document.get("images") or {}
+        found = [("images.icon", "icon", images["icon"])] if "icon" in images else []
+        for index, record in enumerate(images.get("description", [])):
+            found.append((f"images.description[{index}]", "description", record))
+        return found
+
+    def verify(self, record, role):
+        self.fetched.append(record["url"])
+        if record["url"] in self.failures:
+            raise self.failures[record["url"]]
+
+
+class UnchangedHost:
+    key = "github:example/pic"
+
+    def releases(self, etag=None):
+        return None, etag
+
+
+class TruncatedHost:
+    key = "github:example/pic"
+    truncated = True
+
+    def __init__(self):
+        self.answers = [[], None]
+
+    def releases(self, etag=None):
+        return self.answers.pop(0), "etag"
+
+
+def dead():
+    failure = FakeImages.Invalid(f"{ICON_URL} answered HTTP 404, so the image is not there")
+    return FakeImages({ICON_URL: failure})
+
+
+class ImagesAgain(WatcherCase):
+    def tick(self, folder, images, argv=(), document=None):
+        watcher = self.watcher(folder, ["--no-sweep", "--no-commit", *argv])
+        (folder / ".authored" / "listings" / "Pic.toml").write_text(document or icon_listing())
+        watcher.images = images
+        watcher.issues = RecorderIssues()
+        watcher.tick()
+        return watcher
+
+    def test_a_dead_image_opens_the_issue(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.tick(folder, dead())
+
+            [(listing, errors)] = watcher.issues.reported
+            self.assertEqual(listing, "Pic")
+            self.assertIn(ICON_URL, errors[0])
+            self.assertIn(EXPECTED, errors[0])
+            self.assertIn("HTTP 404", errors[0])
+            self.assertEqual(watcher.issues.resolved, [])
+            listing = folder / ".authored" / "listings" / "Pic.toml"
+            self.assertEqual(listing.read_text(), icon_listing())
+
+    def test_a_repaired_image_closes_the_issue(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            self.tick(folder, dead(), ["--image-hours", "0"])
+
+            watcher = self.tick(folder, FakeImages(), ["--image-hours", "0"])
+
+            self.assertEqual(watcher.issues.reported, [])
+            self.assertEqual(watcher.issues.resolved, ["Pic"])
+            self.assertEqual(watcher.issues.reasons, [IMAGES_VERIFIED])
+
+    def test_a_repaired_image_closes_the_issue_while_the_host_answers_unchanged(self):
+        with tempfile.TemporaryDirectory() as name, patch.object(
+            watch.hosts, "build", return_value=(UnchangedHost(), [])
+        ):
+            folder = Path(name)
+            first = self.tick(folder, dead(), ["--image-hours", "0"])
+            signature = Issues.signature_of(first.issues.reported[0][1])
+
+            watcher = self.tick(folder, FakeImages(), ["--image-hours", "0"])
+
+            self.assertEqual(watcher.issues.resolved, [("Pic", signature)])
+            self.assertEqual(watcher.issues.reasons, [IMAGES_VERIFIED])
+
+    def test_a_repaired_image_leaves_other_errors_open_while_the_host_answers_unchanged(self):
+        with tempfile.TemporaryDirectory() as name, patch.object(
+            watch.hosts, "build", return_value=(TruncatedHost(), [])
+        ):
+            folder = Path(name)
+            first = self.tick(folder, dead(), ["--image-hours", "0"])
+            [(_, errors)] = first.issues.reported
+            self.assertEqual(len(errors), 2)
+
+            watcher = self.tick(folder, FakeImages(), ["--image-hours", "0"])
+
+            self.assertEqual(watcher.issues.resolved, [])
+
+    def test_changed_bytes_are_reported_with_both_digests(self):
+        root = Path(os.environ.get("CONTENT_INDEX") or DEFAULT_AUTHORED)
+        try:
+            rules = load_images(root)
+        except ImportError:
+            self.skipTest("content-index with tools/images.py is not checked out")
+        served = png(256)
+        images = SimpleNamespace(
+            records=rules.records,
+            Invalid=rules.Invalid,
+            Unavailable=rules.Unavailable,
+            verify=lambda record, role: rules.verify(record, role, fetch=lambda url, cap: served),
+        )
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.tick(Path(name), images, document=icon_listing(size=len(served)))
+
+        [(_, errors)] = watcher.issues.reported
+        self.assertIn(EXPECTED, errors[0])
+        self.assertIn(hashlib.sha256(served).hexdigest(), errors[0])
+
+    def test_a_host_that_does_not_answer_is_reported_after_consecutive_checks(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            images = FakeImages({ICON_URL: FakeImages.Unavailable("example.org did not answer")})
+
+            first = self.tick(folder, images, ["--unreachable-ticks", "2"])
+            self.assertEqual(first.issues.reported, [])
+            self.assertEqual(first.issues.resolved, [])
+
+            second = self.tick(folder, images, ["--unreachable-ticks", "2"])
+            [(_, errors)] = second.issues.reported
+            self.assertIn("consecutive checks", errors[0])
+            self.assertIn(EXPECTED, errors[0])
+
+    def test_an_invalid_image_is_reported_while_another_host_does_not_answer(self):
+        slow = "https://slow.example.org/shot.png"
+        document = icon_listing() + (
+            f'\n[[images.description]]\nurl = "{slow}"\nsha256 = "{EXPECTED}"\n'
+        )
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            images = dead()
+            images.failures[slow] = FakeImages.Unavailable("slow.example.org did not answer")
+
+            first = self.tick(folder, images, document=document)
+            [(_, errors)] = first.issues.reported
+            self.assertEqual(len(errors), 1)
+            self.assertIn("HTTP 404", errors[0])
+
+            second = self.tick(folder, images, document=document)
+            self.assertEqual(images.fetched, [ICON_URL, slow, slow])
+            self.assertEqual(second.issues.reported, first.issues.reported)
+
+    def test_images_are_fetched_again_when_due_or_when_the_record_changed(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            images = FakeImages()
+            self.tick(folder, images)
+            self.tick(folder, images)
+            self.assertEqual(len(images.fetched), 1)
+
+            self.tick(folder, images, document=icon_listing(sha256="bb" * 32))
+            self.assertEqual(len(images.fetched), 2)
+
+    def test_a_stored_failure_is_reported_until_the_next_check(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            self.tick(folder, dead())
+
+            images = FakeImages()
+            watcher = self.tick(folder, images)
+
+            self.assertEqual(images.fetched, [])
+            self.assertEqual(len(watcher.issues.reported), 1)
+
+    def test_a_listing_whose_images_are_not_checked_yet_closes_no_issue(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.tick(Path(name), FakeImages(), ["--image-budget", "0"])
+            self.assertEqual(watcher.issues.resolved, [])
+            self.assertEqual(watcher.issues.reported, [])
+
+    def test_images_py_comes_from_the_authored_checkout(self):
+        with tempfile.TemporaryDirectory() as name:
+            with self.assertRaises(ImportError) as raised:
+                load_images(name)
+        self.assertIn("content-index", str(raised.exception))
 
 
 class LabelRefusingApi(StubApi):
