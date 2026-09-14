@@ -96,6 +96,11 @@ When the authored checkout has `tags.toml`, the snapshot embeds it as the option
 
 When `download-counts.json` is present, each listing that is not delisted carries its entry as `downloads`. An entry for an id that is not a listing fails the build.
 
+Each listing and pack that is not delisted carries the dates of RFC 0058 next to its `id`.
+`published_at` is the earliest release date, yanked and retracted versions included.
+`updated_at` is the latest release date of a version that is neither yanked nor retracted.
+An entry without such a version does not carry the field.
+
 A build runs on every change to either half: this repository triggers it on a push, and the authored half asks for it through a `repository_dispatch`, so a steward writing `index-status.toml` reaches clients in one build rather than at the next scheduled one.
 
 To build one by hand, against a checkout of the authored half:

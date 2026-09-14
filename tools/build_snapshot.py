@@ -402,12 +402,43 @@ def read_download_counts(path):
     return check_download_counts(load_json(Path(path)), str(path))
 
 
+def instant(value, where):
+    """A timestamp with an offset as an aware datetime."""
+    try:
+        moment = datetime.datetime.fromisoformat(value) if isinstance(value, str) else None
+    except ValueError:
+        moment = None
+    if moment is None or moment.tzinfo is None:
+        raise SnapshotError(f"{where}: {value!r} is not an ISO 8601 timestamp with an offset")
+    return moment
+
+
+def entry_dates(timestamps):
+    """`published_at` and `updated_at` from (text, where, withdrawn). Equal instants tie on the text."""
+    parsed = [(instant(text, where), text, withdrawn) for text, where, withdrawn in timestamps]
+    dates = {}
+    if parsed:
+        dates["published_at"] = min(parsed, key=lambda item: item[:2])[1]
+    live = [item for item in parsed if not item[2]]
+    if live:
+        dates["updated_at"] = max(live, key=lambda item: item[:2])[1]
+    return dates
+
+
 def listing_entry(document, status, releases, downloads=None):
     """One entry of `listings`. Delisted becomes a tombstone: id and status only."""
     if status is not None and status["state"] == "delisted":
         return {"id": document["id"], "index_status": status}
 
-    entry = {"id": document["id"], "authored": document, "releases": releases}
+    dates = entry_dates(
+        (
+            release.get("release_date"),
+            f"{document['id']} {release['version']} release_date",
+            release.get("yanked") is True,
+        )
+        for release in releases
+    )
+    entry = {"id": document["id"], **dates, "authored": document, "releases": releases}
     if status is not None:
         entry["index_status"] = status  # disputed ships whole, the client warns
     if downloads is not None:
@@ -422,14 +453,22 @@ def pack_entry(pack, status, versioned):
         return {"id": identifier, "index_status": status}
 
     rendered = []
+    timestamps = []
     for document in newest_first(list(pack["versions"].values()), f"packs/{identifier}"):
         item = {"authored": document}
         retracted = versioned.get((identifier.lower(), document["version"]))
         if retracted is not None:
             item["index_status"] = retracted
         rendered.append(item)
+        timestamps.append(
+            (
+                document.get("released_at"),
+                f"packs/{identifier}/{document['version']}.toml released_at",
+                retracted is not None,
+            )
+        )
 
-    entry = {"id": identifier, "versions": rendered}
+    entry = {"id": identifier, **entry_dates(timestamps), "versions": rendered}
     if status is not None:
         entry["index_status"] = status
     return entry
