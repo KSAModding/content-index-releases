@@ -69,6 +69,8 @@ class HostRelease:
     # The archives the host offered when none could be picked, so the error the
     # author reads names them instead of claiming there was nothing there.
     candidates: tuple = ()
+    # The download count of the picked archive, or None.
+    downloads: int | None = None
 
     def facts(self):
         """The release facts the stamper takes."""
@@ -179,12 +181,26 @@ def _version_of(tag):
         return None
 
 
+def _count(value):
+    """A non-negative integer count, or None. A JSON bool is not a count."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        return None
+    return value
+
+
 def _parse_json(url, body):
     """The body as JSON, or HostError: a 200 carrying HTML is a bad moment."""
     try:
         return json.loads(body)
     except json.JSONDecodeError as error:
         raise HostError(f"{url}: the answer is not JSON, {error}") from error
+
+
+def _objects(where, value, what):
+    """`value` as a list of objects, or HostError."""
+    if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
+        raise HostError(f"{where}: {what} is not a list of objects")
+    return value
 
 
 def _on_host(base, value, what):
@@ -239,12 +255,15 @@ class GitHubHost(Host):
         # True when the last scan hit max_pages with more pages left, so the
         # caller can report the tail instead of silently never seeing it.
         self.truncated = False
+        # The pages of the last full answer. An ETag covers the first page only.
+        self.pages = 0
 
     @property
     def key(self):
         return f"github:{self.repository.lower()}"
 
     def releases(self, etag=None):
+        self.pages = 0
         url = f"{GITHUB_API}/repos/{self.repository}/releases?per_page=100"
         try:
             first = self.http.get(
@@ -261,7 +280,7 @@ class GitHubHost(Host):
         if first.status == 304:
             return None, etag
 
-        payloads = [_parse_json(url, first.body)]
+        payloads = [_objects(url, _parse_json(url, first.body), "the release list")]
         following = LINK_NEXT.search(first.headers.get("Link", "") or "")
         pages = 1
         while following and pages < self.max_pages:
@@ -271,9 +290,16 @@ class GitHubHost(Host):
                 )
             except urllib.error.HTTPError as error:
                 raise HostError(f"{following.group(1)}: HTTP {error.code}") from error
-            payloads.append(_parse_json(following.group(1), answer.body))
+            payloads.append(
+                _objects(
+                    following.group(1),
+                    _parse_json(following.group(1), answer.body),
+                    "the release list",
+                )
+            )
             following = LINK_NEXT.search(answer.headers.get("Link", "") or "")
             pages += 1
+        self.pages = pages
         self.truncated = bool(following)
         if following:
             self.http.log(
@@ -304,6 +330,7 @@ class GitHubHost(Host):
             changelog=payload.get("html_url"),
             asset_name=(asset or {}).get("name"),
             candidates=() if asset else tuple(candidates),
+            downloads=_count((asset or {}).get("download_count")),
         )
 
     def _asset(self, payload):
@@ -315,11 +342,12 @@ class GitHubHost(Host):
         rather than guessed at: picking the wrong asset would stamp a hash
         clients then verify against the wrong file.
         """
-        uploaded = [
-            asset
-            for asset in payload.get("assets") or []
-            if asset.get("state") == "uploaded"
-        ]
+        listed = _objects(
+            self.repository,
+            payload.get("assets") or [],
+            f"the assets of '{payload.get('tag_name')}'",
+        )
+        uploaded = [asset for asset in listed if asset.get("state") == "uploaded"]
         assets = [
             asset for asset in uploaded if asset.get("name", "").lower().endswith(".zip")
         ] or [
@@ -361,6 +389,8 @@ class SpaceDockHost(Host):
                 f"'{mod_id}' is not a SpaceDock mod id, which is a number"
             ) from None
         self.http = http
+        # The mod's download total from the last answer.
+        self.downloads = None
 
     @property
     def key(self):
@@ -378,11 +408,15 @@ class SpaceDockHost(Host):
             raise HostError(f"{url}: HTTP {error.code}") from error
 
         payload = _parse_json(url, answer.body)
+        if not isinstance(payload, dict):
+            raise HostError(f"{url}: the answer is not an object")
+        versions = _objects(url, payload.get("versions") or [], "versions")
+        self.downloads = _count(payload.get("downloads"))
 
         page = payload.get("url") or f"/mod/{self.mod_id}"
         changelog = _on_host(SPACEDOCK, page, "the mod page")
         releases = []
-        for version in payload.get("versions") or []:
+        for version in versions:
             tag = (version.get("friendly_version") or "").strip()
             releases.append(
                 HostRelease(
@@ -394,6 +428,7 @@ class SpaceDockHost(Host):
                     content_type="application/zip",
                     prerelease=False,
                     changelog=changelog,
+                    downloads=_count(version.get("downloads")),
                 )
             )
         return releases, None
@@ -445,6 +480,17 @@ def download(http, release):
     return answer.body, content_type
 
 
+def named(releases_section, http, listing_id=None):
+    """Every host a `[releases]` section names, keyed by kind."""
+    section = releases_section or {}
+    found = {}
+    if section.get("github"):
+        found["github"] = GitHubHost(section["github"], http, listing_id)
+    if section.get("spacedock"):
+        found["spacedock"] = SpaceDockHost(section["spacedock"], http)
+    return found
+
+
 def build(releases_section, http, listing_id=None):
     """The hosts of one listing, and its authority.
 
@@ -454,23 +500,21 @@ def build(releases_section, http, listing_id=None):
     the index through the watcher, and this returns (None, []).
     """
     section = releases_section or {}
-    named = {}
-    if section.get("github"):
-        named["github"] = GitHubHost(section["github"], http, listing_id)
-    if section.get("spacedock"):
-        named["spacedock"] = SpaceDockHost(section["spacedock"], http)
+    named_hosts = named(section, http, listing_id)
 
-    if not named:
+    if not named_hosts:
         return None, []
 
-    if len(named) == 1:
-        (authority,) = named.values()
+    if len(named_hosts) == 1:
+        (authority,) = named_hosts.values()
         return authority, []
 
     chosen = section.get("authority")
-    if chosen not in named:
+    if chosen not in named_hosts:
         raise StampError(
             "[releases] names several hosts, so it needs an 'authority' key naming "
-            f"one of {', '.join(sorted(named))}"
+            f"one of {', '.join(sorted(named_hosts))}"
         )
-    return named[chosen], [host for name, host in sorted(named.items()) if name != chosen]
+    return named_hosts[chosen], [
+        host for name, host in sorted(named_hosts.items()) if name != chosen
+    ]

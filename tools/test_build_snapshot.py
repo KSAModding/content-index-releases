@@ -812,6 +812,99 @@ class Notes(unittest.TestCase):
         self.assertTrue(self.run_warn(None).startswith("note: "))
 
 
+def counts_entry(identifier, total=12):
+    return {
+        "id": identifier,
+        "total": total,
+        "hosts": {"github": total},
+        "releases": [{"version": "1.0.0", "total": total, "hosts": {"github": total}}],
+    }
+
+
+class DownloadCounts(Fixture):
+    def counts(self, *entries, text=None):
+        path = self.index.root / "download-counts.json"
+        document = {"spec_version": 1, "listings": list(entries)}
+        self.index.write(path, text if text is not None else json.dumps(document, indent=2) + "\n")
+        return path
+
+    def test_a_listing_carries_its_entry_without_the_repeated_id(self):
+        self.index.listing("AutoStage")
+        path = self.counts(counts_entry("AutoStage"))
+        entry = self.entry(self.index.build(download_counts=path), "AutoStage")
+        self.assertEqual(
+            entry["downloads"],
+            {
+                "total": 12,
+                "hosts": {"github": 12},
+                "releases": [{"version": "1.0.0", "total": 12, "hosts": {"github": 12}}],
+            },
+        )
+
+    def test_the_entry_joins_its_listing_case_insensitively(self):
+        self.index.listing("AutoStage")
+        path = self.counts(counts_entry("autostage"))
+        self.assertIn("downloads", self.entry(self.index.build(download_counts=path), "AutoStage"))
+
+    def test_a_listing_without_an_entry_carries_no_downloads(self):
+        self.index.listing("AutoStage")
+        self.index.listing("DeltaVMap")
+        path = self.counts(counts_entry("AutoStage"))
+        self.assertNotIn("downloads", self.entry(self.index.build(download_counts=path), "DeltaVMap"))
+
+    def test_a_tombstone_carries_no_counts(self):
+        self.index.listing("Gone")
+        self.index.status({"id": "Gone", "state": "delisted"})
+        path = self.counts(counts_entry("Gone"))
+        entry = self.entry(self.index.build(download_counts=path), "Gone")
+        self.assertEqual(sorted(entry), ["id", "index_status"])
+
+    def test_a_disputed_listing_keeps_its_counts(self):
+        self.index.listing("Contested")
+        self.index.status({"id": "Contested", "state": "disputed"})
+        path = self.counts(counts_entry("Contested"))
+        self.assertIn("downloads", self.entry(self.index.build(download_counts=path), "Contested"))
+
+    def test_an_entry_for_an_id_that_is_not_listed_is_an_error(self):
+        self.index.listing("AutoStage")
+        path = self.counts(counts_entry("AutoStage"), counts_entry("Typo"))
+        with self.assertRaisesRegex(SnapshotError, "Typo"):
+            self.index.build(download_counts=path)
+
+    def test_an_entry_for_a_pack_is_an_error(self):
+        self.index.pack("Pack", "1.0.0")
+        path = self.counts(counts_entry("Pack"))
+        with self.assertRaises(SnapshotError):
+            self.index.build(download_counts=path)
+
+    def test_an_invalid_document_is_an_error(self):
+        self.index.listing("AutoStage")
+        path = self.counts(text='{"spec_version": 1, "listings": [{"id": "AutoStage"}]}\n')
+        with self.assertRaisesRegex(SnapshotError, "download-counts[.]json"):
+            self.index.build(download_counts=path)
+
+    def test_the_same_counts_give_the_same_bytes(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "0.4.3")
+        path = self.counts(counts_entry("AutoStage"))
+        self.assertEqual(
+            serialize(self.index.build(download_counts=path)),
+            serialize(self.index.build(download_counts=path)),
+        )
+
+    def test_a_missing_document_gives_the_same_bytes_as_no_counts_at_all(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "0.4.3")
+        self.index.status({"id": "AutoStage", "state": "disputed"})
+        absent = self.index.root / "download-counts.json"
+        self.assertFalse(absent.exists())
+        self.assertEqual(
+            serialize(self.index.build(download_counts=absent)),
+            serialize(self.index.build()),
+        )
+        self.assertNotIn("downloads", self.entry(self.index.build(download_counts=absent), "AutoStage"))
+
+
 class Malformed(Fixture):
     def test_a_json_nan_literal_is_an_error(self):
         self.index.listing("AutoStage")

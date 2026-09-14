@@ -21,6 +21,7 @@ from hosts import (
     SpaceDockHost,
     _utc,
     download,
+    named,
 )
 from stamp_release import StampError
 
@@ -182,6 +183,82 @@ class SpaceDock(unittest.TestCase):
         # changelog is published as a link and no checksum gates it.
         with self.assertRaises(StampError):
             SpaceDockHost(1, self.payload("/ok", page="https://evil.example/")).releases()
+
+
+class DownloadCounts(unittest.TestCase):
+    @staticmethod
+    def payload(*assets):
+        return {
+            "tag_name": "v1.0.0",
+            "published_at": "2020-01-01T00:00:00Z",
+            "assets": [
+                {"state": "uploaded", "name": name, "content_type": "application/zip",
+                 "download_count": count, "browser_download_url": f"https://github.com/o/r/{name}"}
+                for name, count in assets
+            ],
+        }
+
+    def test_github_reports_the_count_of_the_selected_archive_only(self):
+        host = GitHubHost("o/r", FakeHttp({}), listing_id="Mod")
+        self.assertEqual(host._release(self.payload(("Mod.zip", 7))).downloads, 7)
+        # The archive named after the listing wins, and only its count is reported.
+        self.assertEqual(
+            host._release(self.payload(("Other.zip", 9), ("Mod.zip", 7))).downloads, 7
+        )
+        # No archive is picked from an ambiguous release, so there is no count.
+        self.assertIsNone(host._release(self.payload(("A.zip", 8), ("B.zip", 9))).downloads)
+
+    def test_a_count_that_is_not_a_non_negative_integer_is_none(self):
+        host = GitHubHost("o/r", FakeHttp({}), listing_id="Mod")
+        for value in (True, -1, "7", None, 1.5):
+            payload = {"tag_name": "v1.0.0", "assets": [
+                {"state": "uploaded", "name": "Mod.zip", "download_count": value},
+            ]}
+            self.assertIsNone(host._release(payload).downloads, msg=repr(value))
+
+    def test_spacedock_reports_the_mod_total_and_each_version(self):
+        body = json.dumps({
+            "url": "/mod/1",
+            "downloads": 90,
+            "versions": [{"friendly_version": "1.0.0", "downloads": 20,
+                          "created": "2020-01-01T00:00:00Z", "download_path": "/mod/1/d"}],
+        }).encode()
+        host = SpaceDockHost(1, FakeHttp({"https://spacedock.info/api/mod/1": Response(200, {}, body)}))
+        releases, _ = host.releases()
+        self.assertEqual(host.downloads, 90)
+        self.assertEqual(releases[0].downloads, 20)
+
+    def test_the_pages_of_the_last_answer_are_known(self):
+        first = Response(200, {"Link": '<https://api.github.com/page2>; rel="next"'}, b"[]")
+        http = FakeHttp({
+            "https://api.github.com/repos/o/r/releases": first,
+            "https://api.github.com/page2": Response(200, {}, b"[]"),
+        })
+        host = GitHubHost("o/r", http)
+        host.releases()
+        self.assertEqual(host.pages, 2)
+
+    def test_an_answer_in_an_undocumented_shape_is_a_host_error(self):
+        # An AttributeError would stop every listing after this one.
+        spacedock_bodies = (
+            b"[]",
+            json.dumps({"downloads": 1, "versions": ["1.0.0"]}).encode(),
+            json.dumps({"downloads": 1, "versions": {"1.0.0": 1}}).encode(),
+        )
+        for body in spacedock_bodies:
+            http = FakeHttp({"https://spacedock.info/api/mod/1": Response(200, {}, body)})
+            with self.assertRaises(HostError, msg=body):
+                SpaceDockHost(1, http).releases()
+        github_bodies = (b"{}", b"[1]", json.dumps([{"tag_name": "v1", "assets": ["x.zip"]}]).encode())
+        for body in github_bodies:
+            http = FakeHttp({"https://api.github.com/repos/o/r/releases": Response(200, {}, body)})
+            with self.assertRaises(HostError, msg=body):
+                GitHubHost("o/r", http).releases()
+
+    def test_named_returns_every_host_without_an_authority(self):
+        found = named({"github": "o/r", "spacedock": 1}, FakeHttp({}), "Mod")
+        self.assertEqual(sorted(found), ["github", "spacedock"])
+        self.assertEqual(named({}, FakeHttp({})), {})
 
 
 class Timestamps(unittest.TestCase):

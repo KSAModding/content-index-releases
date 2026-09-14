@@ -31,6 +31,7 @@ https://ksamodding.github.io/content-index-releases/v1/index.json
 |---|---|
 | `releases/<id>/<version>.json` | One stamped document per release. |
 | `game-versions.json` | Every KSA production build we know of, ordered by revision. |
+| `download-counts.json` | The download counts GitHub and SpaceDock report for each listing and release version. |
 
 ## The game release list
 
@@ -39,6 +40,20 @@ https://ksamodding.github.io/content-index-releases/v1/index.json
 It is seeded from `Content/Versions/`, the dated history every installed copy of the game already carries, and kept current by an hourly poll of the master server.
 
 That poll only ever sees the build that is current when it runs, so a build superseded within the hour can be missing from it. The copy on your own disk stays the complete source.
+
+## Download counts
+
+`download-counts.json` holds the download counts GitHub and SpaceDock report for each listing and release version, as [RFC 0052](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0052-static-download-counts.md) defines them.
+`.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
+A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
+
+Known limit: a deleted GitHub release without its own version entry, and an archive uploaded again, lower a count that the host did not lower.
+
+To refresh by hand, dispatch the workflow with `dry_run`, or run it locally against a checkout of the authored half:
+
+```text
+python3 tools/download_counts.py --authored ../content-index --dry-run
+```
 
 ## The watcher
 
@@ -78,6 +93,8 @@ python3 tools/watch.py --authored ../content-index --dry-run
 The `v1` segment carries the snapshot format version, so a future break can be served next to the version it replaces. The fields are specified in [spec/snapshot.md](https://github.com/KSAModding/content-manager-design/blob/main/spec/snapshot.md).
 
 When the authored checkout has `tags.toml`, the snapshot embeds it as the optional top-level `tags` field. When the file is absent, the field is absent.
+
+When `download-counts.json` is present, each listing that is not delisted carries its entry as `downloads`. An entry for an id that is not a listing fails the build.
 
 A build runs on every change to either half: this repository triggers it on a push, and the authored half asks for it through a `repository_dispatch`, so a steward writing `index-status.toml` reaches clients in one build rather than at the next scheduled one.
 
@@ -161,7 +178,7 @@ A listing that names a release host is refused here, because the watcher stamps 
 ## License
 
 Metadata is dedicated to the public domain under [CC0 1.0](LICENSE).
-That means `releases/`, the game release list, and the published snapshot.
+That means `releases/`, the game release list, the download counts, and the published snapshot.
 
 A mirror, a client, or a website can therefore copy and re-serve the whole index with no conditions attached, which is the point.
 

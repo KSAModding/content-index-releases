@@ -5,6 +5,9 @@
 # from the repository and the hosts, so it is never committed.
 /.watcher/
 
+# Derived cache of the download counts.
+/.download-counts/
+
 # The built snapshot.
 /_site/
 

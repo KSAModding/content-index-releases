@@ -8,6 +8,7 @@ on:
     paths:
       - releases/**
       - game-versions.json
+      - download-counts.json
       - tools/build_snapshot.py
       - tools/stamp_release.py
       - .github/workflows/snapshot.yml
