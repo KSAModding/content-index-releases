@@ -80,6 +80,12 @@ A version is stamped exactly once. A tag that reappears with different bytes is 
 
 An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
 
+A tick also fetches the images of each listing again, once every 24 hours and at once after a record changed (RFC 0058).
+It uses `tools/images.py` from the content-index checkout, so the watcher and the checks apply the same fetch rules from one file.
+A dead or changed image goes into the issue of that listing with the `url`, the expected `sha256` and what the fetch found, and the issue closes when the image verifies again.
+An image that could not be fetched is tried again on the next tick, and is reported only after consecutive failed checks.
+The watcher never edits a listing and never changes `index_status`.
+
 To run a tick by hand, dispatch the workflow: `listing` narrows it to one id, and `dry_run` derives everything and writes nothing. Locally, against a checkout of the authored half:
 
 ```text
