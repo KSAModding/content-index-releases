@@ -1,0 +1,41 @@
+{
+  "spec_version": 1,
+  "id": "StarMap",
+  "type": "mod-loader",
+  "version": "0.4.7",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-15T20:08:48Z",
+  "game_min": "2026.8.3.5117",
+  "game_min_revision": 5117,
+  "download": {
+    "url": "https://github.com/StarMapLoader/StarMap/releases/download/0.4.7/StarMap-0.4.7.zip",
+    "sha256": "0D18FCA5C7080755E163CCAC95CA6068BDF3BB0B08C98DCA7433F5C992B1D330",
+    "size": 891339,
+    "content_type": "application/zip"
+  },
+  "install_size": 2550668,
+  "install": {
+    "derived": true,
+    "target": "standalone"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/StarMapLoader/StarMap/releases/tag/0.4.7",
+  "listing": {
+    "name": "StarMap",
+    "authors": [
+      "KlaasWhite"
+    ],
+    "abstract": "Mod loader that runs code mods for Kitten Space Agency.",
+    "description": "A prototype arbitrary code modloader for Kitten Space Agency.\nIt can run with that functionality in the background, or as a dumb loader that only loads mods.\n\nIt uses Assembly Load Contexts so each mod's dependencies are managed separately, which reduces conflicts.\n\nMods go in `Documents/My Games/Kitten Space Agency/mods/<ModName>/`, which is recommended because it survives game updates, or in `<KSA Installation>/Content/<ModName>/`.\nStarMap uses the game's own manifest system to discover mods in both locations.\n\nYou run `StarMap.exe` rather than the game. The first run fails and writes a `StarMapConfig.json` next to it, where `GameLocation` points at the folder Kitten Space Agency was installed in.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/starmap-mod-loader.384/",
+      "repository": "https://github.com/StarMapLoader/StarMap",
+      "bugtracker": "https://github.com/StarMapLoader/StarMap/issues"
+    }
+  }
+}
