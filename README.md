@@ -76,7 +76,10 @@ A release the watcher cannot stamp, a tag that does not parse or an archive whos
 
 A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue.
 
-`download.mirrors` is the one field the watcher may append to after publish, and only after downloading the other host's archive and finding it byte-identical.
+The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
+
+`changelog_text` holds the release notes of the authority host (RFC 0064): whitespace trimmed at both ends, LF line endings, and left out when the notes are empty or longer than 16 KiB of UTF-8.
+The watcher adds it once to a release file that has none, from the release list the tick already read, and never changes or removes it.
 
 An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
 
