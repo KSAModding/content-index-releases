@@ -37,6 +37,7 @@
     }
   ],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/tag/v0.7.2",
+  "changelog_text": "## Required for KSA 2026.8.19.5261\nKSA 2026.8.19.5261 replaced the `SimTime` type with `UniverseTime` and split `Vehicle.UpdateFromTaskResults` into a parallel and a main-thread half. Update is mandatory for this mod to work if you are on KSA version 2026.8.19.5261 and above; the previous build fails to load and every feature is unavailable.\n\n## Changes\n- Follows the move from `SimTime` to `UniverseTime` across every maneuver, multi-pass and flyby calculation.\n- Moves the multi-pass and RCS per-frame drivers to `Universe.ApplyVehicleSolvers`, the main-thread pass that replaces the hook the game removed.\n- Fixes a crash when planning a transfer to a target on a degenerate orbit. The estimate now reports \"no transfer\" instead of throwing.\n- Fixes the RCS burn executor denying engine burns for the rest of the session after an internal error.\n- Shows an unreachable ascending or descending node as \"N/A\" instead of \"0.0 m/s\", and no longer selects it as the default node.\n\n## Compatibility\nValidated against KSA build version **2026.8.19.5261**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\AdvancedFlightComputer\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
   "listing": {
     "name": "Advanced Flight Computer",
     "authors": [
