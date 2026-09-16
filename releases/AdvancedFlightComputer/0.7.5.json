@@ -37,6 +37,7 @@
     }
   ],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/tag/v0.7.5",
+  "changelog_text": "## Changes\n- Marks the mod as compatible with KSA 2026.9.7.5402. Removes the \"untested version\" warning shown at game start. No functional changes.\n\n## Compatibility\nValidated against KSA build version **2026.9.7.5402**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\AdvancedFlightComputer\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
   "listing": {
     "name": "Advanced Flight Computer",
     "authors": [
