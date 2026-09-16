@@ -37,6 +37,7 @@
     }
   ],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/tag/v0.7.3",
+  "changelog_text": "## Required for KSA 2026.8.22.5348\nKSA 2026.8.22.5348 removed `Vehicle.FindFinalFlightPlan`, which the maneuver quick-tools use to plan against a burn that is already on the plan. Update is mandatory for this mod to work if you are on KSA version 2026.8.22.5348 and above; without it the planner throws as soon as you open a quick-tool with a burn queued.\n\n## Changes\n- Follow the removal of `Vehicle.FindFinalFlightPlan` by reading the final burn's own flight plan.\n- Scale the main window and the flight plan window with the game's Interface Scale setting instead of fixed pixel offsets.\n- Draw the multi-pass markers through `ImGuiHelper.GetOverlayDrawList`, so they no longer bleed into the crew portrait views.\n\n## Compatibility\nValidated against KSA build version **2026.8.22.5348**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\AdvancedFlightComputer\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
   "listing": {
     "name": "Advanced Flight Computer",
     "authors": [
