@@ -17,7 +17,9 @@ import zipfile
 from datetime import datetime, timezone
 
 from stamp_release import (
+    CHANGELOG_TEXT_LIMIT,
     StampError,
+    changelog_text,
     derived_dependencies,
     merge_dependencies,
     normalize_version,
@@ -387,6 +389,35 @@ class Stamp(unittest.TestCase):
         )
         with self.assertRaises(StampError):
             self.stamp(listing=listing)
+
+
+class ChangelogText(unittest.TestCase):
+    def stamp(self, notes):
+        return stamp(
+            LISTING, dict(RELEASE, changelog_text=notes), mod_archive(), GAME_VERSIONS, now=NOW
+        )
+
+    def test_whitespace_is_trimmed_and_line_endings_are_lf(self):
+        document = self.stamp("\r\n  ## Changes\r\n- One\r- Two  \n\n")
+        self.assertEqual(document["changelog_text"], "## Changes\n- One\n- Two")
+
+    def test_empty_notes_are_left_out(self):
+        for notes in (None, "", " \r\n\t", 7):
+            self.assertNotIn("changelog_text", self.stamp(notes), repr(notes))
+
+    def test_notes_longer_than_16_kib_of_utf_8_are_left_out_and_not_cut(self):
+        self.assertEqual(CHANGELOG_TEXT_LIMIT, 16384)
+        self.assertEqual(self.stamp("x" * 16384)["changelog_text"], "x" * 16384)
+        self.assertNotIn("changelog_text", self.stamp("x" * 16385))
+        # Two bytes each, so the limit counts bytes and not characters.
+        self.assertNotIn("changelog_text", self.stamp("ä" * 8193))
+
+    def test_text_that_cannot_be_written_as_utf_8_is_left_out(self):
+        self.assertIsNone(changelog_text("\ud800"))
+
+    def test_the_text_sits_between_the_changelog_link_and_the_listing(self):
+        keys = list(self.stamp("## Changes"))
+        self.assertEqual(keys[keys.index("changelog"):], ["changelog", "changelog_text", "listing"])
 
 
 class Ids(unittest.TestCase):

@@ -71,6 +71,9 @@ DEPENDENCY_KINDS = ("required", "optional", "recommends", "suggests", "conflict"
 
 INSTALL_ANCHORS = ("mods", "user-data", "game-root", "standalone")
 
+# Bytes of UTF-8 (RFC 0064).
+CHANGELOG_TEXT_LIMIT = 16 * 1024
+
 # The id rules of RFC 0031: 1 to 64 ASCII characters, letters, digits, `-`,
 # `_`, `.`, first and last a letter or digit. The id is a folder name on every
 # platform and a path segment in this repository, so nothing else is safe.
@@ -526,6 +529,20 @@ def merge_dependencies(derived, authored):
     return [entry for index, entry in enumerate(merged) if index not in replaced]
 
 
+def changelog_text(notes):
+    """The release notes as a release file carries them, or None when they are left out."""
+    if not isinstance(notes, str):
+        return None
+    text = notes.replace("\r\n", "\n").replace("\r", "\n").strip()
+    try:
+        size = len(text.encode("utf-8"))
+    except UnicodeEncodeError:
+        return None
+    if not text or size > CHANGELOG_TEXT_LIMIT:
+        return None
+    return text
+
+
 def listing_snapshot(authored):
     """The shared authored core as it stands now, frozen into this release."""
     snapshot = {
@@ -550,6 +567,7 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
         content_type    the archive format, defaults to application/zip
         prerelease      the host's pre-release flag, defaults to false
         changelog       URL of the release's changelog, optional
+        changelog_text  the release notes as the host reports them, optional
 
     Only the open month bound depends on `now`.
     """
@@ -659,6 +677,9 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
     document["dependencies"] = dependencies
     if release.get("changelog"):
         document["changelog"] = release["changelog"]
+    text = changelog_text(release.get("changelog_text"))
+    if text is not None:
+        document["changelog_text"] = text
     document["listing"] = listing_snapshot(authored)
 
     return document
@@ -680,7 +701,7 @@ def main(argv=None):
         required=True,
         type=Path,
         help="JSON of the release facts read off the host: tag, release_date, url, "
-        "content_type, prerelease, changelog",
+        "content_type, prerelease, changelog, changelog_text",
     )
     parser.add_argument(
         "--game-versions", type=Path, default=Path("game-versions.json"),
