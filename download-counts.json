@@ -3,25 +3,25 @@
   "listings": [
     {
       "id": "AdvancedFlightComputer",
-      "total": 1042,
+      "total": 1065,
       "hosts": {
-        "github": 302,
-        "spacedock": 740
+        "github": 314,
+        "spacedock": 751
       },
       "releases": [
         {
           "version": "0.7.5",
-          "total": 60,
+          "total": 64,
           "hosts": {
-            "github": 22,
-            "spacedock": 38
+            "github": 24,
+            "spacedock": 40
           }
         },
         {
           "version": "0.7.4",
-          "total": 8,
+          "total": 9,
           "hosts": {
-            "github": 6,
+            "github": 7,
             "spacedock": 2
           }
         },
@@ -35,26 +35,26 @@
         },
         {
           "version": "0.7.2",
-          "total": 153,
+          "total": 159,
           "hosts": {
-            "github": 44,
-            "spacedock": 109
+            "github": 47,
+            "spacedock": 112
           }
         },
         {
           "version": "0.7.1",
-          "total": 76,
+          "total": 82,
           "hosts": {
-            "github": 29,
-            "spacedock": 47
+            "github": 32,
+            "spacedock": 50
           }
         },
         {
           "version": "0.7.0",
-          "total": 57,
+          "total": 63,
           "hosts": {
-            "github": 30,
-            "spacedock": 27
+            "github": 33,
+            "spacedock": 30
           }
         },
         {
@@ -337,18 +337,18 @@
     },
     {
       "id": "KSArmory",
-      "total": 951,
+      "total": 954,
       "hosts": {
-        "github": 771,
-        "spacedock": 180
+        "github": 773,
+        "spacedock": 181
       },
       "releases": [
         {
           "version": "0.8.44",
-          "total": 596,
+          "total": 599,
           "hosts": {
-            "github": 499,
-            "spacedock": 97
+            "github": 501,
+            "spacedock": 98
           }
         },
         {
@@ -795,18 +795,26 @@
     },
     {
       "id": "KSATelemetryOverlay",
-      "total": 37,
+      "total": 48,
       "hosts": {
-        "github": 19,
-        "spacedock": 18
+        "github": 26,
+        "spacedock": 22
       },
       "releases": [
         {
-          "version": "1.0.3",
-          "total": 10,
+          "version": "1.0.4",
+          "total": 8,
           "hosts": {
-            "github": 7,
-            "spacedock": 3
+            "github": 6,
+            "spacedock": 2
+          }
+        },
+        {
+          "version": "1.0.3",
+          "total": 13,
+          "hosts": {
+            "github": 8,
+            "spacedock": 5
           }
         },
         {
@@ -837,17 +845,25 @@
     },
     {
       "id": "MeasureTools",
-      "total": 549,
+      "total": 568,
       "hosts": {
-        "github": 128,
-        "spacedock": 421
+        "github": 139,
+        "spacedock": 429
       },
       "releases": [
         {
-          "version": "1.1.10",
-          "total": 30,
+          "version": "1.1.11",
+          "total": 6,
           "hosts": {
-            "github": 14,
+            "github": 4,
+            "spacedock": 2
+          }
+        },
+        {
+          "version": "1.1.10",
+          "total": 31,
+          "hosts": {
+            "github": 15,
             "spacedock": 16
           }
         },
@@ -869,18 +885,18 @@
         },
         {
           "version": "1.1.7",
-          "total": 101,
+          "total": 107,
           "hosts": {
-            "github": 19,
-            "spacedock": 82
+            "github": 22,
+            "spacedock": 85
           }
         },
         {
           "version": "1.1.6",
-          "total": 69,
+          "total": 75,
           "hosts": {
-            "github": 25,
-            "spacedock": 44
+            "github": 28,
+            "spacedock": 47
           }
         },
         {
@@ -1007,18 +1023,18 @@
     },
     {
       "id": "ModMenu",
-      "total": 1734,
+      "total": 1736,
       "hosts": {
-        "github": 119,
-        "spacedock": 1615
+        "github": 120,
+        "spacedock": 1616
       },
       "releases": [
         {
           "version": "0.2.2",
-          "total": 60,
+          "total": 62,
           "hosts": {
-            "github": 10,
-            "spacedock": 50
+            "github": 11,
+            "spacedock": 51
           }
         },
         {
@@ -1065,16 +1081,23 @@
     },
     {
       "id": "StarMap",
-      "total": 783,
+      "total": 811,
       "hosts": {
-        "github": 783
+        "github": 811
       },
       "releases": [
         {
-          "version": "0.4.6",
-          "total": 281,
+          "version": "0.4.7",
+          "total": 27,
           "hosts": {
-            "github": 281
+            "github": 27
+          }
+        },
+        {
+          "version": "0.4.6",
+          "total": 286,
+          "hosts": {
+            "github": 286
           }
         },
         {
