@@ -123,6 +123,28 @@ class Immutable(unittest.TestCase):
         self.assertTrue(any("downloads" in message for message in errors_for(document)))
 
 
+class ChangelogText(unittest.TestCase):
+    TEXT = "## Changes\n- Marks the mod as compatible."
+
+    def test_a_text_the_watcher_added_passes_unchanged(self):
+        base = head(changelog_text=self.TEXT)
+        self.assertEqual(errors_for(head(changelog_text=self.TEXT, yanked=True), base=base), [])
+
+    def test_a_text_is_not_added_by_pull_request(self):
+        errors = errors_for(head(changelog_text=self.TEXT))
+        self.assertTrue(any("only the watcher" in message for message in errors))
+
+    def test_a_text_never_changes(self):
+        errors = errors_for(head(changelog_text="Edited."), base=head(changelog_text=self.TEXT))
+        self.assertTrue(any("'changelog_text' changed" in message for message in errors))
+
+    def test_a_removed_text_says_to_rebase(self):
+        errors = errors_for(head(yanked=True), base=head(changelog_text=self.TEXT))
+        self.assertTrue(
+            any("changelog_text" in message and "rebase" in message for message in errors)
+        )
+
+
 class PathRules(unittest.TestCase):
     def test_the_folder_has_to_name_the_id(self):
         errors = errors_for(head(), path="releases/SomethingElse/0.7.2.json")
