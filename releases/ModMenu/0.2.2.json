@@ -29,6 +29,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/MrJeranimo/ModMenu/releases/tag/v0.2.2",
+  "changelog_text": "- Fixed errors caused by `Viewport` class being discontinued and changes related to that.\n- Updated to StarMap v0.4.6.\n\nDownload `ModMenu.zip` for the mod files.\nDownload `ModMenu.Attributes.zip` if you want to use ModMenu in your own KSA mod.",
   "listing": {
     "name": "ModMenu",
     "authors": [
