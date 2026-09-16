@@ -29,6 +29,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/elevatorctln/KSA-Public-Telemetry/releases/tag/1.0.3",
+  "changelog_text": "Added a patch to allow the mod to continue to display when the F2 keybind is used to hide the rest of the HUD. Enabled by default, toggleable in settings.\nChanged loss of signal behavior, the mod will consider failure imminent if any tolerance crosses 95% and it will freeze the telemetry simulating LOS preemptively. This means when a breakup happens, the telemetry is frozen on the last meaningful data rather than nonsense data from whatever the individual piece of debris had.\nThe overlay is no longer hidden on vehicle breakup.\nOther small fixes",
   "listing": {
     "name": "Webcast Telemetry Overlay",
     "authors": [
