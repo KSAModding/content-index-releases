@@ -103,6 +103,10 @@ class FakeHttp:
             raise answer
         return hosts.Response(200, {"Content-Type": "application/octet-stream"}, answer)
 
+    def archive(self, url, api=False, limit=None):
+        answer = self.get(url, api=api)
+        return hosts.Archive.of_bytes(answer.body), answer.headers
+
 
 class Fixture(unittest.TestCase):
     """A content-index checkout with one listing, and a host serving its archive."""

@@ -16,15 +16,18 @@ validator, so a SpaceDock authority costs one request per tick.
 """
 
 import dataclasses
+import hashlib
+import http.client
 import json
 import re
+import tempfile
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from stamp_release import StampError, normalize_version
+from stamp_release import Archive, StampError, normalize_version
 
 GITHUB_API = "https://api.github.com"
 GITHUB_API_HOST = urllib.parse.urlsplit(GITHUB_API).hostname
@@ -36,9 +39,20 @@ ARCHIVE_CONTENT_TYPES = frozenset(
     {"application/zip", "application/x-zip-compressed", "application/octet-stream"}
 )
 
-# 512 MiB. A mod archive is orders of magnitude smaller, and a runner that
-# streams something enormous has already lost the tick for every other listing.
-MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
+MIB = 1024 * 1024
+
+# 4 GiB. Twice the largest KSA archive on SpaceDock (1,778 MiB) and above
+# GitHub's 2 GiB file limit. An archive streams to disk, so one fits the 14 GB
+# a runner guarantees with room to spare, and at the 13 MiB/s SpaceDock served
+# a check it downloads in about five minutes, inside both check timeouts.
+MAX_ARCHIVE_BYTES = 4096 * MIB
+
+# 64 MiB. A release list or a raw file is JSON or text and held in memory, so
+# the archive limit does not apply to it.
+MAX_RESPONSE_BYTES = 64 * MIB
+
+# What an archive download reads and writes at a time.
+CHUNK_BYTES = MIB
 
 LINK_NEXT = re.compile(r'<([^>]+)>;\s*rel="next"')
 
@@ -106,9 +120,39 @@ class Http:
     def get(self, url, accept=None, etag=None, api=False, limit=None):
         """GET `url`, returning a Response. A 304 comes back with an empty body.
 
+        The body is held in memory, up to `limit` or MAX_RESPONSE_BYTES. An
+        archive goes through `archive` instead.
+
         Raises HostError for anything transient and urllib's HTTPError for a
         status the caller has to interpret itself, such as 404.
         """
+        return self._send(
+            url,
+            self._headers(accept, etag, api),
+            lambda answer: Response(
+                answer.status,
+                dict(answer.headers),
+                _read(answer, limit or MAX_RESPONSE_BYTES),
+            ),
+        )
+
+    def archive(self, url, api=False, limit=None):
+        """GET an archive into an anonymous temporary file.
+
+        Returns (Archive, headers). The SHA-256 and size are taken while the
+        body streams, and a retry starts the file again. Raises what `get`
+        raises, and OversizeError past `limit` or MAX_ARCHIVE_BYTES.
+        """
+        return self._send(
+            url,
+            self._headers(None, None, api),
+            lambda answer: (
+                _stream(answer, limit or MAX_ARCHIVE_BYTES),
+                dict(answer.headers),
+            ),
+        )
+
+    def _headers(self, accept, etag, api):
         headers = {"User-Agent": USER_AGENT}
         if accept:
             headers["Accept"] = accept
@@ -117,16 +161,17 @@ class Http:
         if api and self.token:
             headers["Authorization"] = f"Bearer {self.token}"
             headers["X-GitHub-Api-Version"] = "2022-11-28"
+        return headers
 
+    def _send(self, url, headers, read):
+        """The retry loop around one GET, with `read` turning the answer into the result."""
         last = None
         for attempt in range(self.retries):
             request = urllib.request.Request(url, headers=headers, method="GET")
             try:
                 self.requests += 1
                 with urllib.request.urlopen(request, timeout=self.timeout) as answer:
-                    return Response(
-                        answer.status, dict(answer.headers), _read(answer, limit)
-                    )
+                    return read(answer)
             except urllib.error.HTTPError as error:
                 if error.code == 304:
                     return Response(304, dict(error.headers), b"")
@@ -135,7 +180,8 @@ class Http:
                 if error.code < 500 and error.code != 429:
                     raise
                 last = error
-            except (urllib.error.URLError, TimeoutError, OSError) as error:
+            # HTTPException covers a body that ends before its Content-Length.
+            except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as error:
                 last = error
 
             if attempt + 1 < self.retries:
@@ -145,11 +191,41 @@ class Http:
 
 
 def _read(answer, limit):
-    limit = limit or MAX_ARCHIVE_BYTES
     body = answer.read(limit + 1)
     if len(body) > limit:
-        raise OversizeError(f"the response is larger than the {limit} byte limit")
+        raise OversizeError(f"the response is larger than the {_mib(limit)} limit")
     return body
+
+
+def _stream(answer, limit):
+    """The body as an Archive in an anonymous temporary file.
+
+    A Content-Length above `limit` rejects before any of the body is read, and
+    the streamed count is the backstop for a host that sends none.
+    """
+    length = (answer.headers.get("Content-Length") or "").strip()
+    if length.isdigit() and int(length) > limit:
+        raise OversizeError(f"the archive is {_mib(int(length))}, above the {_mib(limit)} limit")
+
+    file = tempfile.TemporaryFile()
+    try:
+        digest, size = hashlib.sha256(), 0
+        while chunk := answer.read(CHUNK_BYTES):
+            size += len(chunk)
+            if size > limit:
+                raise OversizeError(f"the archive is larger than the {_mib(limit)} limit")
+            digest.update(chunk)
+            file.write(chunk)
+        file.seek(0)
+        return Archive(file, digest.hexdigest(), size)
+    except BaseException:
+        file.close()
+        raise
+
+
+def _mib(count):
+    """A byte count in whole MiB, the unit the limits are set in."""
+    return f"{count / MIB:,.0f} MiB"
 
 
 def _rate_limited(headers):
@@ -245,7 +321,7 @@ class Host:
         raise NotImplementedError
 
     def download(self, release):
-        """The archive's bytes, and the content type the host serves them as."""
+        """The archive as an Archive, and the content type the host serves it as."""
         raise NotImplementedError
 
 
@@ -447,7 +523,7 @@ class SpaceDockHost(Host):
 
 
 def download(http, release):
-    """The archive of `release`, as (bytes, content type).
+    """The archive of `release`, as (Archive, content type). The caller closes the Archive.
 
     Shared with the release pull request check, which downloads from the URL a
     submission names rather than from a host it polled.
@@ -463,12 +539,11 @@ def download(http, release):
         raise StampError("the release carries no archive to download")
     if release.size and release.size > MAX_ARCHIVE_BYTES:
         raise StampError(
-            f"the archive is {release.size} bytes, above the "
-            f"{MAX_ARCHIVE_BYTES} byte limit"
+            f"the archive is {_mib(release.size)}, above the {_mib(MAX_ARCHIVE_BYTES)} limit"
         )
     api = urllib.parse.urlsplit(release.url).hostname == GITHUB_API_HOST
     try:
-        answer = http.get(release.url, api=api)
+        archive, headers = http.archive(release.url, api=api)
     except OversizeError as error:
         # Permanent, unlike the transient failures HostError stands for: the
         # release stays too large next tick too, so the author hears about it
@@ -482,11 +557,11 @@ def download(http, release):
                 f"the archive at {release.url} is gone (HTTP {error.code})"
             ) from error
         raise HostError(f"{release.url}: HTTP {error.code}") from error
-    served = (answer.headers.get("Content-Type") or "").split(";")[0].strip()
+    served = (headers.get("Content-Type") or "").split(";")[0].strip()
     # What the host says the asset is beats what it happens to serve it as, and
     # the stamper has the bytes to fall back on either way.
     content_type = release.content_type or served
-    return answer.body, content_type
+    return archive, content_type
 
 
 def named(releases_section, http, listing_id=None):

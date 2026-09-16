@@ -7,15 +7,20 @@ HTTPError that escapes either becomes an "unexpected" log line with no
 author-facing issue, which is exactly what the watcher must not do.
 """
 
+import hashlib
+import http.client
 import json
 import unittest
 import urllib.error
+from unittest.mock import patch
 
 from hosts import (
     MAX_ARCHIVE_BYTES,
+    MAX_RESPONSE_BYTES,
     GitHubHost,
     HostError,
     HostRelease,
+    Http,
     OversizeError,
     Response,
     SpaceDockHost,
@@ -23,7 +28,7 @@ from hosts import (
     download,
     named,
 )
-from stamp_release import StampError
+from stamp_release import Archive, StampError
 
 
 def http_error(code):
@@ -50,6 +55,10 @@ class FakeHttp:
                     raise answer
                 return answer
         raise AssertionError(f"unexpected URL {url}")
+
+    def archive(self, url, api=False, limit=None):
+        answer = self.get(url, api=api)
+        return Archive.of_bytes(answer.body), answer.headers
 
 
 def release(url, candidates=(), size=None):
@@ -109,6 +118,109 @@ class Downloads(unittest.TestCase):
         http = FakeHttp({"https://github.com/": OversizeError("too large")})
         with self.assertRaises(StampError):
             download(http, release("https://github.com/o/r/x.zip"))
+
+
+class Answer:
+    """What urlopen returns, serving `body` and counting how much of it was read.
+
+    `broken_at` ends the body early there once, the way a dropped connection does.
+    """
+
+    status = 200
+
+    def __init__(self, body, headers=None, broken_at=None):
+        self.body = body
+        self.headers = headers or {}
+        self.broken_at = broken_at
+        self.read_bytes = 0
+
+    def read(self, amount=-1):
+        end = len(self.body) if amount < 0 else min(len(self.body), self.read_bytes + amount)
+        if self.broken_at is not None and end > self.broken_at:
+            self.read_bytes = self.broken_at
+            raise http.client.IncompleteRead(b"")
+        chunk = self.body[self.read_bytes:end]
+        self.read_bytes = end
+        return chunk
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *details):
+        return False
+
+
+class Streaming(unittest.TestCase):
+    """The real Http against a fake urlopen, with a chunk far smaller than a MiB."""
+
+    URL = "https://github.com/o/r/releases/download/x.zip"
+
+    def setUp(self):
+        for patcher in (
+            patch("hosts.CHUNK_BYTES", 7),
+            patch("hosts.time.sleep"),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def serve(self, *answers):
+        opener = patch("hosts.urllib.request.urlopen", side_effect=list(answers))
+        opener.start()
+        self.addCleanup(opener.stop)
+
+    def test_digest_and_size_are_those_of_the_bytes(self):
+        body = bytes(range(256)) * 3
+        self.serve(Answer(body, {"Content-Type": "application/zip"}))
+        archive, headers = Http().archive(self.URL)
+        with archive:
+            self.assertEqual(archive.sha256, hashlib.sha256(body).hexdigest().upper())
+            self.assertEqual(archive.size, len(body))
+            self.assertEqual(archive.file.read(), body)
+        self.assertEqual(headers["Content-Type"], "application/zip")
+
+    def test_a_content_length_above_the_limit_rejects_before_the_body_is_read(self):
+        answer = Answer(b"x" * 100, {"Content-Length": "100"})
+        self.serve(answer)
+        with self.assertRaises(OversizeError) as raised:
+            Http().archive(self.URL, limit=99)
+        self.assertEqual(answer.read_bytes, 0)
+        self.assertIn("above the", str(raised.exception))
+
+    def test_a_body_without_content_length_is_cut_off_at_the_limit(self):
+        # The streamed count is the backstop for a host that sends no length,
+        # and it stops within one chunk of the limit instead of reading on.
+        answer = Answer(b"x" * 1000)
+        self.serve(answer)
+        with self.assertRaises(OversizeError):
+            Http().archive(self.URL, limit=20)
+        self.assertLessEqual(answer.read_bytes, 20 + 7)
+
+    def test_an_oversized_download_is_a_stamp_error(self):
+        self.serve(Answer(b"", {"Content-Length": str(MAX_ARCHIVE_BYTES + 1)}))
+        with self.assertRaises(StampError) as raised:
+            download(Http(), release(self.URL))
+        self.assertIn("4,096 MiB", str(raised.exception))
+
+    def test_a_retry_starts_the_file_again(self):
+        # A connection that drops midway must not leave its bytes in front of
+        # the next attempt's, or the digest would be of neither.
+        body = b"0123456789" * 5
+        self.serve(Answer(body, broken_at=23), Answer(body))
+        archive, _ = Http().archive(self.URL)
+        with archive:
+            self.assertEqual(archive.size, len(body))
+            self.assertEqual(archive.sha256, hashlib.sha256(body).hexdigest().upper())
+
+    def test_an_api_answer_has_its_own_smaller_limit(self):
+        # The archive limit is for files on disk. JSON is held in memory.
+        self.assertLess(MAX_RESPONSE_BYTES, MAX_ARCHIVE_BYTES)
+        with patch("hosts.MAX_RESPONSE_BYTES", 10):
+            self.serve(Answer(b"[1,2,3,4,5]"), Answer(b"[1,2,3,4,5]"))
+            with self.assertRaises(OversizeError):
+                Http().get("https://api.github.com/repos/o/r/releases", api=True)
+            archive, _ = Http().archive(self.URL)
+            with archive:
+                self.assertEqual(archive.size, 11)
 
 
 class Pagination(unittest.TestCase):

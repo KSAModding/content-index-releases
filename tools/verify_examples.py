@@ -27,7 +27,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import hosts
-from stamp_release import StampError, serialize, stamp
+from stamp_release import StampError, as_archive, serialize, stamp
 
 DESIGN = "KSAModding/content-manager-design"
 RAW = "https://raw.githubusercontent.com/{repository}/main/{path}"
@@ -219,24 +219,26 @@ def _restamp(http, listing_toml, version, game_versions, expected, check_mirrors
     facts = release.facts()
     facts["content_type"] = content_type
 
-    mirrors = expected.get("download", {}).get("mirrors", [])
-    if check_mirrors:
-        mirrors = _mirrors(mirror_hosts, version, archive)
-
     # Wall clock on purpose: the original stamp time is unrecorded, and the
     # watcher's month pass corrects a stamp once its game_max month completes,
     # so re-deriving with the current time matches the corrected state an
     # example is expected to hold.
-    return stamp(
-        authored, facts, archive, game_versions,
-        mirrors=mirrors, now=datetime.now(timezone.utc),
-    )
+    with as_archive(archive) as archive:
+        document = stamp(
+            authored, facts, archive, game_versions, now=datetime.now(timezone.utc),
+        )
+
+    # Checked after the archive is closed, like the watcher does, so one archive is on disk.
+    download = document["download"]
+    mirrors = expected.get("download", {}).get("mirrors", [])
+    if check_mirrors:
+        mirrors = _mirrors(mirror_hosts, version, download["sha256"])
+    if mirrors:
+        download["mirrors"] = list(mirrors)
+    return document
 
 
-def _mirrors(mirror_hosts, version, archive):
-    import hashlib
-
-    digest = hashlib.sha256(archive).hexdigest().upper()
+def _mirrors(mirror_hosts, version, digest):
     found = []
     for host in mirror_hosts:
         releases, _ = host.releases()
@@ -244,8 +246,9 @@ def _mirrors(mirror_hosts, version, archive):
         if release is None:
             continue
         mirrored, _ = host.download(release)
-        if hashlib.sha256(mirrored).hexdigest().upper() == digest:
-            found.append(release.url)
+        with as_archive(mirrored) as mirrored:
+            if mirrored.sha256 == digest:
+                found.append(release.url)
     return found
 
 

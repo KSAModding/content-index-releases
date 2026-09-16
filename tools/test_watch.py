@@ -7,12 +7,14 @@ The API is a stub that records what the watcher would send, which is what makes
 """
 
 import hashlib
+import io
 import json
 import os
 import struct
 import tempfile
 import unittest
 import urllib.error
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,7 +23,7 @@ from unittest.mock import patch
 import watch
 from check_release import DEFAULT_AUTHORED
 from hosts import HostRelease
-from stamp_release import CHANGELOG_TEXT_LIMIT, serialize
+from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, serialize
 from watch import (
     IMAGES_VERIFIED,
     Cache,
@@ -739,9 +741,113 @@ class SwapsAndMirrors(WatcherCase):
                     return b"bytes", "application/zip"
 
             host = CountingHost()
-            found = watcher.mirrors_for([host], release("1.0.0", "x"), b"bytes")
+            found = watcher.mirrors_for([host], release("1.0.0", "x"), digest_of(b"bytes"))
             self.assertEqual(found, [])
             self.assertEqual(host.downloads, 0)
+
+    def test_stamp_one_closes_the_archive_before_a_mirror_downloads(self):
+        # One archive on disk at a time: a 4 GiB archive and its mirror would
+        # not fit the runner together.
+        data = zip_of({"M/M.dll": "x" * 100, "M/mod.toml": 'name = "M"\n'})
+        stamped = TrackedArchive.of_bytes(data)
+        test = self
+
+        class Authority:
+            def download(self, entry):
+                return stamped, "application/zip"
+
+        class Mirror(MirrorHost):
+            def download(self, entry):
+                test.assertTrue(stamped.closed, "the stamped archive is still open")
+                return super().download(entry)
+
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            mirror = Mirror(data)
+
+            watcher.stamp_one("M", AUTHORED, Authority(), [mirror], release("1.0.0", "http://authority"))
+
+            document = json.loads((folder / "releases" / "M" / "1.0.0.json").read_text())
+            self.assertEqual(document["download"]["sha256"], digest_of(data))
+            self.assertEqual(document["download"]["size"], len(data))
+            self.assertEqual(document["download"]["mirrors"], ["http://mirror"])
+            self.assertEqual(list(document["download"]), ["url", "sha256", "size", "content_type", "mirrors"])
+            self.assertEqual(mirror.downloads, 1)
+
+    def test_a_mirror_serving_other_bytes_is_downloaded_once(self):
+        # Nothing about the mismatch changes until the URL or the size does, so
+        # a later tick spends no mirror budget on it.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            stamped_file(folder, download={"url": "http://a", "sha256": digest_of(b"bytes"), "size": 5})
+            mirror = MirrorHost(b"other", size=5)
+
+            for _ in range(3):
+                watcher = self.watcher(folder, ["--no-commit"])
+                watcher.mirror_pass("M", [mirror], [])
+                watcher.cache.save()
+
+            self.assertEqual(mirror.downloads, 1)
+            self.assertNotIn("mirrors", json.loads((folder / "releases" / "M" / "1.0.0.json").read_text())["download"])
+
+            # A new size is a new upload, so it is checked again.
+            mirror.size = 6
+            watcher = self.watcher(folder, ["--no-commit"])
+            watcher.mirror_pass("M", [mirror], [])
+            self.assertEqual(mirror.downloads, 2)
+
+
+AUTHORED = {
+    "spec_version": 1,
+    "id": "M",
+    "type": "mod",
+    "name": "M",
+    "authors": ["A"],
+    "abstract": "A mod.",
+    "license": "MIT",
+    "compatibility": {"game_min": "2026.8.3.5117"},
+}
+
+
+def digest_of(data):
+    return hashlib.sha256(data).hexdigest().upper()
+
+
+def zip_of(files):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as handle:
+        for path, content in files.items():
+            handle.writestr(path, content)
+    return buffer.getvalue()
+
+
+class TrackedArchive(Archive):
+    """An archive that remembers being closed."""
+
+    closed = False
+
+    def close(self):
+        self.closed = True
+        super().close()
+
+
+class MirrorHost:
+    """A mirror host with one release, serving fixed bytes and counting downloads."""
+
+    key = "spacedock:1"
+
+    def __init__(self, payload, size=None):
+        self.payload = payload
+        self.size = size
+        self.downloads = 0
+
+    def releases(self, etag=None):
+        return [release("1.0.0", "http://mirror", size=self.size)], None
+
+    def download(self, entry):
+        self.downloads += 1
+        return Archive.of_bytes(self.payload), "application/zip"
 
 
 def stamped_file(folder, **extra):

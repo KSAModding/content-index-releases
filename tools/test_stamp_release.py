@@ -10,14 +10,17 @@ This is the authored half of a stamp: the bounds, the loader, the dependency
 merge, the listing block. `tools/verify_examples.py` covers the archive half.
 """
 
+import hashlib
 import io
 import json
+import tempfile
 import unittest
 import zipfile
 from datetime import datetime, timezone
 
 from stamp_release import (
     CHANGELOG_TEXT_LIMIT,
+    Archive,
     StampError,
     changelog_text,
     derived_dependencies,
@@ -245,6 +248,24 @@ class Stamp(unittest.TestCase):
             [entry["id"] for entry in document["dependencies"]],
             ["KittenExtensions", "MeasureTools"],
         )
+
+    def test_an_archive_in_a_file_stamps_like_its_bytes(self):
+        # A download streams into a file and brings its digest and size along,
+        # and a caller with bytes in memory gets the same release file.
+        data = mod_archive()
+        with tempfile.TemporaryFile() as file:
+            file.write(data)
+            archive = Archive(file, hashlib.sha256(data).hexdigest(), len(data))
+            self.assertEqual(self.stamp(data=archive), self.stamp(data=data))
+
+    def test_the_digest_and_size_of_an_archive_are_taken_as_given(self):
+        # The stamper does not read the file again for them: the download
+        # measured the bytes as they arrived.
+        data = mod_archive()
+        archive = Archive(io.BytesIO(data), "ab" * 32, 12345)
+        download = self.stamp(data=archive)["download"]
+        self.assertEqual(download["sha256"], "AB" * 32)
+        self.assertEqual(download["size"], 12345)
 
     def test_the_listing_block_freezes_the_descriptive_facts_only(self):
         listing = self.stamp()["listing"]

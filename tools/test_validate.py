@@ -80,6 +80,10 @@ class FakeHttp:
             raise AssertionError(f"unexpected URL {url}")
         return hosts.Response(200, {"Content-Type": "application/octet-stream"}, self.routes[url])
 
+    def archive(self, url, api=False, limit=None):
+        answer = self.get(url, api=api)
+        return hosts.Archive.of_bytes(answer.body), answer.headers
+
 
 RELEASE = {
     "spec_version": 1,

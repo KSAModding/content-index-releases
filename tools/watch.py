@@ -43,6 +43,7 @@ from hosts import HostError
 from stamp_release import (
     GAME_MONTH,
     StampError,
+    as_archive,
     changelog_text,
     month_is_over,
     normalize_version,
@@ -149,7 +150,7 @@ class Cache:
                 loaded = {}
             if isinstance(loaded, dict) and loaded.get("version") == CACHE_VERSION:
                 self.data = loaded
-        for section in ("hosts", "images", "listings", "mirrors", "swaps", "sweep"):
+        for section in ("differs", "hosts", "images", "listings", "mirrors", "swaps", "sweep"):
             self.data.setdefault(section, {})
 
     def section(self, name, key):
@@ -1186,17 +1187,24 @@ class Watcher:
         return settled
 
     def stamp_one(self, listing_id, authored, authority, mirror_hosts, release):
-        archive, content_type = authority.download(release)
-        facts = release.facts()
-        facts["content_type"] = content_type
+        """Stamp one release, then look for its mirrors.
 
-        mirrors = self.mirrors_for(mirror_hosts, release, archive)
-        document = stamp(
-            authored, facts, archive, self.game_versions, mirrors=mirrors, now=now()
-        )
+        The archive is closed before a mirror downloads, so at most one archive
+        is on disk and the mirror is checked against the stamped digest.
+        """
+        archive, content_type = authority.download(release)
+        with as_archive(archive) as archive:
+            facts = release.facts()
+            facts["content_type"] = content_type
+            document = stamp(authored, facts, archive, self.game_versions, now=now())
+
+        download = document["download"]
+        mirrors = self.mirrors_for(mirror_hosts, release, download["sha256"])
+        if mirrors:
+            download["mirrors"] = mirrors
         path = self.folder(listing_id) / f"{document['version']}.json"
         self.write(path, serialize(document), f"Stamp {listing_id} {document['version']}")
-        self.log(f"    stamped {document['version']} ({len(archive)} bytes)")
+        self.log(f"    stamped {document['version']} ({download['size']} bytes)")
         self.stamped.append(f"{listing_id} {document['version']}")
 
     def check_for_a_swap(self, listing_id, authority, release, path, errors):
@@ -1238,7 +1246,8 @@ class Watcher:
             errors.append(f"`{release.version}`: {error}")
             return True
 
-        digest = hashlib.sha256(archive).hexdigest().upper()
+        with as_archive(archive) as archive:
+            digest = archive.sha256
         seen.update({"size": release.size, "url": release.url, "checked": iso(now())})
         if digest == stamped_digest:
             seen["digest"] = None
@@ -1367,18 +1376,18 @@ class Watcher:
         )
         self.mirrored.append(f"{document['id']} {document['version']}")
 
-    def mirrors_for(self, mirror_hosts, release, archive):
+    def mirrors_for(self, mirror_hosts, release, digest):
         """The non-authority hosts serving byte-identical bytes for this release.
 
-        Shares the mirror budget with `mirror_pass`: verifying costs a full
-        download, and a fresh-stamp burst must not multiply that unbounded. A
-        mirror that did not fit the budget is appended by a later tick's pass.
+        `digest` is the stamped SHA-256. Shares the mirror budget with
+        `mirror_pass`: verifying costs a full download, and a fresh-stamp burst
+        must not multiply that unbounded. A mirror that did not fit the budget
+        is appended by a later tick's pass.
         """
-        digest = hashlib.sha256(archive).hexdigest().upper()
         found = []
         for host in mirror_hosts:
             candidate = self.mirror_release(host, release.version)
-            if candidate is None:
+            if candidate is None or self.known_to_differ(host, candidate):
                 continue
             if self.mirror_budget <= 0:
                 break
@@ -1407,16 +1416,33 @@ class Watcher:
         )
 
     def verify_mirror(self, host, release, digest):
-        """The mirror's URL when its bytes are identical, else None."""
+        """The mirror's URL when its bytes are identical, else None.
+
+        Different bytes are remembered by URL and size, so the mirror is not
+        downloaded again until one of them changes.
+        """
         try:
             archive, _ = host.download(release)
         except (HostError, StampError) as error:
             self.log(f"    {host.key}: {error}")
             return None
-        if hashlib.sha256(archive).hexdigest().upper() != digest:
+        with as_archive(archive) as archive:
+            served = archive.sha256
+        if served != digest:
             self.log(f"    {host.key} serves different bytes for {release.version}")
+            self.cache.section("differs", f"{host.key} {release.version}").update(
+                {"url": release.url, "size": release.size, "checked": iso(now())}
+            )
             return None
         return release.url
+
+    def known_to_differ(self, host, release):
+        """Whether the mirror served different bytes at this URL and size before.
+
+        The cache is derived: losing it costs one more download.
+        """
+        seen = self.cache.data["differs"].get(f"{host.key} {release.version}")
+        return bool(seen) and seen.get("url") == release.url and seen.get("size") == release.size
 
     def mirror_pass(self, listing_id, mirror_hosts, errors):
         """Append a mirror that appeared after a release was stamped.
@@ -1453,7 +1479,7 @@ class Watcher:
             found = []
             for host in mirror_hosts:
                 candidate = self.mirror_release(host, version)
-                if candidate is None or candidate.url in known:
+                if candidate is None or candidate.url in known or self.known_to_differ(host, candidate):
                     continue
                 self.mirror_budget -= 1
                 url = self.verify_mirror(host, candidate, (download.get("sha256") or "").upper())
