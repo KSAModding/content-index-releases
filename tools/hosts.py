@@ -180,8 +180,9 @@ class Http:
                 if error.code < 500 and error.code != 429:
                     raise
                 last = error
-            # HTTPException covers a body that ends before its Content-Length.
-            except (urllib.error.URLError, TimeoutError, OSError, http.client.HTTPException) as error:
+            # IncompleteRead is a body that ends before its length. Other
+            # HTTPException kinds, such as InvalidURL, are not transient.
+            except (urllib.error.URLError, TimeoutError, OSError, http.client.IncompleteRead) as error:
                 last = error
 
             if attempt + 1 < self.retries:
