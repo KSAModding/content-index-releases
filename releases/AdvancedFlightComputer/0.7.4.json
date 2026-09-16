@@ -37,6 +37,7 @@
     }
   ],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/tag/v0.7.4",
+  "changelog_text": "## Required for KSA 2026.9.4.5400\nKSA 2026.9.4.5400 removed the `KSA.Viewport` class and replaced it with the `IViewport` and `IGameViewport` interfaces, which every drawing and picking entry point in the Transfer Planner now takes. Update is mandatory for this mod to work if you are on KSA version 2026.9.4.5400 and above; an older build fails to load and its Transfer Planner additions never appear.\n\n## Changes\n- Ports every Harmony boundary and drawing helper to the interface the stock method declares. The two flyby anchors resolve through a single signature array, because `DrawSelectedTransfer` takes `IViewport` while `DrawSelectedTransferUi` takes `IGameViewport`.\n- Logs a repeated draw-path error once instead of every frame, so a single fault no longer floods the log.\n\n## Compatibility\nValidated against KSA build version **2026.9.4.5400**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\AdvancedFlightComputer\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
   "listing": {
     "name": "Advanced Flight Computer",
     "authors": [
