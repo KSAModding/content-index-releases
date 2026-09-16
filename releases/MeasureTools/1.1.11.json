@@ -29,6 +29,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/tag/v1.1.11",
+  "changelog_text": "## Changes\n- Marks the mod as compatible with KSA 2026.9.10.5438. Removes the \"untested version\" warning shown at game start. No functional changes.\n\n## Compatibility\nValidated against KSA build version **2026.9.10.5438**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\MeasureTools\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
   "listing": {
     "name": "MeasureTools",
     "authors": [
