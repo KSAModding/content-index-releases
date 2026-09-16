@@ -26,6 +26,7 @@ from check_amendment import Outcome, check_path
 from stamp_release import (
     CHANGELOG_TEXT_LIMIT,
     StampError,
+    as_archive,
     changelog_text,
     prerelease_identifiers,
     stamp,
@@ -280,10 +281,11 @@ def check(path, head, root, game_versions, http, now=None):
 
     submitted = facts(head)
     submitted["content_type"] = content_type
-    try:
-        derived = stamp(document, submitted, archive, game_versions, now=now)
-    except StampError as error:
-        return Outcome(REJECT, [f"the release does not stamp: {error}"])
+    with as_archive(archive) as archive:
+        try:
+            derived = stamp(document, submitted, archive, game_versions, now=now)
+        except StampError as error:
+            return Outcome(REJECT, [f"the release does not stamp: {error}"])
 
     differences = compare(head, derived)
     if differences:
@@ -292,6 +294,6 @@ def check(path, head, root, game_versions, http, now=None):
         PASS,
         [
             f"every stamped field agrees with the archive at {download['url']} "
-            f"({len(archive)} bytes, sha256 {derived['download']['sha256']})"
+            f"({derived['download']['size']} bytes, sha256 {derived['download']['sha256']})"
         ],
     )

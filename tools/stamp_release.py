@@ -103,6 +103,38 @@ class StampError(Exception):
     """
 
 
+class Archive:
+    """A release archive in a file, with the SHA-256 and size taken while it was written.
+
+    A download streams into an anonymous temporary file, so an archive of
+    several GiB is never held in memory. Closing the archive removes the file.
+    """
+
+    def __init__(self, file, sha256, size):
+        self.file = file
+        self.sha256 = sha256.upper()
+        self.size = size
+
+    @classmethod
+    def of_bytes(cls, data):
+        """The archive of bytes already in memory, for a caller that has nothing larger."""
+        return cls(io.BytesIO(data), hashlib.sha256(data).hexdigest(), len(data))
+
+    def close(self):
+        self.file.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *details):
+        self.close()
+
+
+def as_archive(archive):
+    """`archive` as an Archive, whether it came as one or as bytes."""
+    return archive if isinstance(archive, Archive) else Archive.of_bytes(archive)
+
+
 def normalize_version(tag):
     """The tag as SemVer 2.0.0, with a leading `v` stripped.
 
@@ -208,9 +240,11 @@ def resolve_bound(bound, which, game_versions, now):
 
 
 def open_archive(archive):
-    """A ZipFile over the archive bytes. Anything unreadable is a StampError."""
+    """A ZipFile over the archive, an Archive or bytes. Anything unreadable is a StampError."""
+    archive = as_archive(archive)
+    archive.file.seek(0)
     try:
-        return zipfile.ZipFile(io.BytesIO(archive))
+        return zipfile.ZipFile(archive.file)
     except zipfile.BadZipFile as error:
         raise StampError(f"the archive is not a readable zip, {error}") from error
 
@@ -559,6 +593,8 @@ def listing_snapshot(authored):
 def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
     """The release file for one release.
 
+    `archive` is an Archive or the archive's bytes.
+
     `release` carries the facts the caller read off the host:
 
         tag             the tag or version string the host names, required
@@ -591,6 +627,7 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
         )
 
     version = normalize_version(release.get("tag"))
+    archive = as_archive(archive)
     handle = open_archive(archive)
 
     install = install_object(
@@ -649,8 +686,8 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
 
     download = {
         "url": release["url"],
-        "sha256": hashlib.sha256(archive).hexdigest().upper(),
-        "size": len(archive),
+        "sha256": archive.sha256,
+        "size": archive.size,
         "content_type": content,
     }
     if mirrors:

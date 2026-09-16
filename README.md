@@ -77,6 +77,13 @@ A release the watcher cannot stamp, a tag that does not parse or an archive whos
 A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue.
 
 The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
+A mirror that serves different bytes is remembered in the derived cache by URL and size, and is not downloaded again until one of them changes.
+
+A release archive may be up to 4 GiB.
+That is twice the largest KSA archive on SpaceDock and above GitHub's 2 GiB file limit, and one archive of that size fits the disk a runner guarantees and downloads inside the check timeouts.
+An archive streams into a temporary file while its SHA-256 and size are taken, so the limit is about disk and time, not memory, and at most one archive is on disk at a time.
+A larger archive is rejected before its body is read when the host sends a length, and as soon as the stream passes the limit when it does not.
+Release lists and other answers read into memory have their own limit of 64 MiB.
 
 `changelog_text` holds the release notes of the authority host (RFC 0064): whitespace trimmed at both ends, LF line endings, and left out when the notes are empty or longer than 16 KiB of UTF-8.
 The watcher adds it once to a release file that has none, from the release list the tick already read, and never changes or removes it.
