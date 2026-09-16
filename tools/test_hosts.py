@@ -261,6 +261,31 @@ class DownloadCounts(unittest.TestCase):
         self.assertEqual(named({}, FakeHttp({})), {})
 
 
+class ReleaseNotes(unittest.TestCase):
+    def test_github_reads_the_release_body(self):
+        host = GitHubHost("o/r", FakeHttp({}), listing_id="Mod")
+        found = host._release({"tag_name": "v1.0.0", "body": "## Changes\r\n- A", "assets": []})
+        self.assertEqual(found.changelog_text, "## Changes\r\n- A")
+        self.assertEqual(found.facts()["changelog_text"], "## Changes\r\n- A")
+        for body in (None, 7, ["x"]):
+            payload = {"tag_name": "v1.0.0", "body": body}
+            self.assertIsNone(host._release(payload).changelog_text, msg=repr(body))
+
+    def test_spacedock_reads_the_changelog_of_each_version(self):
+        body = json.dumps({
+            "url": "/mod/1",
+            "versions": [
+                {"friendly_version": "1.0.1", "changelog": "Fixes.",
+                 "created": "2020-02-01T00:00:00Z", "download_path": "/mod/1/d/1.0.1"},
+                {"friendly_version": "1.0.0", "changelog": None,
+                 "created": "2020-01-01T00:00:00Z", "download_path": "/mod/1/d/1.0.0"},
+            ],
+        }).encode()
+        http = FakeHttp({"https://spacedock.info/api/mod/1": Response(200, {}, body)})
+        releases, _ = SpaceDockHost(1, http).releases()
+        self.assertEqual([entry.changelog_text for entry in releases], ["Fixes.", None])
+
+
 class Timestamps(unittest.TestCase):
     def test_garbage_yields_none_rather_than_passing_through(self):
         # release_date is stamped exactly once; the stamper rejects a release
