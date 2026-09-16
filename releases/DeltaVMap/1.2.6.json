@@ -1,0 +1,51 @@
+{
+  "spec_version": 1,
+  "id": "DeltaVMap",
+  "type": "mod",
+  "version": "1.2.6",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-15T11:10:19Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap/releases/download/v1.2.6/DeltaVMap.zip",
+    "sha256": "60478047A35A7555424BF1A60491645EFE5C024E359A330C454D85A3C7ED865A",
+    "size": 91726,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4294/DeltaVMap/download/1.2.6"
+    ]
+  },
+  "install_size": 203326,
+  "install": {
+    "root": "DeltaVMap",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.5",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap/releases/tag/v1.2.6",
+  "changelog_text": "## Required for KSA 2026.9.10.5438\nKSA 2026.9.10.5438 moved `KeyHash` into `Planet.Render.Core` and replaced the public `Part.InertMass` field with methods. Update is mandatory for this mod to work if you are on KSA version 2026.9.10.5438 and above; the previous build cannot read the staged delta-v, so the route bar shows n/a.\n\n## Changes\n- Reads the staged delta-v for the route bar straight from the game's staging model. The game now counts the inert mass of sub-parts such as engines on its own, so the correction this mod added for that mass is removed and the mass is not counted twice.\n- The route bar follows the staging fixes in this game build, so spent stages no longer count twice in flight and solid motors report their delta-v accurately.\n\n## Compatibility\nValidated against KSA build version **2026.9.10.5438**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\DeltaVMap\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
+  "listing": {
+    "name": "DeltaVMap",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "An interactive, auto-generated delta-v subway map and transfer-window planner for Kitten Space Agency.",
+    "description": "It reads the loaded solar system live, so it works with any system, stock or modded, with no per-system setup.\n\n![The Delta-V Map rooted at Earth](ksa-image:delta-v-map)\n\nThis mod is written against the [StarMap loader](https://github.com/StarMapLoader/StarMap).\n\n## What it does\n\nThe map tells you \"where can I go from where I am and for how much delta-v\".\nThe transfer-window layer answers the \"and when do I leave\" question.\n\nBoth are generated from the loaded `CelestialSystem`, recurse through every planet, moon, asteroid and comet, and read each body's mass, radius, SOI, orbit and atmosphere. Nothing is hardcoded.\n\nAll numbers are closed-form patched-conic estimates (Hohmann transfers with Oberth-combined departure and capture, no iterative solver), so the whole map is fast and every transfer is cached once per session.\n\nThe delta-v figures are the idealized optimal values, so they assume a well-timed, well-flown transfer. A \"piloting-margin percentage\" slider is available.\n\n## Features\n\n### Delta-v subway map\n\n- **Ego-centric metro layout.** The body you are currently in is the root; the map re-roots automatically on the next open after an SOI change, and Shift-Click re-roots to any body on demand.\n- **Accurate budgets.** Closed-form Hohmann transfers with Oberth-combined ejection and capture, a per-body state ladder (surface, low orbit, stationary, SOI edge, intercept) and a \"you are here\" marker at your actual orbit.\n- **Route planning.** Click any body to highlight the exact route from your current state, with a running total and a per-segment breakdown. Toggles for from-surface, landing, aerobraking, plane change and a return trip, plus a piloting-margin percentage to budget for non-optimal flying.\n- **Vehicle comparison.** A bar compares the selected route against your ship's available delta-v.\n- **Readable at scale.** Node-symbol vocabulary with a legend, search / focus / isolate, and automatic minor-body aggregation so a dense system (thousands of asteroids) stays usable.\n- **Three layout modes**, switched from the on-canvas toggle or the Options menu:\n\n**Cumulative-down (default)**\n\n![Cumulative-down layout](ksa-image:delta-v-map)\n\n**Gravity-well**\n\n![Gravity-well layout](ksa-image:layout-gravity-well)\n\n**Spring**\n\n![Spring layout](ksa-image:layout-spring)\n\n### Transfer windows\n\nThe timing companion to the map. For the root body and every sibling sharing its parent, it shows the optimal phase angle, the live current phase, a countdown to the next window, the synodic period, the ejection angle and the transfer time, in a compact list plus a live polar phase-clock.\n\n![The transfer-window list and phase clock](ksa-image:transfer-windows)\n\nA separate, opt-in layer draws the same data in the game's 3D map mode: the optimal-departure marker on the destination's real orbit (where it will be when the window opens), the planet-star-planet phase angle, and an ejection-angle gizmo at the departure body.\n\n![The transfer-window overlay in the game map mode](ksa-image:map-mode-overlay)\n\n## Installation\n\n1. Install [StarMap](https://github.com/StarMapLoader/StarMap).\n2. Download the latest release from the [GitHub Releases](https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap/releases) tab or from [SpaceDock](https://spacedock.info/mod/4294/DeltaVMap).\n3. Extract into `Documents\\My Games\\Kitten Space Agency\\mods\\DeltaVMap\\`.\n4. The game auto-discovers new mods and prompts you to enable them. Alternatively, add to `Documents\\My Games\\Kitten Space Agency\\manifest.toml`:\n\n```toml\n[[mods]]\nid = \"DeltaVMap\"\nenabled = true\n```\n\nOpen the map from the **View** -> \"Delta-V Map\" menu in flight, or the top-level **Delta-V Map** tab in the editor.\n\n## Dependencies\n\n- [StarMap](https://github.com/StarMapLoader/StarMap): Mod loader, required at runtime (see Installation). Tested version 0.4.6.\n\n## Build dependencies\n\nRequired only to build the mod from source. Targets **.NET 10**.\n\n- [StarMap.API](https://github.com/StarMapLoader/StarMap) from NuGet, tested version 0.3.6.\n- [Lib.Harmony](https://www.nuget.org/packages/Lib.Harmony) from NuGet, tested version 2.4.2.\n\n## Mod compatibility\n\n- Known conflicts: none\n\n## Community\n\nThread on the KSA forums: https://forums.ahwoo.com/threads/deltavmap.978/\n\n## Check out my other mods\n\n- [AdvancedFlightComputer](https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer) - maneuver planning, burn execution, automatic staging and closed-loop guidance ([forum thread](https://forums.ahwoo.com/threads/advanced-flight-computer.783/))\n- [MeasureTools](https://github.com/Maximilian-Nesslauer/KSA-MeasureTools) - click-to-measure ruler, protractor, and surface measuring in the map view ([forum thread](https://forums.ahwoo.com/threads/measuretools.992/))\n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/deltavmap.978/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap",
+      "spacedock": "https://spacedock.info/mod/4294/DeltaVMap",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap/issues"
+    }
+  }
+}
