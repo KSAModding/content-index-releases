@@ -44,6 +44,7 @@ TOP_LEVEL = frozenset(
         "loader",
         "dependencies",
         "changelog",
+        "changelog_text",
         "listing",
         "yanked",
         "yanked_reason",
@@ -211,6 +212,24 @@ def _only_mirrors_differ(base, head):
     return {key: value for key, value in base.items() if key != "mirrors"} == {
         key: value for key, value in head.items() if key != "mirrors"
     }
+
+
+def check_changelog_text(base, head, errors):
+    """Only the watcher adds `changelog_text`, and nobody changes or removes it (RFC 0064)."""
+    absent = object()
+    before = base.get("changelog_text", absent)
+    after = head.get("changelog_text", absent)
+    if before == after:
+        return
+    if before is absent:
+        errors.append("'changelog_text' is added, and only the watcher adds it, from the release host")
+    elif after is absent:
+        errors.append(
+            "'changelog_text' is removed, and nobody removes it. The watcher adds it on "
+            "the default branch: rebase and run tools/amend.py again"
+        )
+    else:
+        errors.append("'changelog_text' changed, and it never changes after it was added")
 
 
 def check_game_bounds(base, head, errors):
@@ -494,6 +513,7 @@ def check_document(path, base, head, errors):
     _unknown(head, TOP_LEVEL, path, errors)
     check_path(path, head, errors)
     check_immutable(base, head, errors)
+    check_changelog_text(base, head, errors)
     check_game_bounds(base, head, errors)
     check_yank(base, head, errors)
     check_loader(base, head, errors)

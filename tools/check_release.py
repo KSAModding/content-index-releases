@@ -6,8 +6,8 @@ RFC 0033: a release pull request adds exactly one new file under `releases/<id>/
 The checks do not trust the submitted document.
 They download the archive from its `download.url`, stamp the release again with `stamp_release.py`, which is the code the watcher stamps with, and reject the submission when any field disagrees.
 
-Three facts only the host knows and no archive carries: the release date, the pre-release flag, and the changelog link.
-Those are taken from the submission as the author's word. Everything else is derived.
+Four facts only the host knows and no archive carries: the release date, the pre-release flag, the changelog link, and the changelog text.
+Those are taken from the submission as the author's word, and the changelog text is checked only for its form and its length. Everything else is derived.
 """
 
 import json
@@ -23,7 +23,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import hosts
 from check_amendment import Outcome, check_path
-from stamp_release import StampError, prerelease_identifiers, stamp
+from stamp_release import (
+    CHANGELOG_TEXT_LIMIT,
+    StampError,
+    changelog_text,
+    prerelease_identifiers,
+    stamp,
+)
 
 PASS = "pass"
 REJECT = "reject"
@@ -81,6 +87,7 @@ def facts(head):
         "prerelease": head.get("release_status") == "testing"
         and not prerelease_identifiers(version),
         "changelog": head.get("changelog"),
+        "changelog_text": head.get("changelog_text"),
     }
 
 
@@ -140,6 +147,24 @@ def check_shape(path, head, errors):
     changelog = head.get("changelog")
     if changelog is not None and (not isinstance(changelog, str) or not changelog.strip()):
         errors.append("changelog is present and empty, and the stamper leaves an empty one out")
+
+    if "changelog_text" in head:
+        text = head["changelog_text"]
+        written = changelog_text(text)
+        if not isinstance(text, str):
+            errors.append("changelog_text is not a string")
+        elif not text.strip():
+            errors.append("changelog_text is present and empty, and the stamper leaves empty notes out")
+        elif written is None:
+            errors.append(
+                f"changelog_text is not UTF-8 text of at most {CHANGELOG_TEXT_LIMIT} bytes, "
+                "and the stamper leaves such notes out"
+            )
+        elif written != text:
+            errors.append(
+                "changelog_text has whitespace at an end or a CR line ending, and the "
+                "stamper writes neither"
+            )
 
 
 def check_listing(folder, document, errors):

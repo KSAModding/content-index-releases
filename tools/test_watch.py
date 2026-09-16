@@ -21,6 +21,7 @@ from unittest.mock import patch
 import watch
 from check_release import DEFAULT_AUTHORED
 from hosts import HostRelease
+from stamp_release import CHANGELOG_TEXT_LIMIT, serialize
 from watch import (
     IMAGES_VERIFIED,
     Cache,
@@ -637,10 +638,10 @@ class FakeAuthority:
         return self.payload, "application/zip"
 
 
-def release(version, url, size=None, date="2020-01-01T00:00:00Z"):
+def release(version, url, size=None, date="2020-01-01T00:00:00Z", notes=None):
     return HostRelease(
         host="github", tag=f"v{version}", version=version,
-        release_date=date, url=url, size=size,
+        release_date=date, url=url, size=size, changelog_text=notes,
     )
 
 
@@ -741,6 +742,106 @@ class SwapsAndMirrors(WatcherCase):
             found = watcher.mirrors_for([host], release("1.0.0", "x"), b"bytes")
             self.assertEqual(found, [])
             self.assertEqual(host.downloads, 0)
+
+
+def stamped_file(folder, **extra):
+    path = folder / "releases" / "M" / "1.0.0.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    document = {
+        "id": "M",
+        "version": "1.0.0",
+        "release_date": "2020-01-01T00:00:00Z",
+        "download": {"url": "http://a", "size": 5},
+        "changelog": "http://a/tag",
+        **extra,
+        "listing": {"name": "M"},
+    }
+    path.write_text(serialize(document))
+    return path
+
+
+class ChangelogTexts(WatcherCase):
+    def test_notes_are_added_where_a_fresh_stamp_puts_them(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            path = stamped_file(folder)
+            errors = []
+
+            watcher.changelog_pass(
+                "M", [release("1.0.0", "http://a", notes="  ## Changes\r\n- A\r\n")], errors
+            )
+
+            document = json.loads(path.read_text())
+            self.assertEqual(document["changelog_text"], "## Changes\n- A")
+            self.assertEqual(list(document)[-3:], ["changelog", "changelog_text", "listing"])
+            self.assertEqual(watcher.noted, ["M 1.0.0"])
+            self.assertEqual(errors, [])
+
+    def test_a_present_text_is_never_changed_or_removed(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            path = stamped_file(folder, changelog_text="As stamped")
+            before = path.read_text()
+
+            for notes in ("Edited since", None):
+                watcher.changelog_pass("M", [release("1.0.0", "http://a", notes=notes)], [])
+
+            self.assertEqual(path.read_text(), before)
+            self.assertEqual(watcher.noted, [])
+
+    def test_notes_that_are_empty_or_over_the_limit_add_nothing(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            path = stamped_file(folder)
+
+            for notes in (None, " \n ", "x" * (CHANGELOG_TEXT_LIMIT + 1)):
+                watcher.changelog_pass("M", [release("1.0.0", "http://a", notes=notes)], [])
+
+            self.assertNotIn("changelog_text", json.loads(path.read_text()))
+
+    def test_a_version_listed_twice_with_different_notes_is_skipped(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            path = stamped_file(folder)
+
+            watcher.changelog_pass(
+                "M",
+                [
+                    release("1.0.0", "http://a", notes="One"),
+                    release("1.0.0", "http://b", notes="Two"),
+                ],
+                [],
+            )
+
+            self.assertNotIn("changelog_text", json.loads(path.read_text()))
+
+    def test_a_tick_adds_notes_without_a_further_request(self):
+        class Authority(FakeAuthority):
+            key = "github:example/m"
+
+            def releases(self, etag=None):
+                return [release("1.0.0", "http://a", size=5, notes="## Changes")], '"etag"'
+
+        authority = Authority()
+        with tempfile.TemporaryDirectory() as name, patch.object(
+            watch.hosts, "build", return_value=(authority, [])
+        ):
+            folder = Path(name)
+            path = stamped_file(folder)
+            watcher = self.watcher(folder, ["--no-sweep", "--no-commit"])
+            (folder / ".authored" / "listings" / "M.toml").write_text('id = "M"\n')
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+
+            watcher.tick()
+
+            self.assertEqual(json.loads(path.read_text())["changelog_text"], "## Changes")
+            self.assertEqual(authority.downloads, 0)
+            self.assertEqual(watcher.http.requests, 0)
 
 
 def moment(text):

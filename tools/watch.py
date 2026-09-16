@@ -3,9 +3,10 @@
 """One tick of the watcher (RFC 0033).
 
 Scan every authored listing's authority host, stamp every release that appeared
-after the newest one already stamped, commit it, fetch the listing's images
-again, keep one error issue per listing current on the authored repository, and
-sweep that repository's open pull requests.
+after the newest one already stamped, commit it, add the release notes a stamped
+file does not carry yet, fetch the listing's images again, keep one error issue
+per listing current on the authored repository, and sweep that repository's open
+pull requests.
 
 Older releases are left alone, and a listing's first tick takes its newest
 release only. RFC 0031 freezes the authored facts "current at release time", and
@@ -42,6 +43,7 @@ from hosts import HostError
 from stamp_release import (
     GAME_MONTH,
     StampError,
+    changelog_text,
     month_is_over,
     normalize_version,
     resolve_bound,
@@ -52,9 +54,8 @@ from stamp_release import (
 
 GITHUB_API = "https://api.github.com"
 
-# 2: the host ETag entries moved to a per-listing key. The cache is derived,
-# so a version bump just costs one expensive tick.
-CACHE_VERSION = 2
+# The cache is derived, so a version bump just costs one expensive tick.
+CACHE_VERSION = 3
 
 # The marker that makes a listing's issue findable without a search, and the
 # signature that decides whether a genuinely new error deserves a comment.
@@ -645,6 +646,7 @@ class Watcher:
         self.images = None
         self.stamped = []
         self.mirrored = []
+        self.noted = []
         self.failed = []
         self.lines = []
         self._mirror_lists = {}
@@ -950,6 +952,7 @@ class Watcher:
                 listing_id, authored, authority, mirrors, releases, errors,
                 self.issues.attempted(listing_id, self.cache),
             )
+            self.changelog_pass(listing_id, releases, errors)
 
         self.mirror_pass(listing_id, mirrors, errors)
 
@@ -1307,6 +1310,41 @@ class Watcher:
             )
             self.log(f"    resolved game_max {display} onto {version}")
 
+    def changelog_pass(self, listing_id, releases, errors):
+        """Add `changelog_text` once to a stamped file that has none (RFC 0064).
+
+        The notes come with the release list the tick already holds, so the pass
+        costs no request.
+        """
+        notes = {}
+        for release in releases:
+            if release.version is not None:
+                notes.setdefault(release.version, set()).add(
+                    changelog_text(release.changelog_text)
+                )
+
+        for version, path in self.stamped_versions(listing_id).items():
+            texts = notes.get(version) or {None}
+            if len(texts) != 1 or None in texts:
+                continue
+            document = self.read_release(path, errors)
+            if document is None or "changelog_text" in document:
+                continue
+            (text,) = texts
+            updated = {}
+            for key, value in document.items():
+                if key == "listing":
+                    updated["changelog_text"] = text
+                updated[key] = value
+            updated.setdefault("changelog_text", text)
+            self.write(
+                path,
+                serialize(updated),
+                f"Add the changelog text to {listing_id} {version}",
+            )
+            self.log(f"    added the changelog text to {version}")
+            self.noted.append(f"{listing_id} {version}")
+
     def append_mirror(self, path, document, url):
         """Record a further URL proven byte-identical, as a mirror.
 
@@ -1383,10 +1421,9 @@ class Watcher:
     def mirror_pass(self, listing_id, mirror_hosts, errors):
         """Append a mirror that appeared after a release was stamped.
 
-        The one field the watcher may append to after publish, watcher-only and
-        append-only. Verifying one costs a full download, so a tick works
-        through the least recently checked candidates within a budget, and the
-        rest wait for the next tick.
+        Watcher-only and append-only. Verifying one costs a full download, so a
+        tick works through the least recently checked candidates within a budget,
+        and the rest wait for the next tick.
         """
         if not mirror_hosts or self.mirror_budget <= 0:
             return
@@ -1471,6 +1508,7 @@ class Watcher:
             "",
             f"- stamped: {len(self.stamped)}",
             f"- mirrors appended: {len(self.mirrored)}",
+            f"- changelog texts added: {len(self.noted)}",
             f"- listings with an error: {len(set(self.failed))}",
             f"- host requests: {self.http.requests}",
         ]
@@ -1478,12 +1516,14 @@ class Watcher:
             summary += ["", "### Stamped", ""] + [f"- `{name}`" for name in self.stamped]
         if self.mirrored:
             summary += ["", "### Mirrors", ""] + [f"- `{name}`" for name in self.mirrored]
+        if self.noted:
+            summary += ["", "### Changelog texts", ""] + [f"- `{name}`" for name in self.noted]
         if self.failed:
             summary += ["", "### Reported", ""] + [
                 f"- `{name}`" for name in sorted(set(self.failed))
             ]
 
-        print("\n".join(summary[2:6]))
+        print("\n".join(summary[2:7]))
         path = os.environ.get("GITHUB_STEP_SUMMARY")
         if path:
             with open(path, "a", encoding="utf-8") as handle:

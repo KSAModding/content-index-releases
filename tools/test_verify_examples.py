@@ -8,7 +8,7 @@ frozen from the listing (RFC 0031) and drifts when it is edited.
 
 import unittest
 
-from verify_examples import ARCHIVE_FACTS, AUTHORED_FACTS, archive_facts
+from verify_examples import ARCHIVE_FACTS, AUTHORED_FACTS, EDITABLE_FACTS, archive_facts
 
 
 def release(**overrides):
@@ -37,6 +37,7 @@ def release(**overrides):
             {"id": "AutoStage", "kind": "recommends", "source": "authored"},
         ],
         "changelog": "https://example.invalid/tag/v0.7.0",
+        "changelog_text": "## Changes\n- Marks the mod as compatible.",
         "listing": {"name": "Advanced Flight Computer", "license": "MIT"},
     }
     document.update(overrides)
@@ -46,11 +47,14 @@ def release(**overrides):
 class Split(unittest.TestCase):
     def test_every_field_of_a_full_release_is_on_one_side(self):
         # An unclassified field would be dropped silently.
-        unclassified = set(release()) - set(ARCHIVE_FACTS) - set(AUTHORED_FACTS)
+        unclassified = (
+            set(release()) - set(ARCHIVE_FACTS) - set(AUTHORED_FACTS) - set(EDITABLE_FACTS)
+        )
         self.assertEqual(unclassified, {"install"})
 
-    def test_neither_half_claims_the_same_field(self):
-        self.assertEqual(set(ARCHIVE_FACTS) & set(AUTHORED_FACTS), set())
+    def test_no_field_is_claimed_twice(self):
+        groups = (set(ARCHIVE_FACTS), set(AUTHORED_FACTS), set(EDITABLE_FACTS))
+        self.assertEqual(sum(len(group) for group in groups), len(set().union(*groups)))
 
 
 class Kept(unittest.TestCase):
@@ -128,6 +132,11 @@ class Comparison(unittest.TestCase):
         ])
 
         self.assertEqual(archive_facts(release()), archive_facts(restamped))
+
+    def test_notes_edited_on_the_host_since_the_stamp_are_not_a_difference(self):
+        self.assertEqual(
+            archive_facts(release()), archive_facts(release(changelog_text="Edited since.")),
+        )
 
     def test_a_changed_digest_still_is_one(self):
         other = release()

@@ -65,6 +65,7 @@ class HostRelease:
     size: int | None = None
     prerelease: bool = False
     changelog: str | None = None
+    changelog_text: str | None = None
     asset_name: str | None = None
     # The archives the host offered when none could be picked, so the error the
     # author reads names them instead of claiming there was nothing there.
@@ -81,6 +82,7 @@ class HostRelease:
             "content_type": self.content_type,
             "prerelease": self.prerelease,
             "changelog": self.changelog,
+            "changelog_text": self.changelog_text,
         }
 
 
@@ -186,6 +188,11 @@ def _count(value):
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
     return value
+
+
+def _text(value):
+    """A string the host reports, or None."""
+    return value if isinstance(value, str) else None
 
 
 def _parse_json(url, body):
@@ -328,6 +335,7 @@ class GitHubHost(Host):
             size=(asset or {}).get("size"),
             prerelease=bool(payload.get("prerelease")),
             changelog=payload.get("html_url"),
+            changelog_text=_text(payload.get("body")),
             asset_name=(asset or {}).get("name"),
             candidates=() if asset else tuple(candidates),
             downloads=_count((asset or {}).get("download_count")),
@@ -428,6 +436,7 @@ class SpaceDockHost(Host):
                     content_type="application/zip",
                     prerelease=False,
                     changelog=changelog,
+                    changelog_text=_text(version.get("changelog")),
                     downloads=_count(version.get("downloads")),
                 )
             )

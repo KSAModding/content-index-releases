@@ -76,7 +76,10 @@ A release the watcher cannot stamp, a tag that does not parse or an archive whos
 
 A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue.
 
-`download.mirrors` is the one field the watcher may append to after publish, and only after downloading the other host's archive and finding it byte-identical.
+The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
+
+`changelog_text` holds the release notes of the authority host (RFC 0064): whitespace trimmed at both ends, LF line endings, and left out when the notes are empty or longer than 16 KiB of UTF-8.
+The watcher adds it once to a release file that has none, from the release list the tick already read, and never changes or removes it.
 
 An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
 
@@ -175,7 +178,8 @@ A listing without a `[releases]` section has nothing the watcher can poll, so it
 
 The checks do not trust the file.
 They download the archive from its `download.url`, stamp the release again, and reject the pull request when any field disagrees: the checksum, the sizes, the install root, the dependency merge against the authored document, and the compatibility bounds.
-The release date, the pre-release flag and the changelog link are the author's , because no archive carries them.
+The release date, the pre-release flag, the changelog link and the changelog text are the author's, because no archive carries them.
+The checks read the changelog text only for its form and its length.
 
 When it validates and the author's ownership of the listing verifies, through the repository the listing links to the way the listing flow does, it merges itself.
 A listing that names a release host is refused here, because the watcher stamps its releases from that host.
