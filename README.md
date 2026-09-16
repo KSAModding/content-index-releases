@@ -175,7 +175,8 @@ A listing without a `[releases]` section has nothing the watcher can poll, so it
 
 The checks do not trust the file.
 They download the archive from its `download.url`, stamp the release again, and reject the pull request when any field disagrees: the checksum, the sizes, the install root, the dependency merge against the authored document, and the compatibility bounds.
-The release date, the pre-release flag and the changelog link are the author's , because no archive carries them.
+The release date, the pre-release flag, the changelog link and the changelog text are the author's, because no archive carries them.
+The checks read the changelog text only for its form and its length.
 
 When it validates and the author's ownership of the listing verifies, through the repository the listing links to the way the listing flow does, it merges itself.
 A listing that names a release host is refused here, because the watcher stamps its releases from that host.

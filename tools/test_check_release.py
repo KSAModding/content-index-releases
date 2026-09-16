@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import check_release
 import hosts
-from stamp_release import stamp
+from stamp_release import CHANGELOG_TEXT_LIMIT, stamp
 
 GAME_VERSIONS = ["2026.7.5.4892", "2026.7.9.5018", "2026.8.3.5117", "2026.8.19.5261"]
 
@@ -162,6 +162,13 @@ class RoundTrip(Fixture):
         outcome = self.check(head)
         self.assertEqual(outcome.outcome, check_release.PASS, outcome.messages)
 
+    def test_release_notes_are_the_authors_word(self):
+        for notes in ("## Changes\n- Nothing a host says", "x" * CHANGELOG_TEXT_LIMIT):
+            head = self.stamped(release=dict(RELEASE, changelog_text=notes))
+            self.assertEqual(head["changelog_text"], notes)
+            outcome = self.check(head)
+            self.assertEqual(outcome.outcome, check_release.PASS, outcome.messages)
+
 
 class Derivation(Fixture):
     """Every field the archive and the authored document decide."""
@@ -287,6 +294,21 @@ class BeforeAnyRequest(Fixture):
 
     def test_an_empty_changelog_is_refused(self):
         self.assertIn("changelog", self.refused(self.stamped(changelog="")))
+
+    def test_changelog_text_that_is_not_a_string_is_refused(self):
+        for value in (7, None, ["x"]):
+            self.assertIn("changelog_text", self.refused(self.stamped(changelog_text=value)), value)
+
+    def test_empty_changelog_text_is_refused(self):
+        self.assertIn("changelog_text", self.refused(self.stamped(changelog_text=" \n")))
+
+    def test_changelog_text_longer_than_the_limit_is_refused(self):
+        for value in ("x" * (CHANGELOG_TEXT_LIMIT + 1), "ä" * (CHANGELOG_TEXT_LIMIT // 2 + 1)):
+            self.assertIn("at most", self.refused(self.stamped(changelog_text=value)))
+
+    def test_changelog_text_in_a_form_the_stamper_does_not_write_is_refused(self):
+        for value in (" x", "x\n", "a\r\nb"):
+            self.assertIn("stamper writes neither", self.refused(self.stamped(changelog_text=value)))
 
     def test_the_path_names_the_id_and_the_version(self):
         self.assertIn("folder", self.refused(self.stamped(), path="releases/Other/1.0.0.json"))
