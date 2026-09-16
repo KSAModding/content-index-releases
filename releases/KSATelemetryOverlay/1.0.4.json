@@ -29,6 +29,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/elevatorctln/KSA-Public-Telemetry/releases/tag/1.0.4",
+  "changelog_text": "Fixed broken font loading on KSA build 2026.9.10.5438",
   "listing": {
     "name": "Webcast Telemetry Overlay",
     "authors": [
