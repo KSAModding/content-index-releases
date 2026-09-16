@@ -1,0 +1,45 @@
+{
+  "spec_version": 1,
+  "id": "KSP-Redux",
+  "type": "mod",
+  "version": "1.3.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-04-22T23:02:15Z",
+  "game_min": "2026.6.9.4750",
+  "game_min_revision": 4750,
+  "download": {
+    "url": "https://spacedock.info/mod/4040/KSP-Redux/download/1.3.2",
+    "sha256": "4257617E6CEDF38C875846F5521DDE183C525AD95657BE19667BBE5D5E5B32AF",
+    "size": 1864276755,
+    "content_type": "application/zip"
+  },
+  "install_size": 2188492621,
+  "install": {
+    "root": "KSP-Redux",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4040/KSP-Redux",
+  "changelog_text": "- Readded Mohole\n - Added KSC Launchsite\n - Updated Jool Texture\n - Improved Laythe Clouds\n - Made all texture in cubemap format\n - Improved normal maps\n - Gave all atmospheres proper heights\n - Gave Moho some axial tilt\n\nKnown Issues:\n\n - Jool will sometimes decide to turn into a star (you'll know when you see it)\n - Laythe clouds flicker\n - KSC is underground",
+  "listing": {
+    "name": "KSP-Redux",
+    "authors": [
+      "Plazma_Boltz"
+    ],
+    "abstract": "Brings the Kerbal Space Program system to Kitten Space Agency, with its bodies, textures and music.",
+    "description": "Current Features:\n\n- Entire Stock System\n- Outer Planets Mod ([Addon Link](https://spacedock.info/mod/4071/KSP-Redux%20-%20OPM%20Addon))\n- KSP Music\n- [Compendium](https://spacedock.info/mod/4074/Compendium) Support (not required)\n\nPlanned features:\n\n- Better Atmospheres\n- KSP Parts\n- Higher Quality Textures\n- Actual Kerbals\n\n--- HOW TO INSTALL ---\n1. Download the .zip file\n2. Unzip it\n3. Put it in your KSA directory under your Content folder\n4. Find your manifest.toml file (also in the content folder)\n5. Insert the following into the manifest.toml file\n\n```\n[[mods]]\nid = \"KSP-Redux\"\nenabled = true\n```\n\nthere can be no spaces or line breaks between any parts of the manifest.toml. This means your manifest should look like this:\n\n```\n[[mods]]\nid = \"Core\"\nenabled = true\n[[mods]]\nid = \"KSP-Redux\"\nenabled = true\n```\n\n--- WANT TO CONTRIBUTE? ---\nThat's great! Just ping me on the KSA discord (@PlazmaBoltz) in the modding channel. I really want this to be more of a community project instead of just me and 1 other dev.\n\nWhen will the receive updates?\n\n- It will receive updates whenever something significant is added or bug fixes are made\n\nKnown Issues:\n- Sometimes planets will appear with only half of their texture\n\nCredits:\n\n- PlazmaBoltz: Creator\n- KerbalChris: Music\n- Derpikus: Planet Assets\n- _emu__: Minmus Texture\n\n- The people who made the OPM KSP mod: Textures for the OPM System\n",
+    "license": "MIT",
+    "tags": [
+      "celestial",
+      "visual",
+      "audio"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/ksp-redux.338/",
+      "repository": "https://github.com/PlazmaBoltz/KSP-Redux",
+      "spacedock": "https://spacedock.info/mod/4040/KSP-Redux",
+      "bugtracker": "https://github.com/PlazmaBoltz/KSP-Redux/issues"
+    }
+  }
+}
