@@ -217,6 +217,10 @@ def _stream(answer, limit):
                 raise OversizeError(f"the archive is larger than the {_mib(limit)} limit")
             digest.update(chunk)
             file.write(chunk)
+        # http.client returns a short body when the connection closes early
+        # instead of raising, so the length decides whether the body is whole.
+        if length.isdigit() and size != int(length):
+            raise http.client.IncompleteRead(b"", int(length) - size)
         file.seek(0)
         return Archive(file, digest.hexdigest(), size)
     except BaseException:
