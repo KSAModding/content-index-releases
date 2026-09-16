@@ -6,7 +6,8 @@ examples/ in content-manager-design was stamped by hand from the same archives,
 so it is an expectation this repository did not write itself.
 
 Only the half the archive and its host decide is compared. The rest is frozen
-from the authored listing (RFC 0031) and drifts when it is edited.
+from the authored listing (RFC 0031) and drifts when it is edited, and the
+release notes drift when the author edits them on the host.
 
     python3 tools/verify_examples.py
     python3 tools/verify_examples.py --examples ../content-manager-design/examples
@@ -46,7 +47,7 @@ ARCHIVE_FACTS = (
     "changelog",
 )
 
-# The rest, frozen from the listing. Both halves add up to a full document.
+# The rest, frozen from the listing.
 AUTHORED_FACTS = (
     "game_min",
     "game_min_revision",
@@ -57,6 +58,10 @@ AUTHORED_FACTS = (
     "dependencies",
     "listing",
 )
+
+# Host facts the author can edit after the stamp, so a later derivation does not
+# reproduce them. The three groups add up to a full document.
+EDITABLE_FACTS = ("changelog_text",)
 
 # Only when the root was derived. An authored root and the anchor are listing facts.
 INSTALL_ARCHIVE_FACTS = ("root", "derived")
