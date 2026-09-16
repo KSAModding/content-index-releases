@@ -31,6 +31,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/tag/v1.1.7",
+  "changelog_text": "## Required for KSA 2026.8.19.5261\nKSA 2026.8.19.5261 reworked cursor hovering and the camera apparent-size methods this mod picks with. Update is mandatory for this mod to work if you are on KSA version 2026.8.19.5261 and above; the previous build fails to load and the tool is unavailable.\n\n## Changes\n- Follows the cursor hover rework and the new camera apparent-size methods, including the extra tie-break stock added when two objects overlap on screen.\n- Fixes the map camera running away after a measurement click. Cancelling a placement with the right mouse button left the camera in rotate-drag with the cursor captured.\n- Fixes free-point placement in the vehicle editor with the projection set to orthographic, where every click resolved to the same point.\n- No longer offers a phantom surface point on the invisible bounding sphere around a vehicle. Centre snapping and part picking still reach vehicles.\n- Keeps a `colors.cfg` that failed to load from being overwritten with the shipped defaults.\n\n## Compatibility\nValidated against KSA build version **2026.8.19.5261**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\MeasureTools\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
   "listing": {
     "name": "MeasureTools",
     "authors": [
