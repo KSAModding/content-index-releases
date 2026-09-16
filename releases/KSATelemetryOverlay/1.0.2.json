@@ -29,6 +29,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/elevatorctln/KSA-Public-Telemetry/releases/tag/1.0.2",
+  "changelog_text": "quite a few bug fixes and optimizations, and a few usability improvements. notably the T+ clock doesn't jitter anymore, and the mod keybinds can now be re-bound in the settings menu.",
   "listing": {
     "name": "Webcast Telemetry Overlay",
     "authors": [
