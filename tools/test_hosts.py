@@ -123,7 +123,8 @@ class Downloads(unittest.TestCase):
 class Answer:
     """What urlopen returns, serving `body` and counting how much of it was read.
 
-    `broken_at` ends the body early there once, the way a dropped connection does.
+    `broken_at` ends the body there, the way a dropped connection does: the
+    real HTTPResponse.read returns a short read then, it does not raise.
     """
 
     status = 200
@@ -131,15 +132,12 @@ class Answer:
     def __init__(self, body, headers=None, broken_at=None):
         self.body = body
         self.headers = headers or {}
-        self.broken_at = broken_at
+        self.served = body if broken_at is None else body[:broken_at]
         self.read_bytes = 0
 
     def read(self, amount=-1):
-        end = len(self.body) if amount < 0 else min(len(self.body), self.read_bytes + amount)
-        if self.broken_at is not None and end > self.broken_at:
-            self.read_bytes = self.broken_at
-            raise http.client.IncompleteRead(b"")
-        chunk = self.body[self.read_bytes:end]
+        end = len(self.served) if amount < 0 else min(len(self.served), self.read_bytes + amount)
+        chunk = self.served[self.read_bytes:end]
         self.read_bytes = end
         return chunk
 
@@ -201,15 +199,34 @@ class Streaming(unittest.TestCase):
             download(Http(), release(self.URL))
         self.assertIn("4,096 MiB", str(raised.exception))
 
-    def test_a_retry_starts_the_file_again(self):
-        # A connection that drops midway must not leave its bytes in front of
-        # the next attempt's, or the digest would be of neither.
+    def test_a_body_that_ends_before_its_length_is_retried_from_the_start(self):
+        # A connection that drops midway gives a short read, not an error. The
+        # length is what tells, and the next attempt must not have the first
+        # attempt's bytes in front of its own, or the digest would be of neither.
         body = b"0123456789" * 5
-        self.serve(Answer(body, broken_at=23), Answer(body))
+        headers = {"Content-Length": str(len(body))}
+        self.serve(Answer(body, headers, broken_at=23), Answer(body, headers))
         archive, _ = Http().archive(self.URL)
         with archive:
             self.assertEqual(archive.size, len(body))
             self.assertEqual(archive.sha256, hashlib.sha256(body).hexdigest().upper())
+
+    def test_a_body_that_keeps_ending_early_is_a_host_error(self):
+        body = b"0123456789" * 5
+        headers = {"Content-Length": str(len(body))}
+        self.serve(*(Answer(body, headers, broken_at=23) for _ in range(3)))
+        with self.assertRaises(HostError):
+            Http().archive(self.URL)
+
+    def test_an_invalid_url_is_not_retried(self):
+        # InvalidURL is an HTTPException too, and it is the author's URL, not
+        # the host having a bad moment: it reaches the caller after one try.
+        opener = patch("hosts.urllib.request.urlopen", side_effect=http.client.InvalidURL("a space"))
+        urlopen = opener.start()
+        self.addCleanup(opener.stop)
+        with self.assertRaises(http.client.InvalidURL):
+            Http().archive("https://example.com/a b.zip")
+        self.assertEqual(urlopen.call_count, 1)
 
     def test_an_api_answer_has_its_own_smaller_limit(self):
         # The archive limit is for files on disk. JSON is held in memory.
