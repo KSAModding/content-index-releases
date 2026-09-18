@@ -3,18 +3,18 @@
   "listings": [
     {
       "id": "AdvancedFlightComputer",
-      "total": 1162,
+      "total": 1164,
       "hosts": {
         "github": 346,
-        "spacedock": 816
+        "spacedock": 818
       },
       "releases": [
         {
           "version": "0.7.5",
-          "total": 81,
+          "total": 83,
           "hosts": {
             "github": 37,
-            "spacedock": 44
+            "spacedock": 46
           }
         },
         {
@@ -337,18 +337,18 @@
     },
     {
       "id": "DeltaVMap",
-      "total": 3568,
+      "total": 3714,
       "hosts": {
-        "github": 2969,
-        "spacedock": 599
+        "github": 3113,
+        "spacedock": 601
       },
       "releases": [
         {
           "version": "1.2.6",
-          "total": 14,
+          "total": 18,
           "hosts": {
-            "github": 8,
-            "spacedock": 6
+            "github": 10,
+            "spacedock": 8
           }
         },
         {
@@ -361,9 +361,9 @@
         },
         {
           "version": "1.2.4",
-          "total": 2110,
+          "total": 2252,
           "hosts": {
-            "github": 2107,
+            "github": 2249,
             "spacedock": 3
           }
         },
@@ -981,18 +981,18 @@
     },
     {
       "id": "KSATelemetryOverlay",
-      "total": 69,
+      "total": 73,
       "hosts": {
         "github": 31,
-        "spacedock": 38
+        "spacedock": 42
       },
       "releases": [
         {
           "version": "1.0.4",
-          "total": 20,
+          "total": 24,
           "hosts": {
             "github": 10,
-            "spacedock": 10
+            "spacedock": 14
           }
         },
         {
@@ -1031,17 +1031,17 @@
     },
     {
       "id": "KSP-Redux",
-      "total": 1738,
+      "total": 1741,
       "hosts": {
         "github": 90,
-        "spacedock": 1648
+        "spacedock": 1651
       },
       "releases": [
         {
           "version": "1.3.2",
-          "total": 792,
+          "total": 795,
           "hosts": {
-            "spacedock": 792
+            "spacedock": 795
           }
         },
         {
@@ -1129,18 +1129,18 @@
     },
     {
       "id": "MeasureTools",
-      "total": 623,
+      "total": 624,
       "hosts": {
         "github": 149,
-        "spacedock": 474
+        "spacedock": 475
       },
       "releases": [
         {
           "version": "1.1.11",
-          "total": 17,
+          "total": 18,
           "hosts": {
             "github": 12,
-            "spacedock": 5
+            "spacedock": 6
           }
         },
         {
@@ -1307,18 +1307,18 @@
     },
     {
       "id": "ModMenu",
-      "total": 1755,
+      "total": 1759,
       "hosts": {
         "github": 126,
-        "spacedock": 1629
+        "spacedock": 1633
       },
       "releases": [
         {
           "version": "0.2.2",
-          "total": 71,
+          "total": 75,
           "hosts": {
             "github": 17,
-            "spacedock": 54
+            "spacedock": 58
           }
         },
         {
@@ -1365,16 +1365,16 @@
     },
     {
       "id": "StarMap",
-      "total": 970,
+      "total": 1114,
       "hosts": {
-        "github": 970
+        "github": 1114
       },
       "releases": [
         {
           "version": "0.4.7",
-          "total": 185,
+          "total": 329,
           "hosts": {
-            "github": 185
+            "github": 329
           }
         },
         {
