@@ -423,18 +423,21 @@ def install_object(handle, listing_id, content_type, authored_install, provides=
 def _check_provides(handle, root, target, provides):
     """The release-time checks on a loader's [provides] section (RFC 0035).
 
-    `launch` must exist in the archive, and rule 4 forbids a `standalone`
-    install without one.
+    `launch`, and the `launch` of every `[provides.platform]` entry (RFC 0067),
+    must exist in the archive, and rule 4 forbids a `standalone` install
+    without one.
     """
+    names = {name.replace("\\", "/") for name in handle.namelist()}
     launch = provides.get("launch")
     if launch is not None:
-        launch = relative_path(launch, "the provides launch path")
-        entry = f"{root}/{launch}" if root else launch
-        names = {name.replace("\\", "/") for name in handle.namelist()}
-        if entry not in names:
-            raise StampError(
-                f"the provides launch path '{launch}' is not in the release archive"
-            )
+        _check_launch(names, root, launch, "the provides launch path")
+    platforms = provides.get("platform")
+    if isinstance(platforms, dict):
+        for platform, entry in sorted(platforms.items()):
+            if isinstance(entry, dict) and entry.get("launch") is not None:
+                _check_launch(
+                    names, root, entry["launch"], f"the provides platform {platform} launch path"
+                )
     if target == "standalone" and launch is None:
         raise StampError(
             "target = 'standalone' requires [provides] launch: a directory "
@@ -446,6 +449,13 @@ def _check_provides(handle, root, target, provides):
     content_path = provides.get("content-path")
     if content_path is not None:
         relative_path(content_path, "the provides content-path")
+
+
+def _check_launch(names, root, launch, what):
+    launch = relative_path(launch, what)
+    entry = f"{root}/{launch}" if root else launch
+    if entry not in names:
+        raise StampError(f"{what} '{launch}' is not in the release archive")
 
 
 def install_size(handle, root):

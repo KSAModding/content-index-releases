@@ -532,6 +532,36 @@ class Rfc0035(unittest.TestCase):
         document = self.stamp_loader(provides={"launch": "StarMap.exe"})
         self.assertNotIn("install", document)
 
+    def test_a_platform_launch_absent_from_the_archive_rejects_the_release(self):
+        provides = {
+            "launch": "StarMap.exe",
+            "platform": {"linux": {"runtime": "dotnet", "launch": "Missing.dll"}},
+        }
+        with self.assertRaises(StampError) as raised:
+            self.stamp_loader(provides=provides)
+        self.assertIn("the provides platform linux launch path 'Missing.dll'", str(raised.exception))
+
+    def test_a_platform_launch_present_in_the_archive_passes(self):
+        provides = {
+            "launch": "StarMap.exe",
+            "platform": {
+                "linux": {"runtime": "dotnet", "launch": "StarMap.dll"},
+                "macos": {"runtime": "dotnet", "launch": "StarMap.dll"},
+            },
+        }
+        document = self.stamp_loader(provides=provides)
+        self.assertNotIn("install", document)
+        self.assertNotIn("provides", document)
+
+    def test_an_escaping_platform_launch_rejects_the_release(self):
+        provides = {"launch": "StarMap.exe", "platform": {"linux": {"launch": "../StarMap.dll"}}}
+        with self.assertRaises(StampError) as raised:
+            self.stamp_loader(provides=provides)
+        self.assertIn(
+            "the provides platform linux launch path '../StarMap.dll' escapes its anchor",
+            str(raised.exception),
+        )
+
     def test_standalone_requires_a_launch(self):
         with self.assertRaises(StampError):
             self.stamp_loader(install={"target": "standalone"})
