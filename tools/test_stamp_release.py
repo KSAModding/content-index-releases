@@ -338,6 +338,13 @@ class Stamp(unittest.TestCase):
         self.assertEqual(document["install"], {"root": "AutoStage", "derived": True})
         self.assertEqual(document["dependencies"], [])
 
+    def test_a_mod_toml_with_a_byte_order_mark_is_read(self):
+        document = self.stamp(data=mod_archive(manifest="﻿" + MOD_TOML))
+        self.assertEqual(
+            [entry["id"] for entry in document["dependencies"]],
+            ["KittenExtensions", "MeasureTools"],
+        )
+
     def test_a_loader_installs_from_the_archive_root(self):
         listing = {
             "spec_version": 1,

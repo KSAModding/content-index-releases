@@ -293,7 +293,9 @@ def read_mod_toml(handle, root):
     except UNREADABLE_ENTRY as error:
         raise StampError(f"the archive's {name} cannot be read, {error}") from error
     try:
-        return tomllib.loads(raw.decode("utf-8"))
+        # The game reads mod.toml with File.ReadAllText, which drops a UTF-8 BOM,
+        # and Visual Studio writes one, so a BOM is accepted here too.
+        return tomllib.loads(raw.decode("utf-8-sig"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise StampError(f"the archive's {name} is not valid TOML, {error}") from error
 
