@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "KSARS",
+  "type": "mod",
+  "version": "0.1.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-17T17:53:55Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/AMPW-german/KSARS/releases/download/v0.1.2/KSARSv0.1.2.zip",
+    "sha256": "D3BFB7086156C8DB85AB1D0CDB15DA609364FA2D72D34C607E02D2507329913D",
+    "size": 15659,
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://spacedock.info/mod/4480/KSARS/download/v0.1.2"
+    ]
+  },
+  "install_size": 26911,
+  "install": {
+    "root": "KSARS",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/AMPW-german/KSARS/releases/tag/v0.1.2",
+  "changelog_text": "Recompile for KSA v2026.9.10.5438",
+  "listing": {
+    "name": "KSARS",
+    "authors": [
+      "AMPW"
+    ],
+    "abstract": "Reduces acceleration realistically the closer you get to the speed of light.",
+    "description": "# KSARS\n\nKSA Relativistic Speeds is a small mod for Kitten Space Agency that adds acceleration decrease at relativistic speeds. It always uses an external observer as the reference frame so the acceleration read in game decreases as the ship approaches the speed of light.\n\nIRL the acceleration stays constant in the ship's frame of reference as the time dilation also increases.\nKSARS does NOT simulate time dilation, visual effects or adjust the acceleration readout in the ship's frame of reference.\n\nThis is just a small mod to make the game more realistic and fun for those who want to explore relativistic speeds.\n\nTo help get to relativistic speeds, this mod increases the efficiency of Hydrolox by yes and adjust the \"LR91 Sea\" engine to have 2.47 GN of thrust for much higher acceleration.\nThis may break the game and cause uncontrollable spin at higher timewarp (> 30x) so use at your own risk.\nThe Vehicle.DetectStructuralFailure method is disabled as it would cause vessel destruction at <= 50G which is really low for relativistic speeds.\n",
+    "license": "GPL-3.0-or-later",
+    "tags": [
+      "gameplay",
+      "physics"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksars-acceleration-decrease-at-relativistic-speeds.1136/",
+      "repository": "https://github.com/AMPW-german/KSARS",
+      "spacedock": "https://spacedock.info/mod/4480/KSARS",
+      "bugtracker": "https://github.com/AMPW-german/KSARS/issues"
+    }
+  }
+}
