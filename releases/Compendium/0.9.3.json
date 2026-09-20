@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "Compendium",
+  "type": "mod",
+  "version": "0.9.3",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-03-29T20:20:44Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4074/Compendium/download/0.9.3",
+    "sha256": "BE02DC351AB87E9C91F5841A9388F016CF0F74FD7C6756E3F8036F977E2CEC32",
+    "size": 245524,
+    "content_type": "application/zip"
+  },
+  "install_size": 527545,
+  "install": {
+    "root": "Compendium",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4074/Compendium",
+  "changelog_text": "- rezipped the 0.9.2 files to be in a 'Compendium' folder to avoid confusion about what to use as a folder placed in 'mods'",
+  "listing": {
+    "name": "Compendium",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "Compendium adds a window (which may be toggled on/off via ModMenu) which provides a helpful companion to exploring the currently loaded solar system!",
+    "description": "Compendium adds a window (which may be toggled on/off via ModMenu) which provides a helpful companion to exploring the currently loaded solar system!\n\n- Solar system bodies (celestials) are listed in categories and tiered based on parent bodies and their satellites (moons/moonlets).  \n- Orbit lines have toggle buttons for individual bodies, groups of bodies, and entire categories.  \n- Fun and useful information is displayed regarding each body's stats.  \n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/compendium.647/",
+      "repository": "https://github.com/meow-sci/Compendium",
+      "spacedock": "https://spacedock.info/mod/4074/Compendium",
+      "bugtracker": "https://github.com/meow-sci/Compendium/issues"
+    }
+  }
+}
