@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "Compendium",
+  "type": "mod",
+  "version": "0.9.12",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-05T20:03:40Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4074/Compendium/download/0.9.12",
+    "sha256": "39AB5034E3C2FB3CE6544C14CEA0EA117C78EE041D45D6CF3B3FB2422E259E88",
+    "size": 283140,
+    "content_type": "application/zip"
+  },
+  "install_size": 1867408,
+  "install": {
+    "root": "Compendium",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4074/Compendium",
+  "changelog_text": "- updated the window style to use the newer style the game has\n- for bodies which have an atmosphere:  added graphs which can show density and pressure vs altitude",
+  "listing": {
+    "name": "Compendium",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "Compendium adds a window (which may be toggled on/off via ModMenu) which provides a helpful companion to exploring the currently loaded solar system!",
+    "description": "Compendium adds a window (which may be toggled on/off via ModMenu) which provides a helpful companion to exploring the currently loaded solar system!\n\n- Solar system bodies (celestials) are listed in categories and tiered based on parent bodies and their satellites (moons/moonlets).  \n- Orbit lines have toggle buttons for individual bodies, groups of bodies, and entire categories.  \n- Fun and useful information is displayed regarding each body's stats.  \n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/compendium.647/",
+      "repository": "https://github.com/meow-sci/Compendium",
+      "spacedock": "https://spacedock.info/mod/4074/Compendium",
+      "bugtracker": "https://github.com/meow-sci/Compendium/issues"
+    }
+  }
+}
