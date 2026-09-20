@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "Compendium",
+  "type": "mod",
+  "version": "0.9.10",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-08-07T15:46:11Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4074/Compendium/download/0.9.10",
+    "sha256": "AB9625F4E00C0D295F43CE8E5F05C24605A5948278AAA426032A17039838FD2A",
+    "size": 281457,
+    "content_type": "application/zip"
+  },
+  "install_size": 1862855,
+  "install": {
+    "root": "Compendium",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4074/Compendium",
+  "changelog_text": "- Updated to accommodate changed KSA code",
+  "listing": {
+    "name": "Compendium",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "Compendium adds a window (which may be toggled on/off via ModMenu) which provides a helpful companion to exploring the currently loaded solar system!",
+    "description": "Compendium adds a window (which may be toggled on/off via ModMenu) which provides a helpful companion to exploring the currently loaded solar system!\n\n- Solar system bodies (celestials) are listed in categories and tiered based on parent bodies and their satellites (moons/moonlets).  \n- Orbit lines have toggle buttons for individual bodies, groups of bodies, and entire categories.  \n- Fun and useful information is displayed regarding each body's stats.  \n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/compendium.647/",
+      "repository": "https://github.com/meow-sci/Compendium",
+      "spacedock": "https://spacedock.info/mod/4074/Compendium",
+      "bugtracker": "https://github.com/meow-sci/Compendium/issues"
+    }
+  }
+}
