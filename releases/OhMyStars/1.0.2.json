@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "OhMyStars",
+  "type": "mod",
+  "version": "1.0.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-14T01:46:54Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4537/Oh%20My%20Stars/download/1.0.2",
+    "sha256": "21EB5B4DA09DCE175D28018A809D596B2D8F91AB7098A2AA3C3BC9DF93F64B8B",
+    "size": 25716467,
+    "content_type": "application/zip"
+  },
+  "install_size": 70023490,
+  "install": {
+    "root": "OhMyStars",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+  "changelog_text": "Added button to orient the currently controlled vehicle towards a selected star in the information tab!  Works some of the time most of the time(tm)!",
+  "listing": {
+    "name": "OhMyStars",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "This mod adds constellation lines between stars in KSA!",
+    "description": "This mod adds constellation lines between stars in KSA!\n\nFeatures: \n- Constellation (Asterism) Lines between stars  \n- Constellation Boundary lines (IAU defined) - Star informational window  \n- Star names and informational window  \n- Vehicle orientation mode to point towards stars  \n",
+    "license": "GPL-2.0-only AND CC-BY-SA-4.0",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/oh-my-stars.1255",
+      "repository": "https://github.com/nanonestor/OhMyStars",
+      "spacedock": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+      "bugtracker": "https://github.com/nanonestor/OhMyStars/issues"
+    }
+  }
+}
