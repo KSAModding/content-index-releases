@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "ModMenu.ExampleMod",
+  "type": "mod",
+  "version": "1.0.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2025-12-03T03:29:31Z",
+  "game_min": "2025.12.5.2976",
+  "game_min_revision": 2976,
+  "download": {
+    "url": "https://github.com/MrJeranimo/ModMenu.ExampleMod/releases/download/v1.0.1/ModMenu.ExampleMod.zip",
+    "sha256": "43A22C650F8350E7F7F5B34CD2367E12FA15EB5D84C7434A136E64C26C3287C2",
+    "size": 5475,
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://spacedock.info/mod/4055/ModMenu%20ExampleMod/download/1.0.1"
+    ]
+  },
+  "install_size": 10860,
+  "install": {
+    "root": "ModMenu.ExampleMod",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.3.4",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "required",
+      "min": "0.1.1",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/MrJeranimo/ModMenu.ExampleMod/releases/tag/v1.0.1",
+  "changelog_text": "## v1.0.1\n\n- Updated to .NET10.0\n- Updated to StarMap v0.3.4\n- Updated to KSA Version 2025.12.5.2976",
+  "listing": {
+    "name": "ModMenu ExampleMod",
+    "authors": [
+      "MrJeranimo"
+    ],
+    "abstract": "This is example KSA mod for the mod ModMenu using the StarMap modloader.",
+    "description": "This is example KSA mod for the mod ModMenu using the StarMap modloader. It is being listed for testing purposes",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/modmenu-examplemod.1257/",
+      "repository": "https://github.com/MrJeranimo/ModMenu.ExampleMod",
+      "spacedock": "https://spacedock.info/mod/4055/ModMenu%20ExampleMod",
+      "bugtracker": "https://github.com/MrJeranimo/ModMenu.ExampleMod/issues"
+    }
+  }
+}
