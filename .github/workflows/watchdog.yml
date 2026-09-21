@@ -1,0 +1,59 @@
+# Report when GitHub has not started the watcher for a long time. A dropped
+# scheduled run is otherwise silent, because nothing fails and only the run list
+# shows it.
+name: watchdog
+
+on:
+  schedule:
+    # A gap is only seen at a sample, so fifteen minutes against the 45 below
+    # keeps the longest invisible one under an hour.
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      stale_minutes:
+        description: "Report when the watcher last started a successful scheduled run longer ago than this."
+        required: false
+        default: "45"
+      dry_run:
+        description: "Read everything, open and close nothing."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      # The run list of this repository, and the one issue that reports the gap.
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check when the watcher last started a successful scheduled run
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          STALE_MINUTES: ${{ inputs.stale_minutes || '45' }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          arguments=(
+            --repository "$REPOSITORY"
+            --stale-minutes "$STALE_MINUTES"
+          )
+          if [ "$DRY_RUN" = "true" ]; then
+            arguments+=(--dry-run)
+          fi
+
+          python3 tools/watchdog.py "${arguments[@]}"
