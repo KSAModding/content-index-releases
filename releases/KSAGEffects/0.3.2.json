@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "KSAGEffects",
+  "type": "mod",
+  "version": "0.3.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-21T20:10:38Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/AMPW-german/KSAGEffects/releases/download/v0.3.2/KSAGEffects-v0.3.2.zip",
+    "sha256": "103BDAB500CBE2AC7CD1418B10589A7805FD594FD4ABA419B334283D6DA32B9D",
+    "size": 52140,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4363/KSA%20G%20Effects/download/v0.3.2"
+    ]
+  },
+  "install_size": 110287,
+  "install": {
+    "root": "KSAGEffects",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ShaderExtensions",
+      "kind": "required",
+      "min": "1.0.2",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/AMPW-german/KSAGEffects/releases/tag/v0.3.2",
+  "changelog_text": "Built for KSA version 2026.9.10.5438\n\n## What's Changed\n* Fix and standarize ci/cd setup by @AMPW-german in https://github.com/AMPW-german/KSAGEffects/pull/9\n\n\n**Full Changelog**: https://github.com/AMPW-german/KSAGEffects/compare/v0.3.1...v0.3.2",
+  "listing": {
+    "name": "KSA G-Effects",
+    "authors": [
+      "AMPW"
+    ],
+    "abstract": "Realistic G-Effects on humans",
+    "description": "# KSA G-Effects\n\nThis mod aims to bring highly realistic (human) G-effects to KSA, including blackout, redout, ALoC, GLoC, death through G forces and confusion/disorientation.\n\nPlease check the KSA forum for the current state.\n",
+    "license": "GPL-3.0-or-later",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/unfinished-mods/g-effects-v0-3-0.635/",
+      "repository": "https://github.com/AMPW-german/KSAGEffects",
+      "spacedock": "https://spacedock.info/mod/4363/KSA%20G%20Effects",
+      "bugtracker": "https://github.com/AMPW-german/KSAGEffects/issues"
+    }
+  }
+}
