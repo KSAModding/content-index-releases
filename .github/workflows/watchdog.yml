@@ -33,15 +33,22 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      # The run list of this repository, and the one issue that reports the gap.
-      actions: read
-      issues: write
     steps:
+      # The same identity the watcher runs as, so the gap is reported by the
+      # bot that keeps the other index issues rather than by github-actions.
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: content-index-releases
+
       - uses: actions/checkout@v7
 
       - name: Check when the watcher last started a successful scheduled run
         env:
-          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
           STALE_MINUTES: ${{ inputs.stale_minutes || '45' }}
           DRY_RUN: ${{ inputs.dry_run }}
