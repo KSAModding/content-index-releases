@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "MPFX",
+  "type": "mod",
+  "version": "0.3.5",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-21T19:57:02Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/AMPW-german/MPFX/releases/download/v0.3.5/MPFX-v0.3.5.zip",
+    "sha256": "728486523AF55C5F866E72574061FF915EF5D04FFA57069A496EB965B343B6D7",
+    "size": 56990,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4165/MPFX/download/v0.3.5"
+    ]
+  },
+  "install_size": 129950,
+  "install": {
+    "root": "MPFX",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ShaderExtensions",
+      "kind": "required",
+      "min": "1.0.2",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/AMPW-german/MPFX/releases/tag/v0.3.5",
+  "changelog_text": "Built for KSA version 2026.9.10.5438\n\n## What's Changed\n* Fix ci and release setup by @AMPW-german in https://github.com/AMPW-german/MPFX/pull/5\n\n\n**Full Changelog**: https://github.com/AMPW-german/MPFX/compare/v0.3.4...v0.3.5",
+  "listing": {
+    "name": "MPFX",
+    "authors": [
+      "AMPW"
+    ],
+    "abstract": "Simple post processing shaders for KSA",
+    "description": "# MPFX\n\nA very simple post processing mod.\n\nCurrently included effects in their default execution order:\n\n- Color balance using lift, gamma and gain. Either for all channels or per channel.\n- Color Temperature\n- Hue shift in YIQ color format\n- Brightness\n- Contrast\n- Saturation\n- Single color color overlay\n- Vignette\n- (RGB2HSV: converts from rgb to hsv and shows the result in rgb)\n- (HSV2RGB: converts the rgb input from hsv to rgb and shows the result)\n- (Single color: only keeps the largest rgb channels for each pixel)\n- (Single color smallest)\n- (Single solid color: same as single color but sets largest channels to max value)\n\nThe execution order can be changed by changing the subpass in the MPFXAssets.xml file.\n\nAll effects are separated into pre and post imgui.\n\nEffects in parathenses are just some stuff I wanted to try during development, they are not meant for real use but I wanted to include them anyway.\n",
+    "license": "MIT",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/mpfx-v0-2-0-simple-post-processing-effects.812/",
+      "repository": "https://github.com/AMPW-german/MPFX",
+      "spacedock": "https://spacedock.info/mod/4165/MPFX",
+      "bugtracker": "https://github.com/AMPW-german/MPFX/issues"
+    }
+  }
+}
