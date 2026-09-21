@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "ShaderExtensions",
+  "type": "mod",
+  "version": "1.0.3",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-21T19:50:23Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/AMPW-german/ShaderExtensions/releases/download/v1.0.3/ShaderExtensions-v1.0.3.zip",
+    "sha256": "BB308054B3A2472C5697405576F5A547AD3EBC1C0B39CF33ED49BBF2B6964D2A",
+    "size": 55766,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4164/ShaderExtensions/download/v1.0.3"
+    ]
+  },
+  "install_size": 110933,
+  "install": {
+    "root": "ShaderExtensions",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "KittenExtensions",
+      "kind": "required",
+      "min": "0.5.0",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/AMPW-german/ShaderExtensions/releases/tag/v1.0.3",
+  "changelog_text": "Built for KSA version 2026.9.10.5438\n\n## What's Changed\n* Fix and standarize ci/cd setup by @AMPW-german in https://github.com/AMPW-german/ShaderExtensions/pull/12\n\n\n**Full Changelog**: https://github.com/AMPW-german/ShaderExtensions/compare/v1.0.2...v1.0.3",
+  "listing": {
+    "name": "ShaderExtensions",
+    "authors": [
+      "AMPW"
+    ],
+    "abstract": "Post Processing Shaders and uniform buffers for KSA",
+    "description": "# ShaderExtensions\n\nPost Processing Shaders and uniform buffers for KSA\n\nThis mod adds nothing on its own but provides an easy way to add post processing shaders.\nPlease visit the repo if you want to know more.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/shaderextensions-v0-2-0-post-processing-shaders.811/",
+      "repository": "https://github.com/AMPW-german/ShaderExtensions",
+      "spacedock": "https://spacedock.info/mod/4164/ShaderExtensions",
+      "bugtracker": "https://github.com/AMPW-german/ShaderExtensions/issues"
+    }
+  }
+}
