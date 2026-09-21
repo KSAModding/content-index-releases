@@ -11,6 +11,10 @@ on:
     # Ten minutes is a tuning parameter and needs no RFC to change. GitHub's
     # floor is five. The times sit off the hour, where runs are dropped worst.
     - cron: "4,14,24,34,44,54 * * * *"
+  repository_dispatch:
+    # The authored half already sends this on every merge, and it names no
+    # listing, so the tick covers the whole set.
+    types: [index-changed]
   workflow_dispatch:
     inputs:
       listing:

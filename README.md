@@ -57,7 +57,10 @@ python3 tools/download_counts.py --authored ../content-index --dry-run
 
 ## The watcher
 
-`.github/workflows/watcher.yml` runs every ten minutes as the org App.
+`.github/workflows/watcher.yml` runs every ten minutes as the org App, at minute 4 and not on the hour, because GitHub drops a scheduled run when it has no room and has least room on the hour.
+A merge in the authored half starts a tick too, through the `index-changed` dispatch it already sends, so a changed listing is stamped at once.
+A new release on a listing that did not change still waits for the schedule.
+
 Each tick asks every listing's authority host for its releases and stamps every release that appeared after the newest one already stamped, so a patch for an older line, tagged after a newer version exists, is stamped too.
 
 A listing's first tick stamps its newest release only, and its back catalogue stays unstamped.
@@ -69,6 +72,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
 | `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
+| `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
 | `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
 
@@ -100,6 +104,16 @@ To run a tick by hand, dispatch the workflow: `listing` narrows it to one id, an
 
 ```text
 python3 tools/watch.py --authored ../content-index --dry-run
+```
+
+### When no tick ran at all
+
+`.github/workflows/watchdog.yml` asks every fifteen minutes when the watcher last succeeded on its schedule, and opens one issue here once that is more than 45 minutes ago.
+Only a scheduled run counts, because a hand dispatch and the merge dispatch both succeed while the schedule is still dropped.
+The issue is kept current and closes itself when a scheduled run succeeds, so the watchdog holds no state.
+
+```text
+python3 tools/watchdog.py --dry-run
 ```
 
 ## The snapshot
