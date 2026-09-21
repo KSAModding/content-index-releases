@@ -1,0 +1,54 @@
+{
+  "spec_version": 1,
+  "id": "OhMyStars",
+  "type": "mod",
+  "version": "1.0.5",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-21T00:28:56Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4537/Oh%20My%20Stars/download/1.0.5",
+    "sha256": "3D11EF15E762FD1F6ACA4000A1141AED9F996ABF710C20D9E2F21F4E05753CDD",
+    "size": 25761268,
+    "content_type": "application/zip"
+  },
+  "install_size": 70128055,
+  "install": {
+    "root": "OhMyStars",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "required",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+  "changelog_text": "- Fixes to toggling back to previous orientation modes - specifically going back to a hold rate mode should no longer go wild\n- Rearragned the settings tab\n- Added color picker boxes for things\n- Added two-line star pointer option and rainbow pointer line option",
+  "listing": {
+    "name": "OhMyStars",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "This mod adds constellation lines between stars in KSA!",
+    "description": "This mod adds constellation lines between stars in KSA!\n\nFeatures: \n- Constellation (Asterism) Lines between stars  \n- Constellation Boundary lines (IAU defined) - Star informational window  \n- Star names and informational window  \n- Vehicle orientation mode to point towards stars  \n\n![OMShunter](ksa-image:OMSHunter)\n\nA pointer can be enabled showing the direction to a currently selected star.  A navball marker can be enabled showing the orientation where the selected star is in relation to your vehicle's pointing!\n\n![OMS3medium](ksa-image:OhMyStars3)\n\nAn orientation mode can be activated making the flight computer aim your vehicles towards the currently selected star!  Toggle the mode off to go back to the vehicle's previous orientation mode!\n\n![OMS3medium](ksa-image:OhMyStars4)\n",
+    "license": "GPL-2.0-only AND CC-BY-SA-4.0",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/oh-my-stars.1255",
+      "repository": "https://github.com/nanonestor/OhMyStars",
+      "spacedock": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+      "bugtracker": "https://github.com/nanonestor/OhMyStars/issues"
+    }
+  }
+}
