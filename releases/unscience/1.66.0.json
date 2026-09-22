@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "unscience",
+  "type": "mod",
+  "version": "1.66.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-22T01:20:42Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/meow-sci/unscience/releases/download/v1.66.0/unscience-1.66.0.zip",
+    "sha256": "AFB5A4BFA80C5062BC5E08E9A8D54478E995B280E57D494B95F94242FF8D05A8",
+    "size": 1348099,
+    "content_type": "application/zip"
+  },
+  "install_size": 2885426,
+  "install": {
+    "root": "unscience",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/unscience/releases/tag/v1.66.0",
+  "changelog_text": "**Installing over an existing install:** delete the old `unscience/` folder from your mods directory before unzipping — files removed from the mod are not removed by unzipping over it.\n\n**Full Changelog**: https://github.com/meow-sci/unscience/compare/v2026.09.21.65...v1.66.0",
+  "listing": {
+    "name": "unscience",
+    "authors": [
+      "Alex",
+      "aka tomservo"
+    ],
+    "abstract": "unscience hacks up ksa to change physics, replace colors, move parts, resize things, change effects, shaders, etc.  In general, it helps you break stuff for fun and no profit.",
+    "description": "unscience lets you do *things* to KSA\n\n![thug-life](ksa-image:thug-life_01)\n\n![thug-life](ksa-image:garrys-torch_01)\n\n![thug-life](ksa-image:zippo_01)\n\n![thug-life](ksa-image:godzilla_01)\n\n![thug-life](ksa-image:godzilla_02)\n\n![thug-life](ksa-image:free-fallin_01)",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "visual",
+      "audio",
+      "tools",
+      "hacks"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/unscience-mod.1261/",
+      "repository": "https://github.com/meow-sci/unscience",
+      "bugtracker": "https://github.com/meow-sci/unscience/issues"
+    }
+  }
+}
