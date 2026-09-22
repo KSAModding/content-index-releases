@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "unscience",
+  "type": "mod",
+  "version": "1.67.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-22T02:50:30Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/meow-sci/unscience/releases/download/v1.67.0/unscience-1.67.0.zip",
+    "sha256": "6255CD7B59D4A9BF32F1EDE407A39E1328FA37EFBD5AC9E7D6ED9FBDDB0558D2",
+    "size": 1348267,
+    "content_type": "application/zip"
+  },
+  "install_size": 2885498,
+  "install": {
+    "root": "unscience",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/unscience/releases/tag/v1.67.0",
+  "changelog_text": "**Installing over an existing install:** delete the old `unscience/` folder from your mods directory before unzipping — files removed from the mod are not removed by unzipping over it.\n\n**Full Changelog**: https://github.com/meow-sci/unscience/compare/v1.66.0...v1.67.0",
+  "listing": {
+    "name": "unscience",
+    "authors": [
+      "Alex",
+      "aka tomservo"
+    ],
+    "abstract": "unscience hacks up ksa to change physics, replace colors, move parts, resize things, change effects, shaders, etc.  In general, it helps you break stuff for fun and no profit.",
+    "description": "unscience lets you do *things* to KSA\n\n![thug-life](ksa-image:thug-life_01)\n\n![garrys-torch](ksa-image:garrys-torch_01)\n\n![zippo](ksa-image:zippo_01)\n\n![godzilla1](ksa-image:godzilla_01)\n\n![godzilla2](ksa-image:godzilla_02)\n\n![free-fallin](ksa-image:free-fallin_01)",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "visual",
+      "audio",
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/unscience-mod.1261/",
+      "repository": "https://github.com/meow-sci/unscience",
+      "bugtracker": "https://github.com/meow-sci/unscience/issues"
+    }
+  }
+}
