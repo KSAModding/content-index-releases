@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "KittenExtensionsContinued",
+  "type": "mod",
+  "version": "0.5.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-22T17:55:33Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/AMPW-german/KittenExtensions/releases/download/v0.5.2/KittenExtensions-v0.5.2.zip",
+    "sha256": "C5982FFA258B2B0DE8D2BC209E7D132C307AF551CA826B7A210EFE5E24EDC56B",
+    "size": 156065,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4588/KittenExtensions%20Continued/download/v0.5.2"
+    ]
+  },
+  "install_size": 330281,
+  "install": {
+    "root": "KittenExtensionsContinued",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/AMPW-german/KittenExtensions/releases/tag/v0.5.2",
+  "changelog_text": "Built for KSA version 2026.9.10.5438\n\n## What's Changed\n* Fix ci/cd setup by @AMPW-german in https://github.com/AMPW-german/KittenExtensions/pull/5\n* Create ksa-index-ampw-german by @AMPW-german in https://github.com/AMPW-german/KittenExtensions/pull/6\n* Chore/kxc by @AMPW-german in https://github.com/AMPW-german/KittenExtensions/pull/7\n\n\n**Full Changelog**: https://github.com/AMPW-german/KittenExtensions/compare/v0.5.1...v0.5.2",
+  "listing": {
+    "name": "KittenExtensions Continued",
+    "authors": [
+      "AMPW"
+    ],
+    "abstract": "XML Patching (ModuleManager like), Custom XML Assets",
+    "description": "# KittenExtensions Continued\n\nThis is a continuation of tom_is_unlucky's awesome KittenExtensions mod. All of the credit goes to him. It replaces the original mod under the new KittenExtensionsContinued mod and directory name while keeping the KittenExtensions assembly name for compatibility.\n\n    Write XML patches to alter xml assets from core or other mods\n    Add custom xml asset types that can be used in other mods\n\nVisit the Forum Thread and Github Repo for more information.\n",
+    "license": "MIT",
+    "tags": [
+      "tools",
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kittenextensions-continued-v0-5-0-xml-patching-modulemanager-like-custom-xml-assets.1259/",
+      "repository": "https://github.com/AMPW-german/KittenExtensions",
+      "spacedock": "https://spacedock.info/mod/4588/KittenExtensions%20Continued",
+      "bugtracker": "https://github.com/AMPW-german/KittenExtensions/issues"
+    }
+  }
+}
