@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "KSATelemetryOverlay",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-11T21:49:04Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://github.com/elevatorctln/KSA-Public-Telemetry/releases/download/1.0.0/KSATelemetryOverlay.zip",
+    "sha256": "DC0D418CADFA8DE6DA76B51313026DF5869C716CFD562544C7C6FCA5FCE6D00E",
+    "size": 88078,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4552/Webcast%20Telemetry%20Overlay/download/1.0.0"
+    ]
+  },
+  "install_size": 162507,
+  "install": {
+    "root": "KSATelemetryOverlay",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.5",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "recommends",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/elevatorctln/KSA-Public-Telemetry/releases/tag/1.0.0",
+  "changelog_text": "first one",
+  "listing": {
+    "name": "Webcast Telemetry Overlay",
+    "authors": [
+      "elevatorcait"
+    ],
+    "abstract": "A SpaceX-style launch broadcast telemetry overlay in-game",
+    "description": "A work-in-progress mod for Kitten Space Agency that creates a SpaceX-style launch broadcast telemetry overlay in-game. The overlay is populated with live data from the active vehicle and the mod includes an engine diagram generated automatically using the actual position of the engines on your stage relative to each other.\n\n![Screenshot](ksa-image:9e-hero)\n\n## Features\n\n- A broadcast-style bottom bar: speed and altitude on the left, T+ clock and mission timeline in the center, g-force and the engine diagram on the right. Styled to look like the SpaceX webcast overlay slick animations and all.\n- An engine diagram built from the real nozzle positions on your active stage, with a propellant arc gauge around it.\n- Event notifications for certain in-flight events. Be warned that this is not totally reliable, maybe I'll make it a toggle or something.\n- A mission timeline bar showing detected events behind the marker and any planned maneuvers ahead of it. Same deal as the event notifications.\n- Freeze-on-signal-loss: if the vehicle stops being controllable, the overlay freezes at the last recieved values.\n- Optionally and by default hides the flight UI while the overlay is up, and restores it when disabled.\n- Every element is also available as its own movable imgui window that behaves like any other.\n- Fairly in-depth configuration avalible in the settlings menu.\n\n![Unusual engine layout example](ksa-image:funky)\n![Extreme engine count example](ksa-image:72e)\n\nStarMap loader is required for this mod.\n\n## Maintainance\n\nThis feels important for me to be clear about: KSA is in pre-alpha and this mod uses unofficial code mod loading using undocumented methods. This mod will break very regularly while the game is still in this phase of development and I cannot promise to fix it for every single build. When it breaks I will try to get it working again when I have the time, I just cannot promise when that will be at any given time. Your patience is greatly appreciated!\n\n## Settings\n\nIf ModMenu is installed, settings appear under **Mods > Telemetry Overlay**. ModMenu is optional. Without it, press **numpad slash** for the same settings in a standalone window.\n\nToggle the overlay on and off using the **numpad period** key (I know). This can be configured in the config file.\n\nSettings are saved to `Documents/My Games/Kitten Space Agency/KSATelemetryOverlay/config.json`, which is safe to hand-edit.\n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/webcast-telemetry-overlay.1237/",
+      "homepage": "https://linktr.ee/caitlynlh",
+      "repository": "https://github.com/elevatorctln/KSA-Public-Telemetry/",
+      "spacedock": "https://spacedock.info/mod/4552/Webcast%20Telemetry%20Overlay#info",
+      "bugtracker": "https://github.com/elevatorctln/KSA-Public-Telemetry/issues"
+    }
+  }
+}
