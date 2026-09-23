@@ -27,7 +27,13 @@
     "min": "0.4.5",
     "source": "authored"
   },
-  "dependencies": [],
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "recommends",
+      "source": "authored"
+    }
+  ],
   "changelog": "https://github.com/elevatorctln/KSA-Public-Telemetry/releases/tag/1.1.1",
   "changelog_text": "Fixed engine diagram issues, the diagram will now display all the engines even if some are deactivated for a landing burn or other similar scenarios.\nIf there are no engine on the active sequence, it will display the engines on the next sequence that has them.",
   "listing": {
