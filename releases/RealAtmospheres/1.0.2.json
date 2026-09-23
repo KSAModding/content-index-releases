@@ -12,7 +12,10 @@
     "url": "https://github.com/Brimfyr/RealAtmospheres/releases/download/v1.0.2/RealAtmospheres-v1.0.2-ksa2026.9.10.5438.zip",
     "sha256": "6A5233103A190F9C33A0EC6BE1A66D1569844120648E94111663A6D3107F9679",
     "size": 72676019,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4565/Real%20Atmospheres/download/1.0.2"
+    ]
   },
   "install_size": 110633438,
   "install": {
