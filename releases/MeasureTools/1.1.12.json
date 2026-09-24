@@ -1,0 +1,51 @@
+{
+  "spec_version": 1,
+  "id": "MeasureTools",
+  "type": "mod",
+  "version": "1.1.12",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-24T21:45:52Z",
+  "game_min": "2026.9.22.5482",
+  "game_min_revision": 5482,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/download/v1.1.12/MeasureTools.zip",
+    "sha256": "486EB595137ADBB7D4859E55F0D264E7AE677F2462632E79BED4C17FBD184E60",
+    "size": 42513,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4319/MeasureTools/download/1.1.12"
+    ]
+  },
+  "install_size": 89664,
+  "install": {
+    "root": "MeasureTools",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.5",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/tag/v1.1.12",
+  "changelog_text": "## Required for KSA 2026.9.22.5482\nKSA 2026.9.22.5482 changed how the game picks the orbit point under the cursor and removed the methods this mod used for it. Update is mandatory for this mod to work if you are on KSA version 2026.9.22.5482 and above; with the previous build, placing a point on an orbit line in the map view fails.\n\n## Changes\n- Snapping to orbit lines ranks the points the same way as the game's own hover: a hovered burn marker first, then the line closest to the cursor, then the parts of a flight plan that the vehicle will actually reach.\n- While the tool is armed, a click on an open popup, or a click that matches a mouse binding from the game's control settings, now goes to the game instead of placing a point.\n\n## Compatibility\nValidated against KSA build version **2026.9.22.5482**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\MeasureTools\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).\n\nYou can also easily download and install it via the mod manager **Borea**: https://ksamodding.github.io/Borea/",
+  "listing": {
+    "name": "MeasureTools",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Click-to-measure ruler and protractor tools for Kitten Space Agency.",
+    "description": "This mod is written against the [StarMap loader](https://github.com/StarMapLoader/StarMap).\n\n![Measuring in the map view](ksa-image:map-view)\n\n## Features\n\n- **Ruler** - click two points to measure the straight-line distance. Snaps to bodies, to body surfaces (the edge of a planet's disc), and to points on orbit lines; clicks on empty space place free points.\n- **Protractor** - click three points (arm, apex, arm) to read the true 3D angle plus both arm lengths, e.g. the phase angle between two planets around their star.\n- **Part-level measuring** - when the camera is close to a vehicle, points snap to individual parts with centimeter precision: attach nodes and part centers first, then mesh vertices (tank rims, panel corners), and everywhere else the exact hull point under the cursor. Anchors stick to their part, so measurements stay correct while the vehicle moves and rotates - including between parts of two vehicles flying side by side. Engine nozzles measure at their neutral position (gimbal deflection is visual only). Anchors follow their part across staging and docking (watch a separation distance grow after decoupling); only destroying the part removes the measurement.\n- **CAD-style snapping** - beyond attach nodes and vertices, points snap to mesh feature edges (slide along a tank rim between its vertices), edge midpoints, fitted rim centers, and the mirror of the previous point across the part's axis for exact antipodal pairs. Same-vehicle ruler measurements additionally report axial and radial components along the stack axis, on the overlay and in the copied text.\n- **Circle** - one click on a circular part edge (tank rim, engine bell exit) reads diameter, radius, and circumference from a fitted circle that tracks the part.\n- **Face angle** - two clicks on part surfaces read the angle between the surface normals (engine cant, fin alignment), live while the vehicle rotates.\n- **Surface** - pin two points to a planet's surface for the great-circle distance, chord, and initial bearing; pins track the body's rotation like ground markers.\n- **Editor measuring** - the ruler and protractor also work inside the vehicle editor, with the same part-level snapping (attach nodes, part centers, mesh vertices, hull points) over the craft being built, including parts currently held in the hand. Open it from the new top-level **Measure** menu in the editor menu bar. Anchors follow parts as they are dragged, so a measurement updates live while building, and part measurements carry across the editor boundary in both directions: measure in flight and refine in the editor, or measure while building and keep the numbers through launch. Points on a part disappear when the part is deleted; free points placed in the editor clear when it closes.\n- **Live preview** with snap highlighting, hover-sync between the list and the map, and click-to-copy values.\n- **Color palettes** - every overlay color (lines, labels, snap markers, construction plane) has a color picker, organized into named palettes: four shipped ones (Red, Green, Blue, Contrast) plus your own, all editable, persisted across sessions. Switch quickly via the window's **Palette** menu to match the vehicle you are measuring (green lines on a red rocket, red on a green one).\n\n![Part-level measuring on a rocket: tank diameter from a fitted rim circle, stack height with axial and radial components, booster clearance, and engine cant angles](ksa-image:parts)\n\n## Usage\n\nIn the map view or the default flight view, open **View -> Measure**; in the vehicle editor, open **Measure -> Show Window** from the menu bar. Pick a tool (Ruler, Protractor, Surface, Circle, Face angle) and click in the view to place points. The free-fly and IVA cameras steer with the left mouse button, so the tool stays inactive there to leave their controls untouched. While the tool is armed it owns left clicks, so editor part placement is suspended; pause the tool (short right-click) or close the window to build normally.\n\n- **Left-click**: Place a point (snaps to parts, bodies, disc edges, and orbit lines)\n- **Ctrl + left-click**: Place a free point on the ecliptic plane through the reference body\n- **Short right-click**: Cancel the current point, or pause measuring when nothing is pending (over a part, the stock part menu opens instead of pausing)\n- **Click a list row**: Copy the measurement to the clipboard\n\nPart snapping can be tuned in the window: \"Snap to parts\" turns part picking off entirely (vehicles then snap at their center marker as before), and the two sub-toggles control the attach-node/part-center and mesh-vertex snap tiers.\n\nFree clicks that snap to nothing land on the camera-facing plane. While measuring is paused, no tool is selected and all clicks pass through to the game; pick a tool to resume. Measurements are not saved to the save file; closing the window clears them.\n\n## Installation\n\n1. Install [StarMap](https://github.com/StarMapLoader/StarMap).\n2. Download the latest release from the [GitHub Releases](https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases) tab or from [SpaceDock](https://spacedock.info/mod/4319/MeasureTools).\n3. Extract into `Documents\\My Games\\Kitten Space Agency\\mods\\MeasureTools\\`.\n4. The game auto-discovers new mods and prompts you to enable them. Alternatively, add to `Documents\\My Games\\Kitten Space Agency\\manifest.toml`:\n\n```toml\n[[mods]]\nid = \"MeasureTools\"\nenabled = true\n```\n\n## Dependencies\n\n- [StarMap](https://github.com/StarMapLoader/StarMap): Mod loader, required at runtime (see Installation). Tested version 0.4.6.\n\n## Build dependencies\n\nRequired only to build the mod from source. Targets **.NET 10**.\n\n- [StarMap.API](https://github.com/StarMapLoader/StarMap) from NuGet, tested version 0.3.6.\n- [Lib.Harmony](https://www.nuget.org/packages/Lib.Harmony) from NuGet, tested version 2.4.2.\n\n## Mod compatibility\n\n- Known conflicts: none\n\n## Community\n\nThread on the KSA forums: https://forums.ahwoo.com/threads/measuretools.992/\n\n## Check out my other mods\n\n- [AdvancedFlightComputer](https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer) - maneuver planning, burn execution, automatic staging and closed-loop guidance ([forum thread](https://forums.ahwoo.com/threads/advanced-flight-computer.783/))\n- [DeltaVMap](https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap) - interactive delta-v subway map and transfer-window planner, auto-generated from the loaded system ([forum thread](https://forums.ahwoo.com/threads/deltavmap.978/))\n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/measuretools.992/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools",
+      "spacedock": "https://spacedock.info/mod/4319/MeasureTools",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/issues"
+    }
+  }
+}
