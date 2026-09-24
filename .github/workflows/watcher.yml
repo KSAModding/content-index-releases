@@ -64,16 +64,21 @@ jobs:
           # Always the tip of main: an old checkout would decide "already
           # stamped" against an outdated tree and then fail to push.
           ref: main
+          # The whole history, because a listing edit reads when each release
+          # file was stamped.
+          fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
       # The authored documents the tick reads, and tools/images.py, the image
       # fetch rules the checks there use. A checkout costs one clone instead of
-      # one API request per listing.
+      # one API request per listing. The whole history, because a listing edit
+      # reads each listing as it stood when its most recent release was stamped.
       - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/content-index
           ref: main
           path: .authored
+          fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
       # Derived cache, never state: the per-listing ETags, the failure counts
@@ -100,6 +105,7 @@ jobs:
           arguments=(
             --authored .authored
             --authored-repo "${{ github.repository_owner }}/content-index"
+            --releases-repo "${{ github.repository }}"
             --cache .watcher/cache.json
             --lookback-days "$LOOKBACK_DAYS"
             # The workflow the sweep re-runs, and the check whose verdict it
