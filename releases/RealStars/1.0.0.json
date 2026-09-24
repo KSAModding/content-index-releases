@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "RealStars",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-24T19:54:36Z",
+  "game_min": "2026.9.22.5482",
+  "game_min_revision": 5482,
+  "download": {
+    "url": "https://github.com/Brimfyr/RealStars/releases/download/v1.0.0/RealStars-v1.0.0-ksa2026.9.22.5482.zip",
+    "sha256": "0E2A59D5A77C2E05AF952AD96887D717FF27B43E4F7C14CC2796F16CD70EE538",
+    "size": 1405173,
+    "content_type": "application/zip"
+  },
+  "install_size": 2111958,
+  "install": {
+    "root": "RealStars",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Brimfyr/RealStars/releases/tag/v1.0.0",
+  "changelog_text": "**Requires:** [StarMap](https://github.com/StarMapLoader/StarMap) 0.4.7 or later\n**Tested on:** KSA v2026.9.22.5482\n\n### Added\n\n- Star catalogue of 83,337 Hipparcos stars to magnitude 9, with 3D positions and colours from B−V.\n- Star brightness from magnitude, with a realistic point spread function.\n- Parallax.\n- Twinkling through atmospheres, following simulation time.\n- Planet brightness from albedo, phase, rings and eclipses.\n- The Sun drawn as a star at every distance, blending into the 3D sphere up close.\n- Sun sphere at its real size and photosphere colour, with limb darkening.\n- Sun brightness reduced as it fills the screen, replacing the stock sun sprite and lens flare.\n- Occlusion of stars, planets and the Sun by planets, atmospheres and vessels.\n- Starbursts modelled on the human eye, on the Sun and planets brighter than magnitude −3.\n\nInstall with Borea, or follow the [README](https://github.com/Brimfyr/RealStars#installation).\n\n### Credits\n\n- Star catalogue built from the Hipparcos Catalogue (ESA 1997, ESA SP-1200), retrieved from [VizieR](https://vizier.cds.unistra.fr/) (CDS, Strasbourg), catalogue I/239.\n\nThe code is MIT. [CREDITS.md](https://github.com/Brimfyr/RealStars/blob/main/CREDITS.md) gives the source and terms of the shipped catalogue.",
+  "listing": {
+    "name": "Real Stars",
+    "authors": [
+      "Brimfyr"
+    ],
+    "abstract": "Draws stars, planets and the Sun with their real brightness, colour and position.",
+    "description": "# Real Stars\n\nStars, planets and the Sun drawn with their real brightness, colour and position, for Kitten Space Agency. A [StarMap](https://github.com/StarMapLoader/StarMap) mod.\n\nNo game files are modified. At launch the mod builds patched copies of the game's star, planet and Sun shaders and loads those instead. If a game update changes one of those shaders, it is left stock until the mod is updated. Works alongside Real Atmospheres.\n\n## Features\n\n### Stars\n\n- 83,337 stars from the Hipparcos catalogue, to magnitude 9, coloured from their B−V index\n- Brightness from magnitude, drawn with a realistic point spread function\n- Parallax: stars sit at their real distances and shift as you travel\n- Twinkling through atmospheres, stronger and more colourful toward the horizon, following simulation time\n\n### Planets\n\n- Brightness from albedo, phase and distance, on the same magnitude scale as the stars\n- Saturn's rings add to its brightness\n- Planets and moons dim in their parent's shadow\n- Twinkling reduced by apparent size\n\n### The Sun\n\n- Drawn as a star at every distance, at its real angular size, blending into the 3D sphere up close\n- Sphere at its real size and photosphere colour, with limb darkening\n- Dims as it fills more of the screen\n- Replaces the stock sun sprite and lens flare\n\n### Occlusion and starbursts\n\n- Stars, planets and the Sun fade behind planets, atmospheres and vessels\n- Starbursts modelled on the human eye, on the Sun and on planets brighter than magnitude −3\n- Starbursts fade as their source is covered or leaves the screen\n- The Sun's starburst is drawn over everything else\n- Starbursts follow the game's lens flare setting\n\n## Screenshots\n\n![Earth and Orion](ksa-image:earth-and-orion)\n![The Sun from the Moon's surface](ksa-image:moon-surface)\n![Sunset from orbit](ksa-image:orbit-sunset)\n\n## Installation\n\nRequires [StarMap](https://github.com/StarMapLoader/StarMap). Each release is named with the KSA build it was tested on.\n\n**With Borea:** install Real Stars from the mod list.\n\n**Manually:**\n\n1. Install StarMap and run the game once through `StarMap.Loader.exe`.\n2. Extract the release into `Documents\\My Games\\Kitten Space Agency\\mods\\`, giving `mods\\RealStars\\RealStars.dll`.\n3. Launch the game once and close it. KSA adds new mods to `manifest.toml` disabled: set this mod's entry to `enabled = true`.\n4. Launch through StarMap.\n\nTo uninstall, delete `mods\\RealStars`.\n\n## Building\n\n`deploy.ps1` builds the mod and installs it into your mods folder. `package.ps1 -Version x.y.z -GameBuild vYYYY.M.D.NNNN` builds a release archive in `dist\\`. Set `StarMapDir` to your StarMap folder. `make_star_binary.py` rebuilds the star catalogue from the Hipparcos main catalogue (`hip_main.dat`).\n\n## Credits\n\n- Star catalogue built from the Hipparcos Catalogue (ESA 1997, ESA SP-1200), retrieved from [VizieR](https://vizier.cds.unistra.fr/) (CDS, Strasbourg), catalogue I/239.\n\nThe code is MIT. [CREDITS.md](https://github.com/Brimfyr/RealStars/blob/main/CREDITS.md) gives the source and terms of the shipped catalogue.\n",
+    "license": "MIT",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/real-stars.1285/",
+      "repository": "https://github.com/Brimfyr/RealStars",
+      "bugtracker": "https://github.com/Brimfyr/RealStars/issues"
+    }
+  }
+}
