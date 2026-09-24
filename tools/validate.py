@@ -21,6 +21,7 @@ import check_amendment
 import check_release
 import check_scope
 import hosts
+from stamp_release import StampError
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -40,10 +41,11 @@ DEFAULT_BASE_REF = "HEAD^1"
 
 class Check:
 
-    def __init__(self, name, outcome, messages=()):
+    def __init__(self, name, outcome, messages=(), owner_only=False):
         self.name = name
         self.outcome = outcome
         self.messages = list(messages)
+        self.owner_only = owner_only
 
     def as_dict(self):
         return {"name": self.name, "outcome": self.outcome, "messages": self.messages}
@@ -125,7 +127,11 @@ def head_document(path):
         raise ValueError(f"{path} is not readable JSON: {error}") from error
 
 
-def run_amendment(paths, base_ref=DEFAULT_BASE_REF):
+def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None):
+    """The changed release files, each measured against the published version.
+
+    The archive is downloaded only for a file that drops an authored dependency entry, because only its mod.toml shows whether the loader still acts on that dependency.
+    """
     if not paths:
         return Check(
             "amendment", PASS, ["the change touches no release file, so nothing is amended"]
@@ -137,8 +143,11 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF):
         return Check("amendment", COULD_NOT_EVALUATE, [str(error)])
 
     changes = []
+    derived = {}
     unreadable_base = []
     unreadable_head = []
+    unreadable_archive = []
+    archive_problems = []
     for path in paths:
         base, problem = base_document(commit, path)
         if problem:
@@ -149,13 +158,27 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF):
         except ValueError as error:
             unreadable_head.append(str(error))
             continue
+        if isinstance(base, dict) and isinstance(head, dict) and check_amendment.reads_archive(
+            base, head
+        ):
+            http = http or hosts.Http()
+            try:
+                derived[path] = hosts.stamped_dependencies(http, base)
+            except hosts.HostError as error:
+                unreadable_archive.append(
+                    f"{path}: the archive could not be downloaded this run: {error}"
+                )
+                continue
+            except StampError as error:
+                archive_problems.append(f"{path}: {error}")
         changes.append((path, base, head))
 
-    results = check_amendment.check(changes)
+    results = check_amendment.check(changes, derived)
 
-    messages = unreadable_base + unreadable_head
+    messages = unreadable_base + unreadable_head + unreadable_archive + archive_problems
     outcomes = []
-    if unreadable_base:
+    owner_only = any(outcome.owner_only for outcome in results.values())
+    if unreadable_base or unreadable_archive:
         outcomes.append(COULD_NOT_EVALUATE)
     if unreadable_head:
         outcomes.append(REJECT)
@@ -164,7 +187,7 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF):
         messages.extend(f"{path}: {message}" for message in outcome.messages)
     if not messages:
         messages.append(f"{len(paths)} release file(s) narrow what they claim, and nothing else")
-    return Check("amendment", worst(outcomes), messages)
+    return Check("amendment", worst(outcomes), messages, owner_only)
 
 
 def load_game_versions():
@@ -317,6 +340,7 @@ def _verdict(checks, candidate=False, documents=(), reason="", number=None, sha=
         "head_sha": sha,
         "documents": list(documents),
         "scope_reason": reason,
+        "owner_only": any(check.owner_only for check in checks),
         "checks": [check.as_dict() for check in checks],
     }
 

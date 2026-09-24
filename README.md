@@ -71,7 +71,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 |---|---|
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
 | `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
-| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
+| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
 | `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
@@ -92,7 +92,18 @@ Release lists and other answers read into memory have their own limit of 64 MiB.
 `changelog_text` holds the release notes of the authority host (RFC 0064): whitespace trimmed at both ends, LF line endings, and left out when the notes are empty or longer than 16 KiB of UTF-8.
 The watcher adds it once to a release file that has none, from the release list the tick already read, and never changes or removes it.
 
-An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
+An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick adds the resolved bound to that release once the month completes.
+
+A merged listing edit to `[compatibility]`, `[loader]` or `[[dependencies]]` reaches the newest release as an amendment of the verified owner (RFC 0081), in both directions, and older releases keep their stamp.
+The newest release is the newest by SemVer precedence that is neither yanked nor `dev`.
+Only what changed in the listing since the most recent stamp of the listing counts, or since the listing commit that release last received when that is later, so an amendment made after it has the last word.
+A change is written the way a stamp writes it, so a dependency the archive's `mod.toml` declares stays, and a changed loader id reaches only the next release.
+The edit reaches the release with the next tick after the merge, unless a pull request here adds a release file of the listing, so an edit made for that release lands in it.
+A `game_max` month the edit names waits until the month is over.
+A disputed listing gets no edit.
+Each change goes through the check of an owner's amendment before it is written, and a change the check refuses goes into the issue of that listing.
+The commit names the release, the listing commit it read and each change.
+Both checkouts need their full history, because the watcher reads from git when each release file was stamped and how the listing stood then.
 
 A tick also fetches the images of each listing again, once every 24 hours and at once after a record changed (RFC 0058).
 It uses `tools/images.py` from the content-index checkout, so the watcher and the checks apply the same fetch rules from one file.
@@ -154,14 +165,20 @@ A build fails closed: nothing is published, and clients keep the last good snaps
 Identity, the version, the download and the install data never change.
 A release that turns out to be broken is yanked, or superseded by a new version.
 
-The one narrow exception is an amendment, which can only make a release claim less than it claimed before: a yank, a tightened game or dependency bound, or a dependency entry that was missing.
-
-A release file can never become more permissive after publish, and a check enforces that mechanically.
+The one exception is an amendment, which changes only what a release claims to work with: the game bounds, `os`, the loader bounds, the dependencies and a yank.
+Anyone may make a release claim less, and only the verified owner of the listing may make it claim more (RFC 0079).
+A check enforces both mechanically.
 
 ## Amendments
 
-An amendment is a small edit to a release file that is already published, and it can only ever make the release claim less.
+An amendment is a small edit to a release file that is already published.
 Only the author knows that a release broke, and everything after that is arithmetic.
+
+Anyone may narrow a release: yank it, add or lower `game_max`, raise `game_min`, tighten a loader or dependency bound, or add a dependency entry that was missing.
+The verified owner of the listing may also widen it (RFC 0079): lower `game_min`, raise or remove `game_max`, change `os`, loosen or remove a loader or dependency bound, change the kind of an entry, remove an authored entry, or take back a yank.
+Such a pull request merges itself for the verified owner, and a steward merges one only on the owner's behalf.
+Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
+The loader id, a dependency the archive's `mod.toml` declares, `download.mirrors` and `changelog_text` stay out of reach of every amendment.
 
 There are three ways to make the edit.
 
@@ -176,6 +193,7 @@ python3 tools/amend.py --listing AdvancedFlightComputer --up-to 0.7.2 --game-max
 ```
 
 That takes every stamped release at or below `0.7.2` by SemVer precedence, resolves the bound against the game release list, and writes the files.
+It writes narrowing amendments only, so a widening is made by hand.
 
 | Tool | What it does |
 |---|---|
@@ -185,7 +203,7 @@ That takes every stamped release at or below `0.7.2` by SemVer precedence, resol
 | `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
 | `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
 
-`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: `os` is immutable, and a dependency entry's `source` moves from `derived` to `authored` only together with a bound.
+`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: a dependency entry's `source` moves from `derived` to `authored` only together with a bound or a kind, and back to `derived` only exactly as the archive's `mod.toml` declares it, and a derived entry gives way only to an `any_of` entry that names it while it is optional, as the stamp's merge does.
 
 To measure a change before opening anything:
 

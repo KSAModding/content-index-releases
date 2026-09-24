@@ -158,6 +158,24 @@ class Decide(Ownership):
         self.assertIn("no proof", decision.comment)
         self.assertIn("ksa-index-<your-github-username>", decision.comment)
 
+    def test_an_owner_only_amendment_tells_the_steward_it_needs_the_owner(self):
+        for owner_only in (True, False):
+            with self.subTest(owner_only=owner_only):
+                decision = decide.decide(
+                    self.verdict("pass", owner_only=owner_only), True, self.ownership,
+                    self.result(self.ownership.UNVERIFIED, "no proof"),
+                )
+                self.assertTrue(decision.needs_steward)
+                self.assertEqual("on the owner's behalf" in decision.comment, owner_only)
+
+    def test_an_owner_only_amendment_by_the_verified_owner_merges_itself(self):
+        decision = decide.decide(
+            self.verdict("pass", owner_only=True), True, self.ownership,
+            self.result(self.ownership.VERIFIED),
+        )
+        self.assertTrue(decision.auto_merge)
+        self.assertNotIn("on the owner's behalf", decision.comment)
+
     def test_ownership_that_could_not_be_checked_waits_for_a_steward(self):
         decision = decide.decide(
             self.verdict("pass"), True, self.ownership,

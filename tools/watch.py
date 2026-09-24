@@ -4,14 +4,14 @@
 
 Scan every authored listing's authority host, stamp every release that appeared
 after the newest one already stamped, commit it, add the release notes a stamped
-file does not carry yet, fetch the listing's images again, keep one error issue
-per listing current on the authored repository, and sweep that repository's open
-pull requests.
+file does not carry yet, apply a listing edit to the newest release, fetch the
+listing's images again, keep one error issue per listing current on the authored
+repository, and sweep that repository's open pull requests.
 
 Older releases are left alone, and a listing's first tick takes its newest
-release only. RFC 0031 freezes the authored facts "current at release time", and
-an amendment can only narrow a published release, so a `game_min` stamped too
-high can never be lowered again. `--backfill` opts out.
+release only. RFC 0031 freezes the authored facts "current at release time", so
+a `game_min` stamped too high stays until its owner amends it. `--backfill` opts
+out.
 
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
@@ -39,6 +39,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import hosts
+import listing_edit
+from check_amendment import RELEASE_PATH
 from hosts import HostError
 from stamp_release import (
     GAME_MONTH,
@@ -103,6 +105,13 @@ def parse_iso(text):
     return moment if moment.tzinfo else moment.replace(tzinfo=timezone.utc)
 
 
+def listing_month(authored):
+    """The month an authored `game_max` names, as (year, month), or None."""
+    bound = ((authored or {}).get("compatibility") or {}).get("game_max")
+    match = GAME_MONTH.match(bound.strip()) if isinstance(bound, str) else None
+    return (int(match.group(1)), int(match.group(2))) if match else None
+
+
 def load_images(authored):
     """`images.py` from the authored checkout: one implementation of the fetch rules, not two."""
     path = Path(authored) / "tools" / "images.py"
@@ -131,9 +140,10 @@ class Cache:
     """Derived cache, never state.
 
     It holds the per-listing ETags, the consecutive-failure counts, the issue
-    numbers, the last image check, and what the mirror and sweep passes already
-    tried. Every entry is rebuildable from the repository and the hosts, so
-    losing the whole file costs one expensive tick and nothing else.
+    numbers, the last image check, what the mirror and sweep passes already
+    tried, and the dependencies a stamped archive declares. Every entry is
+    rebuildable from the repository and the hosts, so losing the whole file
+    costs one expensive tick and nothing else.
     """
 
     def __init__(self, path, log=None):
@@ -150,7 +160,8 @@ class Cache:
                 loaded = {}
             if isinstance(loaded, dict) and loaded.get("version") == CACHE_VERSION:
                 self.data = loaded
-        for section in ("differs", "hosts", "images", "listings", "mirrors", "swaps", "sweep"):
+        sections = ("derived", "differs", "hosts", "images", "listings", "mirrors", "swaps", "sweep")
+        for section in sections:
             self.data.setdefault(section, {})
 
     def section(self, name, key):
@@ -637,6 +648,8 @@ class Watcher:
         self.cache = Cache(options.cache, log=self.log)
         self.http = hosts.Http(token=options.token, log=self.log)
         self.api = Api(self.http, options.authored_repo, options.dry_run, self.log)
+        self.releases_api = Api(self.http, options.releases_repo, options.dry_run, self.log)
+        self.history = listing_edit.History(options.authored, options.releases)
         self.issues = Issues(self.api, options.issue_label, self.log)
         self.game_versions = json.loads(
             Path(options.game_versions).read_text(encoding="utf-8")
@@ -648,9 +661,13 @@ class Watcher:
         self.stamped = []
         self.mirrored = []
         self.noted = []
+        self.edited = []
         self.failed = []
         self.lines = []
+        self.disputed = set()
         self._mirror_lists = {}
+        self._history_problem = None
+        self._release_pulls = None
 
     def log(self, message):
         print(message, flush=True)
@@ -759,31 +776,34 @@ class Watcher:
             return []
 
         wanted = {name.lower() for name in self.options.listing or []}
-        delisted = self.delisted()
-        if delisted is None:
+        states = self.index_states()
+        if states is None:
             # Failing open would stamp releases a steward delisted, so an
             # unreadable status file skips the whole tick's listings instead.
             self.log("index-status.toml is unreadable, so no listing is scanned this tick")
             return []
+        self.disputed = {key for key, state in states.items() if state == "disputed"}
         chosen = []
         for path in sorted(folder.glob("*.toml")):
             if wanted and path.stem.lower() not in wanted:
                 continue
-            if path.stem.lower() in delisted:
+            if states.get(path.stem.lower()) == "delisted":
                 self.log(f"{path.stem}: delisted, so the watcher leaves it alone")
                 continue
             chosen.append(path)
         return chosen
 
-    def delisted(self):
-        """The ids the index has delisted, or None when the file is unreadable.
+    def index_states(self):
+        """The ids the index delisted or disputed, to that state, or None when the file is unreadable.
 
         A delisted listing is out of the snapshot, so stamping further releases
-        for it would be the watcher arguing with a steward.
+        for it would be the watcher arguing with a steward. A disputed one is
+        still stamped, but no listing edit reaches it, because the dispute
+        contests the ownership the edit verified against.
         """
         path = self.authored_root / "index-status.toml"
         if not path.is_file():
-            return set()
+            return {}
         try:
             with path.open("rb") as handle:
                 document = tomllib.load(handle)
@@ -791,9 +811,9 @@ class Watcher:
             self.log(f"could not read {path.name}: {error}")
             return None
         return {
-            (entry.get("id") or "").lower()
+            (entry.get("id") or "").lower(): entry.get("state")
             for entry in document.get("entries") or []
-            if entry.get("state") == "delisted"
+            if entry.get("state") in ("delisted", "disputed")
         }
 
     def listing_problem(self, path, listing_id):
@@ -832,7 +852,7 @@ class Watcher:
                         self.issues.report(listing_id, [problem], self.cache)
                         continue
                     self.log(f"{listing_id}:")
-                    self.one_listing(listing_id, authored)
+                    self.one_listing(listing_id, authored, path)
                 except tomllib.TOMLDecodeError as error:
                     # `report` never raises for API failures, which matters
                     # here: an exception inside an except clause would leave
@@ -887,11 +907,11 @@ class Watcher:
                 "id gets here.",
             )
 
-    def one_listing(self, listing_id, authored):
+    def one_listing(self, listing_id, authored, path):
         state = self.cache.section("listings", listing_id)
         errors = []
 
-        self.month_pass(listing_id, authored, errors)
+        self.month_pass(listing_id, authored, path, errors)
         images = self.image_pass(listing_id, authored)
         errors.extend(images or [])
 
@@ -905,6 +925,7 @@ class Watcher:
             return
         if authority is None:
             self.log("  no [releases] section, so releases enter by pull request")
+            self.listing_edit_pass(listing_id, authored, path, errors)
             if errors:
                 self.failed.append(listing_id)
                 self.report(listing_id, errors, state, images)
@@ -958,6 +979,9 @@ class Watcher:
         self.mirror_pass(listing_id, mirrors, errors)
 
         if settled:
+            # Not before every release the host lists is settled, because one
+            # still unstamped may be the release the listing edit was made for.
+            self.listing_edit_pass(listing_id, authored, path, errors)
             # The ETag stands for "every release behind this answer is
             # settled", so a tick that ran out of budget or could not reach the
             # host always refetches. A payload that changes changes the ETag, so
@@ -1268,20 +1292,19 @@ class Watcher:
             "way forward is a new version, or a yank of this one."
         )
 
-    def month_pass(self, listing_id, authored, errors):
+    def month_pass(self, listing_id, authored, path, errors):
         """Resolve an authored `game_max` month once that month is over.
 
         Adding the bound is the stamp correction RFC 0033 describes, not an
         amendment: the file only becomes less permissive and nothing already
         present is touched. It reads the authored document, so it needs no host
-        and runs for every listing.
+        and runs for every listing. It reaches only a release stamped while the
+        listing named that month, because a month named later is a listing edit.
         """
-        bound = ((authored.get("compatibility") or {}).get("game_max") or "").strip()
-        match = GAME_MONTH.match(bound)
-        if match is None:
+        month = listing_month(authored)
+        if month is None or not month_is_over(*month, now()):
             return
-        if not month_is_over(int(match.group(1)), int(match.group(2)), now()):
-            return
+        bound = authored["compatibility"]["game_max"].strip()
 
         try:
             display, revision = resolve_bound(bound, "game_max", self.game_versions, now())
@@ -1291,11 +1314,18 @@ class Watcher:
         if display is None:
             return
 
-        for version, path in self.stamped_versions(listing_id).items():
-            document = self.read_release(path, errors)
+        for version, file in self.stamped_versions(listing_id).items():
+            document = self.read_release(file, errors)
             if document is None:
                 continue
             if "game_max" in document or "game_min_revision" not in document:
+                continue
+            problem = self.history_problem()
+            if problem:
+                self.log(f"  no game_max month resolved, the history cannot be read: {problem}")
+                return
+            stamped = parse_iso(self.history.last_stamp(file))
+            if stamped is None or listing_month(self.listing_then(path, stamped)) != month:
                 continue
             if revision < document["game_min_revision"]:
                 errors.append(
@@ -1313,11 +1343,176 @@ class Watcher:
                     updated["game_max"] = display
                     updated["game_max_revision"] = revision
             self.write(
-                path,
+                file,
                 serialize(updated),
                 f"Resolve the game_max month for {listing_id} {version}",
             )
             self.log(f"    resolved game_max {display} onto {version}")
+
+    def listing_edit_pass(self, listing_id, authored, path, errors):
+        """Apply a merged listing edit to the newest release (RFC 0081).
+
+        The edit is what changed since the most recent stamp, or since the
+        listing commit the release last received when that is later, so an
+        amendment made after it has the last word. It waits while a release
+        pull request of the listing is open, so an edit made for the next
+        release lands in that release. Each change goes through the check of an
+        owner's amendment first, and one it refuses is reported on every tick
+        rather than applied.
+        """
+        if listing_id.lower() in self.disputed:
+            return
+        documents = {}
+        for version, file in self.stamped_versions(listing_id).items():
+            document = self.read_release(file, errors)
+            if document is None:
+                return
+            documents[version] = document
+        try:
+            version = listing_edit.target(documents)
+        except ValueError as error:
+            self.log(f"  no listing edit applied, a release file name is not a version: {error}")
+            return
+        if version is None:
+            return
+
+        problem = self.history_problem()
+        if problem:
+            self.log(f"  no listing edit applied, the history cannot be read: {problem}")
+            return
+        stamped = parse_iso(self.history.last_stamp(self.folder(listing_id)))
+        change = self.history.listing_change(path)
+        if stamped is None or change is None:
+            self.log("  no listing edit applied, a release file or the listing is not committed")
+            return
+        sha, changed = change[0], parse_iso(change[1])
+        if changed is None or changed <= stamped:
+            return
+
+        at_stamp = self.listing_then(path, stamped)
+        file = self.folder(listing_id) / f"{version}.json"
+        before, since = at_stamp, stamped
+        received = self.listing_received(path, file)
+        if received is not None and (received[1] is None or received[1] > stamped):
+            before, since = received
+        if at_stamp is None or before is None or since is None:
+            self.log("  no listing edit applied, the listing the release was measured against is unknown")
+            return
+        release = documents[version]
+        where = f"releases/{listing_id}/{version}.json"
+
+        def derived():
+            return self.archive_dependencies(listing_id, release)
+
+        try:
+            found = listing_edit.changes(
+                at_stamp, authored, release, self.game_versions, now(), derived
+            )
+            fresh = found
+            if since != stamped:
+                fresh = {} if changed <= since else listing_edit.changes(
+                    before, authored, release, self.game_versions, now(), derived
+                )
+            stale = {field: found[field] for field in found if field not in fresh}
+            refused = listing_edit.refusals(where, release, stale, derived)
+            applied = []
+            if fresh:
+                if self.release_pull_open(listing_id) is not False:
+                    self.log("  a release pull request of this listing may be open, so its edit waits")
+                    return
+                head, applied, more = listing_edit.amended(where, release, fresh, derived)
+                refused += more
+        except listing_edit.Wait as wait:
+            self.log(f"  {wait}, so the listing edit waits")
+            return
+        except HostError as error:
+            self.log(f"  the archive of {version} is out of reach, so the edit waits: {error}")
+            return
+
+        for descriptions, problems in refused:
+            errors.append(
+                f"the listing edit that {' and '.join(descriptions)} does not reach "
+                f"`{version}`, because the amendment check refuses it: {'; '.join(problems)}"
+            )
+        if not applied:
+            return
+        message = "\n".join(
+            [
+                f"Apply the listing of {listing_id} to {version}",
+                "",
+                f"Listing: {self.options.authored_repo}@{sha}",
+                *[f"- {description}" for description in applied],
+            ]
+        )
+        self.write(file, serialize(head), message)
+        self.log(f"    applied the listing to {version}: {', '.join(applied)}")
+        self.edited.append(f"{listing_id} {version}")
+
+    def listing_received(self, path, file):
+        """The listing commit a release file last received, as (document, committed), or None when it received none.
+
+        Either part is None when git cannot say.
+        """
+        received = self.history.received(file, self.options.authored_repo)
+        if received is None:
+            return None
+        text = self.history.listing_in(path, received)
+        try:
+            document = None if text is None else tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            document = None
+        return document, parse_iso(self.history.committed(path, received))
+
+    def archive_dependencies(self, listing_id, document):
+        """The dependencies the release archive's own mod.toml declares.
+
+        A stamped archive never changes, so the answer is cached by its digest.
+        """
+        digest = ((document.get("download") or {}).get("sha256") or "").upper()
+        cached = self.cache.section("derived", f"{listing_id}/{document.get('version')}")
+        if cached.get("sha256") == digest and isinstance(cached.get("dependencies"), list):
+            return cached["dependencies"]
+        dependencies = hosts.stamped_dependencies(self.http, document)
+        cached.update(sha256=digest, dependencies=dependencies)
+        return dependencies
+
+    def history_problem(self):
+        """Why git cannot say when a listing changed or a release was stamped, or None. Asked once per tick."""
+        if self._history_problem is None:
+            self._history_problem = self.history.problem() or ""
+        return self._history_problem or None
+
+    def listing_then(self, path, moment):
+        """The listing document as it stood at `moment`, or None when git cannot say or it did not parse."""
+        text = self.history.listing_at(path, iso(moment))
+        if text is None:
+            return None
+        try:
+            return tomllib.loads(text)
+        except tomllib.TOMLDecodeError:
+            return None
+
+    def release_pull_open(self, listing_id):
+        """Whether an open pull request here adds a release file of the listing, None when unknown.
+
+        The open pull requests are read once per tick, and only once a
+        listing edit is due.
+        """
+        if self._release_pulls is None:
+            try:
+                added = set()
+                for pull in self.releases_api.get_paged("/pulls", state="open"):
+                    for entry in self.releases_api.get_paged(f"/pulls/{pull['number']}/files"):
+                        match = RELEASE_PATH.match(entry.get("filename") or "")
+                        if match and entry.get("status") == "added":
+                            added.add(match.group(1).lower())
+                self._release_pulls = added
+            except (urllib.error.HTTPError, HostError, ValueError, KeyError, TypeError) as error:
+                self.log(f"  could not list the release pull requests: {error}")
+                self._release_pulls = False
+        if self._release_pulls is False:
+            return None
+        return listing_id.lower() in self._release_pulls
 
     def changelog_pass(self, listing_id, releases, errors):
         """Add `changelog_text` once to a stamped file that has none (RFC 0064).
@@ -1535,6 +1730,7 @@ class Watcher:
             f"- stamped: {len(self.stamped)}",
             f"- mirrors appended: {len(self.mirrored)}",
             f"- changelog texts added: {len(self.noted)}",
+            f"- listing edits applied: {len(self.edited)}",
             f"- listings with an error: {len(set(self.failed))}",
             f"- host requests: {self.http.requests}",
         ]
@@ -1544,12 +1740,14 @@ class Watcher:
             summary += ["", "### Mirrors", ""] + [f"- `{name}`" for name in self.mirrored]
         if self.noted:
             summary += ["", "### Changelog texts", ""] + [f"- `{name}`" for name in self.noted]
+        if self.edited:
+            summary += ["", "### Listing edits", ""] + [f"- `{name}`" for name in self.edited]
         if self.failed:
             summary += ["", "### Reported", ""] + [
                 f"- `{name}`" for name in sorted(set(self.failed))
             ]
 
-        print("\n".join(summary[2:7]))
+        print("\n".join(summary[2:8]))
         path = os.environ.get("GITHUB_STEP_SUMMARY")
         if path:
             with open(path, "a", encoding="utf-8") as handle:
@@ -1567,6 +1765,10 @@ def parse_arguments(argv):
         help="the authored repository, for issues and the sweep",
     )
     parser.add_argument("--releases", default="releases", type=Path)
+    parser.add_argument(
+        "--releases-repo", default="KSAModding/content-index-releases",
+        help="this repository, whose open release pull requests hold a listing edit back",
+    )
     parser.add_argument("--game-versions", default="game-versions.json", type=Path)
     parser.add_argument(
         "--cache", default=".watcher/cache.json", type=Path,

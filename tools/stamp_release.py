@@ -575,6 +575,20 @@ def merge_dependencies(derived, authored):
     return [entry for index, entry in enumerate(merged) if index not in replaced]
 
 
+def stamp_loader(loader):
+    """The authored `[loader]` section in release file shape."""
+    stamped = {"id": loader.get("id")}
+    if not stamped["id"]:
+        raise StampError("the authored [loader] section names no id")
+    if not loader.get("min"):
+        raise StampError("the authored [loader] section states no min")
+    stamped["min"] = normalize_version(loader["min"])
+    if loader.get("max"):
+        stamped["max"] = normalize_version(loader["max"])
+    stamped["source"] = "authored"
+    return stamped
+
+
 def changelog_text(notes):
     """The release notes as a release file carries them, or None when they are left out."""
     if not isinstance(notes, str):
@@ -712,16 +726,7 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
 
     loader = authored.get("loader")
     if loader and content_type == "mod":
-        stamped_loader = {"id": loader.get("id")}
-        if not stamped_loader["id"]:
-            raise StampError("the authored [loader] section names no id")
-        if not loader.get("min"):
-            raise StampError("the authored [loader] section states no min")
-        stamped_loader["min"] = normalize_version(loader["min"])
-        if loader.get("max"):
-            stamped_loader["max"] = normalize_version(loader["max"])
-        stamped_loader["source"] = "authored"
-        document["loader"] = stamped_loader
+        document["loader"] = stamp_loader(loader)
 
     document["dependencies"] = dependencies
     if release.get("changelog"):
