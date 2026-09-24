@@ -113,10 +113,10 @@ class Immutable(unittest.TestCase):
     def test_the_release_status_never_changes(self):
         self.assertTrue(errors_for(head(release_status="testing")))
 
-    def test_os_is_not_in_the_amendment_class(self):
+    def test_os_is_not_in_the_class_of_a_steward(self):
         document = head()
         document["os"] = ["windows"]
-        self.assertTrue(any("'os'" in message for message in errors_for(document)))
+        self.assertIn("os changes from no restriction to windows", errors_for(document))
 
     def test_a_key_a_release_file_does_not_have_is_rejected(self):
         document = head()
@@ -338,7 +338,7 @@ class Dependencies(unittest.TestCase):
             [{"id": "KittenExtensions", "kind": "optional", "min": "0.5.0", "source": "derived"}]
         )
         self.assertTrue(
-            any("changes source" in message for message in errors_for(document, base=base))
+            any("turns derived" in message for message in errors_for(document, base=base))
         )
 
     def test_an_entry_that_was_missing_can_be_added(self):
@@ -481,6 +481,224 @@ class AnyOf(unittest.TestCase):
         self.assertTrue(errors_for(document, base=self.base()))
 
 
+RIVAL = {"id": "Rival", "kind": "conflict", "max": "2.0.0", "source": "authored"}
+
+
+class TheOwner(unittest.TestCase):
+    """The verified owner may also widen (RFC 0079), and a steward alone may not."""
+
+    def measured(self, document, base=None, derived=None):
+        errors, owner_only = [], []
+        check_document(
+            PATH, BASE if base is None else base, document, errors, owner_only, derived
+        )
+        return errors, owner_only
+
+    def assert_owner_only(self, document, base=None, derived=None):
+        errors, owner_only = self.measured(document, base, derived)
+        self.assertEqual(errors, [])
+        self.assertTrue(owner_only)
+        self.assertTrue(errors_for(document, base=base))
+
+    def test_the_game_bounds_move_both_ways(self):
+        capped = head(game_max="2026.8.19.5261", game_max_revision=5261)
+        self.assert_owner_only(head(game_min="2026.8.3.5117", game_min_revision=5117))
+        self.assert_owner_only(head(game_max="2026.9.10.5438", game_max_revision=5438), base=capped)
+        self.assert_owner_only(head(), base=capped)
+
+    def test_os_can_be_added_changed_and_removed(self):
+        linux = head(os=["linux"])
+        self.assert_owner_only(head(os=["windows"]))
+        self.assert_owner_only(head(os=["windows", "linux"]), base=linux)
+        self.assert_owner_only(head(), base=linux)
+
+    def test_os_holds_known_platforms_only(self):
+        for platforms in ([], ["windows", "windows"], ["freebsd"], "windows"):
+            with self.subTest(platforms=platforms):
+                errors, _ = self.measured(head(os=platforms))
+                self.assertTrue(any("os is absent or a list" in message for message in errors))
+
+    def test_a_loader_bound_can_be_loosened_or_removed(self):
+        capped = head(loader={"id": "StarMap", "min": "0.4.5", "max": "0.5.0", "source": "authored"})
+        self.assert_owner_only(head(loader={"id": "StarMap", "min": "0.4.0", "source": "authored"}))
+        self.assert_owner_only(head(loader={"id": "StarMap", "source": "authored"}))
+        self.assert_owner_only(
+            head(loader={"id": "StarMap", "min": "0.4.5", "max": "0.6.0", "source": "authored"}),
+            base=capped,
+        )
+
+    def test_the_loader_itself_stays(self):
+        removed = head()
+        del removed["loader"]
+        repointed = head(loader={"id": "OtherLoader", "min": "0.4.5", "source": "authored"})
+        for document in (removed, repointed):
+            with self.subTest(document=document.get("loader")):
+                errors, _ = self.measured(document)
+                self.assertTrue(any("loader" in message for message in errors))
+
+    def test_an_authored_entry_can_be_removed_or_change_kind(self):
+        base = head(dependencies=BASE["dependencies"] + [RIVAL])
+        self.assert_owner_only(head(), base=base, derived=BASE["dependencies"])
+        self.assert_owner_only(
+            head(dependencies=BASE["dependencies"] + [{**RIVAL, "kind": "optional"}]), base=base
+        )
+        self.assert_owner_only(
+            head(dependencies=BASE["dependencies"] + [{**RIVAL, "max": "3.0.0"}]),
+            base=base,
+        )
+
+    def test_a_derived_entry_can_change_kind_and_is_then_authored(self):
+        document = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "required", "source": "authored"}]
+        )
+        self.assert_owner_only(document)
+
+    def test_an_authored_entry_can_fall_back_to_the_derived_one(self):
+        base = head(
+            dependencies=[
+                {"id": "KittenExtensions", "kind": "required", "min": "0.4.0", "source": "authored"}
+            ]
+        )
+        self.assert_owner_only(head(), base=base, derived=BASE["dependencies"])
+
+    def test_an_entry_turns_derived_only_as_the_archive_declares_it(self):
+        base = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "required", "source": "authored"}]
+        )
+        fake = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "recommends", "source": "derived"}]
+        )
+        for document, derived in ((fake, BASE["dependencies"]), (head(), None)):
+            with self.subTest(derived=derived):
+                errors, _ = self.measured(document, base, derived)
+                self.assertTrue(any("turns derived" in message for message in errors))
+
+    def test_an_entry_the_archive_declares_is_never_removed(self):
+        # First the derived entry becomes authored with a new kind, then the authored one goes.
+        authored = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "recommends", "source": "authored"}]
+        )
+        self.assert_owner_only(authored)
+        errors, _ = self.measured(head(dependencies=[]), authored, BASE["dependencies"])
+        self.assertTrue(
+            any("mod.toml declares 'kittenextensions'" in message for message in errors)
+        )
+
+    def test_a_removal_the_archive_cannot_vouch_for_is_refused(self):
+        errors, _ = self.measured(head(), head(dependencies=BASE["dependencies"] + [RIVAL]))
+        self.assertTrue(any("the archive was not read" in message for message in errors))
+
+    def test_only_an_authored_entry_that_leaves_reads_the_archive(self):
+        with_rival = head(dependencies=BASE["dependencies"] + [RIVAL])
+        self.assertTrue(check_amendment.reads_archive(with_rival, head()))
+        self.assertFalse(check_amendment.reads_archive(head(), with_rival))
+        self.assertFalse(
+            check_amendment.reads_archive(
+                with_rival, head(dependencies=BASE["dependencies"] + [{**RIVAL, "max": "1.0.0"}])
+            )
+        )
+
+    def test_a_derived_entry_is_never_removed(self):
+        errors, _ = self.measured(head(dependencies=[]))
+        self.assertTrue(any("a derived entry stays" in message for message in errors))
+
+    def test_an_any_of_can_take_over_an_optional_derived_entry(self):
+        # The stamp's merge does the same, because the loader starts without an optional one.
+        any_of = {
+            "any_of": [{"id": "KittenExtensions"}, {"id": "OtherExtensions"}],
+            "kind": "recommends",
+            "source": "authored",
+        }
+        errors, owner_only = self.measured(head(dependencies=[any_of]))
+        self.assertEqual(errors, [])
+        required = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "required", "source": "derived"}]
+        )
+        errors, _ = self.measured(head(dependencies=[any_of]), base=required)
+        self.assertTrue(any("a derived entry stays" in message for message in errors))
+
+    def test_an_any_of_cannot_take_the_place_of_an_authored_entry_over_a_required_one(self):
+        # The loader refuses to start without a required dependency, so no alternative stands in for it.
+        declared = [{"id": "KittenExtensions", "kind": "required", "source": "derived"}]
+        base = head(
+            dependencies=[
+                {"id": "KittenExtensions", "kind": "required", "min": "1.0.0", "source": "authored"}
+            ]
+        )
+        any_of = {
+            "any_of": [{"id": "KittenExtensions"}, {"id": "OtherExtensions"}],
+            "kind": "required",
+            "source": "authored",
+        }
+        errors, _ = self.measured(head(dependencies=[any_of]), base, declared)
+        self.assertTrue(any("cannot take its place" in message for message in errors))
+        errors, _ = self.measured(head(dependencies=[any_of]), base, BASE["dependencies"])
+        self.assertEqual(errors, [])
+
+    def test_an_any_of_has_a_kind_that_allows_alternatives(self):
+        any_of = {
+            "any_of": [{"id": "KittenExtensions"}, {"id": "OtherExtensions"}],
+            "kind": "recommends",
+            "source": "authored",
+        }
+        base = head(dependencies=[any_of])
+        for kind in ("optional", "suggests", "conflict"):
+            with self.subTest(kind=kind):
+                errors, _ = self.measured(head(dependencies=[{**any_of, "kind": kind}]), base)
+                self.assertTrue(any("any_of is valid with kind" in message for message in errors))
+        errors, owner_only = self.measured(head(dependencies=[{**any_of, "kind": "required"}]), base)
+        self.assertEqual(errors, [])
+        self.assertTrue(owner_only)
+
+    def test_a_removed_any_of_gives_back_the_derived_entry_it_took_over(self):
+        base = head(
+            dependencies=[
+                {
+                    "any_of": [{"id": "KittenExtensions"}, {"id": "OtherExtensions"}],
+                    "kind": "recommends",
+                    "source": "authored",
+                }
+            ]
+        )
+        errors, owner_only = self.measured(head(), base, BASE["dependencies"])
+        self.assertEqual(errors, [])
+        self.assertTrue(owner_only)
+        # Only exactly what the archive declares comes back as derived.
+        other = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "required", "source": "derived"}]
+        )
+        errors, _ = self.measured(other, base, BASE["dependencies"])
+        self.assertTrue(any("an added entry is authored" in message for message in errors))
+
+    def test_a_yank_can_be_taken_back(self):
+        self.assert_owner_only(head(), base=head(yanked=True, yanked_reason="broken"))
+
+    def test_a_derived_entry_that_changes_kind_does_not_stay_derived(self):
+        document = head(
+            dependencies=[{"id": "KittenExtensions", "kind": "required", "source": "derived"}]
+        )
+        errors, _ = self.measured(document)
+        self.assertTrue(any("stays derived" in message for message in errors))
+
+    def test_the_fields_of_the_watcher_stay_out_of_reach(self):
+        mirrored = head()
+        mirrored["download"] = {**BASE["download"], "mirrors": ["https://example.invalid/m.zip"]}
+        for document in (head(changelog_text="Fixed."), mirrored):
+            with self.subTest(document=document):
+                errors, _ = self.measured(document)
+                self.assertTrue(errors)
+
+    def test_a_batch_passes_a_widening_and_names_it(self):
+        results = check([(PATH, BASE, head(game_min="2026.8.3.5117", game_min_revision=5117))])
+        self.assertEqual(results[PATH].outcome, "pass")
+        self.assertTrue(results[PATH].owner_only)
+        self.assertTrue(any("widens" in message for message in results[PATH].messages))
+
+    def test_a_narrowing_does_not_widen(self):
+        results = check([(PATH, BASE, head(yanked=True))])
+        self.assertFalse(results[PATH].owner_only)
+
+
 class NewAndDeleted(unittest.TestCase):
     def test_a_new_release_file_is_not_an_amendment(self):
         # Not a rejection: there is no published release to measure against, and the scope rule already routes it to a steward.
@@ -564,9 +782,14 @@ class Vectors(unittest.TestCase):
         self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
 
     def test_a_widening_that_says_unchanged_fails(self):
-        vector = self.named("a game_min cannot be lowered")
+        vector = self.named("a steward alone cannot lower a game_min")
         del vector["reason"]
         vector["verdict"] = "unchanged"
+        self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
+
+    def test_an_owner_widening_run_as_a_steward_fails(self):
+        vector = self.named("the owner raises a game_max")
+        vector["actor"] = "steward"
         self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
 
     def test_written_text_outside_the_class_fails(self):

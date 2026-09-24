@@ -6,7 +6,9 @@ The tool checks its own output, so a case that passes here is one the check in f
 """
 
 import argparse
+import contextlib
 import copy
+import io
 import json
 import tempfile
 import unittest
@@ -221,10 +223,24 @@ class GameMin(Tree):
 
     def test_it_cannot_be_lowered(self):
         self.write("Mod", "0.7.2")
-        self.assertEqual(
-            self.run_tool("--listing", "Mod", "--all", "--game-min", "2026.8.3.5117"), 1
-        )
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            code = self.run_tool("--listing", "Mod", "--all", "--game-min", "2026.8.3.5117")
+        self.assertEqual(code, 1)
         self.assertEqual(self.read("Mod", "0.7.2")["game_min_revision"], 5261)
+        self.assertIn(
+            "only the verified owner of the listing widens a release, with --owner",
+            output.getvalue(),
+        )
+
+    def test_the_owner_can_lower_it(self):
+        self.write("Mod", "0.7.2")
+        self.assertEqual(
+            self.run_tool("--listing", "Mod", "--all", "--game-min", "2026.8.3.5117", "--owner"),
+            0,
+        )
+        self.assertEqual(self.read("Mod", "0.7.2")["game_min_revision"], 5117)
+
 
 
 class Yank(Tree):
@@ -413,9 +429,19 @@ class Vectors(unittest.TestCase):
         self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
 
     def test_a_wrong_reason_fails(self):
-        vector = self.named("a game_min cannot be lowered")
+        vector = self.named("a steward alone cannot lower a game_min")
         vector["reason"] = "game_min_revision falls from 5117 to 5000"
         self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
+
+    def test_the_actor_decides_whether_a_widening_is_written(self):
+        for name, actor in (
+            ("the owner raises a game_max", "steward"),
+            ("a steward alone cannot raise a game_max", "owner"),
+        ):
+            with self.subTest(name):
+                vector = self.named(name)
+                vector["actor"] = actor
+                self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
 
     def test_escaped_non_ascii_is_wrong_bytes(self):
         vector = self.named("fields the tool does not change or know keep their value and place")
@@ -439,6 +465,7 @@ class Reminders(unittest.TestCase):
 
     def test_a_yank_needs_no_reminder(self):
         self.assertEqual(amend.reminders({"yank": True}), [])
+
 
 
 if __name__ == "__main__":

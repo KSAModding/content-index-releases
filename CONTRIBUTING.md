@@ -7,20 +7,32 @@ A pull request is labelled `release` or `amendment` once the checks finish, whic
 
 ## An amendment
 
-An amendment records something learned after a release was published, and it can only narrow what that release claims:
+An amendment records something learned after a release was published.
+Anyone may narrow what a release claims:
 
 - a yank, with an optional reason
 - adding or lowering `game_max`, or raising `game_min`
 - tightening a dependency or loader bound
 - adding a dependency entry that was missing, including a conflict
 
-Widening a bound, removing an entry, and touching identity, the version, the download or the install data are never amendments.
+The verified owner of the listing may also widen it (RFC 0079):
+
+- lowering `game_min`, or raising or removing `game_max`
+- adding, changing or removing `os`
+- loosening or removing a loader or dependency bound, while the loader stays the same
+- removing a dependency entry, or changing its kind
+- taking back a yank
+
+A dependency that the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release, because the loader acts on it.
+The check reads the archive to know which dependencies those are.
+
+Identity, the version, the download, the install data and `changelog_text` are never amendments.
 The way forward for those is a new version, or a yank.
 
 One amendment may touch several release files of one listing, which is what makes "this mod breaks above game build X" a single pull request instead of one per past release.
 
 You may amend a listing you are the verified owner of, through the same ownership check the authored repository uses.
-A steward may amend any.
+A steward may narrow any.
 
 ### Making an amendment
 
@@ -38,6 +50,9 @@ python3 tools/amend.py --listing <id> --up-to 0.7.2 --game-max 2026.8.19.5261
 
 # This one build is broken outright.
 python3 tools/amend.py --listing <id> --version 0.7.2 --yank --reason "It corrupts saves."
+
+# It works on a newer game build after all. Only the owner widens.
+python3 tools/amend.py --listing <id> --version 0.7.2 --game-max 2026.9.10.5438 --owner
 
 # It needs a newer loader than it was stamped with.
 python3 tools/amend.py --listing <id> --all --loader-min 0.4.6

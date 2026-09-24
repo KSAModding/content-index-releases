@@ -104,6 +104,11 @@ def arguments(amendment):
     return argv
 
 
+def actor_arguments(vector):
+    """A steward acting alone only narrows, and the owner, or anyone on the owner's request, may also widen."""
+    return ["--owner"] if vector["actor"] == "owner" else []
+
+
 def release_path(base):
     return f"releases/{base['id']}/{base['version']}.json"
 
@@ -127,6 +132,7 @@ def through_amend(vector, game_versions):
             "--version", base["version"],
             "--releases", str(root / "releases"),
             "--game-versions", str(versions),
+            *actor_arguments(vector),
             *arguments(vector["amendment"]),
         ]
         output = io.StringIO()
@@ -197,11 +203,14 @@ def invariant_mismatches(vector, game_versions):
 
     path = release_path(base)
     outcome = check_amendment.check([(path, json.loads(vector["base"]), head)])[path]
+    given = outcome.outcome
+    if outcome.owner_only and vector["actor"] != "owner":
+        given = "reject"
     expected = "reject" if vector["verdict"] == "rejected" else "pass"
     found = []
-    if outcome.outcome != expected:
+    if given != expected:
         found.append(
-            f"tools/check_amendment.py gives {outcome.outcome}, and the vector says "
+            f"tools/check_amendment.py gives {given}, and the vector says "
             f"{vector['verdict']}: {outcome.messages}"
         )
     if "reason" in vector and not any(vector["reason"] in line for line in outcome.messages):

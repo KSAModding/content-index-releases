@@ -68,6 +68,12 @@ def load_ownership(authored=None):
     return ownership
 
 
+OWNER_ONLY = (
+    "Only the verified owner of the listing may make this amendment. A steward merges it "
+    "only on the owner's behalf."
+)
+
+
 class Decision:
     def __init__(self, status, description, auto_merge=False, needs_steward=False, comment=None):
         self.status = status
@@ -100,8 +106,10 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
     """The status reports validation alone.
 
     Ownership is a separate axis, so an amendment that validates but cannot prove who made it is green and waits for a steward.
+    A steward acting alone only narrows (RFC 0079), so an amendment only the owner may make says so to the steward.
     """
     outcome = verdict.get("verdict")
+    owner_only = OWNER_ONLY if verdict.get("owner_only") else ""
 
     if outcome == REJECT:
         return Decision(
@@ -138,6 +146,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
             comment=_comment(
                 f"Validation passed, but a steward has to merge this one because {reason}.",
                 verdict,
+                owner_only,
                 run_url=run_url,
             ),
         )
@@ -163,6 +172,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
                 "Validation passed, but the ownership check reached no verdict, so this pull request waits for a steward.",
                 verdict,
                 f"The ownership check reported: {ownership_result.reason}.",
+                owner_only,
                 run_url=run_url,
             ),
         )
@@ -179,6 +189,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
             "The proof is something only you can put on the release repository. "
             f"Set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on it, "
             f"or commit `{ownership.MARKER_PATH}` naming your username.",
+            owner_only,
             run_url=run_url,
         ),
     )
