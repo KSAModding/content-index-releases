@@ -1,0 +1,54 @@
+{
+  "spec_version": 1,
+  "id": "OhMyStars",
+  "type": "mod",
+  "version": "1.2.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-24T06:58:21Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4537/Oh%20My%20Stars/download/1.2.2",
+    "sha256": "78B9572E8DBCF79A552821C368F0128FFED0983A34D01331AE8AD366A0481B44",
+    "size": 25732047,
+    "content_type": "application/zip"
+  },
+  "install_size": 70060560,
+  "install": {
+    "root": "OhMyStars",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "required",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+  "changelog_text": "- added star search tabs for all stars in the AT-HYG catalog with either proper names or Bayer IDs that can get selected.  You can now find Wolf 359 and Barnard's Star for example!\n- made those new lists text filterable (searchable)\n- made Sol a special case that points and orients vessels at the sun\n- fixed light years display so that it converts the parsecs in the AT-HYG listing into light years (LY) - oops",
+  "listing": {
+    "name": "OhMyStars",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "This mod adds constellation lines between stars in KSA!",
+    "description": "This mod adds constellation lines between stars in KSA!\n\nFeatures: \n- Constellation (Asterism) Lines between stars  \n- Constellation Boundary lines (IAU defined) - Star informational window  \n- Star names and informational window  \n- Vehicle orientation mode to point towards stars  \n\n![OMShunter](ksa-image:OMSHunter)\n\nA pointer can be enabled showing the direction to a currently selected star.  A navball marker can be enabled showing the orientation where the selected star is in relation to your vehicle's pointing!\n\n![OMS3medium](ksa-image:OhMyStars3)\n\nAn orientation mode can be activated making the flight computer aim your vehicles towards the currently selected star!  Toggle the mode off to go back to the vehicle's previous orientation mode!\n\n![OMS3medium](ksa-image:OhMyStars4)\n",
+    "license": "GPL-2.0-only AND CC-BY-SA-4.0",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/oh-my-stars.1255",
+      "repository": "https://github.com/nanonestor/OhMyStars",
+      "spacedock": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+      "bugtracker": "https://github.com/nanonestor/OhMyStars/issues"
+    }
+  }
+}
