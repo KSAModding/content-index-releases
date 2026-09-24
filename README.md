@@ -154,14 +154,20 @@ A build fails closed: nothing is published, and clients keep the last good snaps
 Identity, the version, the download and the install data never change.
 A release that turns out to be broken is yanked, or superseded by a new version.
 
-The one narrow exception is an amendment, which can only make a release claim less than it claimed before: a yank, a tightened game or dependency bound, or a dependency entry that was missing.
-
-A release file can never become more permissive after publish, and a check enforces that mechanically.
+The one exception is an amendment, which changes only what a release claims to work with: the game bounds, `os`, the loader bounds, the dependencies and a yank.
+Anyone may make a release claim less, and only the verified owner of the listing may make it claim more (RFC 0079).
+A check enforces both mechanically.
 
 ## Amendments
 
-An amendment is a small edit to a release file that is already published, and it can only ever make the release claim less.
+An amendment is a small edit to a release file that is already published.
 Only the author knows that a release broke, and everything after that is arithmetic.
+
+Anyone may narrow a release: yank it, add or lower `game_max`, raise `game_min`, tighten a loader or dependency bound, or add a dependency entry that was missing.
+The verified owner of the listing may also widen it (RFC 0079): lower `game_min`, raise or remove `game_max`, change `os`, loosen or remove a loader or dependency bound, change the kind of an entry, remove an authored entry, or take back a yank.
+Such a pull request merges itself for the verified owner, and a steward merges one only on the owner's behalf.
+Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
+The loader id, a dependency the archive's `mod.toml` declares, `download.mirrors` and `changelog_text` stay out of reach of every amendment.
 
 There are three ways to make the edit.
 
@@ -176,6 +182,7 @@ python3 tools/amend.py --listing AdvancedFlightComputer --up-to 0.7.2 --game-max
 ```
 
 That takes every stamped release at or below `0.7.2` by SemVer precedence, resolves the bound against the game release list, and writes the files.
+It writes narrowing amendments only, so a widening is made by hand.
 
 | Tool | What it does |
 |---|---|
@@ -185,7 +192,7 @@ That takes every stamped release at or below `0.7.2` by SemVer precedence, resol
 | `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
 | `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
 
-`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: `os` is immutable, and a dependency entry's `source` moves from `derived` to `authored` only together with a bound.
+`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: a dependency entry's `source` moves from `derived` to `authored` only together with a bound or a kind, and back to `derived` only exactly as the archive's `mod.toml` declares it, and a derived entry gives way only to an `any_of` entry that names it while it is optional, as the stamp's merge does.
 
 To measure a change before opening anything:
 
