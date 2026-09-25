@@ -14,6 +14,10 @@ time". A listing that names `since` under `[releases]` opts in (RFC 0079), and
 every release at or above that version is stamped too, with today's facts, which
 the owner corrects with an amendment. `--backfill` stamps the whole history.
 
+A stamped release that the host no longer lists for a day, and whose every URL
+then answers that the archive is gone, gets `download.unavailable_since`, and
+the field goes again once the host serves the stamped bytes (RFC 0078).
+
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
 
@@ -88,6 +92,10 @@ SETTLING_MINUTES = 5
 # again without a download, while nothing it was stamped from changed.
 REJECTION_HOURS = 24
 
+# How long every observation has to find a stamped release gone from its host
+# before the watcher asks its URLs, and how long it waits to ask again (RFC 0078).
+GONE_HOURS = 24
+
 IMAGES_VERIFIED = (
     "The images of this listing verify again and the watcher found no other error, "
     "so this is done."
@@ -150,12 +158,25 @@ def reaches(version, floor):
     return floor is not None and version is not None and precedence(version) >= floor
 
 
+def stamped_urls(download):
+    """`download.url` and every mirror, the URLs a client may fetch a release from."""
+    return [
+        url for url in [download.get("url"), *(download.get("mirrors") or [])]
+        if isinstance(url, str) and url
+    ]
+
+
+def served(answer):
+    """Whether a status says the URL serves something."""
+    return answer is not None and 200 <= answer < 300
+
+
 class Cache:
     """Derived cache, never state.
 
     It holds the per-listing ETags, the consecutive-failure counts, the issue
-    numbers, the last image check, and what the mirror and sweep passes already
-    tried. Every entry is rebuildable from the repository and the hosts, so
+    numbers, the last image check, what the mirror and sweep passes already
+    tried, and how long a stamped release has been gone from its host. Every entry is rebuildable from the repository and the hosts, so
     losing the whole file costs one expensive tick and nothing else.
     """
 
@@ -174,7 +195,8 @@ class Cache:
             if isinstance(loaded, dict) and loaded.get("version") == CACHE_VERSION:
                 self.data = loaded
         for section in (
-            "differs", "hosts", "images", "listings", "mirrors", "rejected", "swaps", "sweep"
+            "differs", "gone", "hosts", "images", "listings", "mirrors", "rejected", "swaps",
+            "sweep",
         ):
             self.data.setdefault(section, {})
 
@@ -285,8 +307,8 @@ class Issues:
         """The stable fingerprint of a failure, for edit-versus-comment decisions."""
         return hashlib.sha256("\n".join(sorted(errors)).encode()).hexdigest()[:16]
 
-    def _all_open(self, labelled):
-        """The open issues of the authored repository, listed once per tick.
+    def _all(self, labelled, state="open"):
+        """The issues of the authored repository in `state`, listed once per tick.
 
         The label narrows the list to the watcher's own issues, and the
         unlabelled list is the fallback for the tick that opened an issue before
@@ -294,35 +316,126 @@ class Issues:
         `report` skips creating rather than duplicating an issue it could not
         see.
         """
-        if labelled not in self._open:
+        if (labelled, state) not in self._open:
             query = {"labels": self.label} if labelled else {}
             try:
-                issues = self.api.get_paged("/issues", state="open", **query)
+                issues = self.api.get_paged("/issues", state=state, **query)
             except (urllib.error.HTTPError, HostError) as error:
                 self.log(f"  could not list issues: {error}")
                 self._degraded = True
                 issues = []
-            self._open[labelled] = [
+            self._open[(labelled, state)] = [
                 issue for issue in issues if "pull_request" not in issue
             ]
-        return self._open[labelled]
+        return self._open[(labelled, state)]
+
+    def _remembered(self, listing_id, cache, key, marker):
+        """The issue the cache remembers under `key`, when it still carries the listing's marker."""
+        number = cache.section("listings", listing_id).get(key)
+        if not number:
+            return None
+        try:
+            issue = self.api.get(f"/issues/{number}")
+        except (urllib.error.HTTPError, HostError):
+            return None
+        return issue if issue and marker in (issue.get("body") or "") else None
 
     def find(self, listing_id, cache):
         marker = LISTING_MARKER.format(id=listing_id)
-        remembered = cache.section("listings", listing_id).get("issue")
-        if remembered:
-            try:
-                issue = self.api.get(f"/issues/{remembered}")
-            except (urllib.error.HTTPError, HostError):
-                issue = None
-            if issue and issue.get("state") == "open" and marker in (issue.get("body") or ""):
-                return issue
+        issue = self._remembered(listing_id, cache, "issue", marker)
+        if issue and issue.get("state") == "open":
+            return issue
         for labelled in (True, False):
-            for issue in self._all_open(labelled):
+            for issue in self._all(labelled):
                 if marker in (issue.get("body") or ""):
                     cache.section("listings", listing_id)["issue"] = issue["number"]
                     return issue
         return None
+
+    def last(self, listing_id, cache):
+        """The newest watcher issue of the listing, closed ones included, or None.
+
+        `find` sees only open issues, and a note goes to a closed one as well.
+        The issues the cache remembers count together with the listed ones,
+        because a human can close a newer issue than the one the watcher
+        closed last.
+        """
+        marker = LISTING_MARKER.format(id=listing_id)
+        found = [
+            issue
+            for issue in (
+                self._remembered(listing_id, cache, "last_issue", marker),
+                self._remembered(listing_id, cache, "issue", marker),
+            )
+            if issue
+        ]
+        for labelled in (True, False):
+            listed = [
+                issue for issue in self._all(labelled, "all")
+                if marker in (issue.get("body") or "")
+            ]
+            if listed:
+                found.extend(listed)
+                break
+        return max(found, key=lambda issue: issue["number"], default=None)
+
+    def _open_issue(self, title, body):
+        """Open an issue with the watcher's label, or without it when the label is refused."""
+        try:
+            return self.api.send(
+                "POST", "/issues", {"title": title, "body": body, "labels": [self.label]}
+            )
+        except urllib.error.HTTPError as error:
+            if error.code != 422:
+                self.log(f"  could not open an issue (HTTP {error.code})")
+                return None
+        # A label the repository does not define is not worth losing the
+        # report over; the marker in the body is what the watcher finds
+        # the issue by anyway.
+        self.log(f"  the '{self.label}' label was refused (HTTP 422)")
+        try:
+            return self.api.send("POST", "/issues", {"title": title, "body": body})
+        except urllib.error.HTTPError as error:
+            self.log(f"  could not open an issue (HTTP {error.code})")
+            return None
+
+    def note(self, listing_id, text, cache):
+        """Comment `text` on the listing's issue, and return whether it was sent.
+
+        A note is a fact and not an error, so it never opens an issue for the
+        listing and never keeps one open. With no open issue, it goes to the
+        listing's last watcher issue, which stays closed, and a listing that
+        never had one gets a new issue that is closed at once.
+        """
+        try:
+            issue = self.find(listing_id, cache) or self.last(listing_id, cache)
+            if issue is None:
+                if self._degraded:
+                    self.log("  the note waits: the issue list could not be read this tick")
+                    return False
+                body = f"{LISTING_MARKER.format(id=listing_id)}\n{text}"
+                created = self._open_issue(f"{listing_id}: releases gone from their host", body)
+                if not created:
+                    return False
+                number = created["number"]
+                cache.section("listings", listing_id)["last_issue"] = number
+                try:
+                    self.api.send("PATCH", f"/issues/{number}", {"state": "closed"})
+                except (urllib.error.HTTPError, HostError) as error:
+                    # The note is sent, so it is not sent again. The next clean
+                    # tick closes the issue.
+                    self.log(f"  noted on {self.api.repository}#{number}, not closed: {error}")
+                    return True
+                self.log(f"  noted on {self.api.repository}#{number}, closed")
+                return True
+            number = issue["number"]
+            self.api.send("POST", f"/issues/{number}/comments", {"body": text})
+            cache.section("listings", listing_id)["last_issue"] = number
+            self.log(f"  noted on {self.api.repository}#{number}")
+            return True
+        except (urllib.error.HTTPError, HostError) as error:
+            self.log(f"  could not note on the issue for {listing_id}: {error}")
+            return False
 
     def report(self, listing_id, errors, cache):
         """Keep the listing's issue current with `errors`.
@@ -349,23 +462,7 @@ class Issues:
                     "this tick, and a blind create duplicates"
                 )
                 return
-            try:
-                created = self.api.send(
-                    "POST", "/issues", {"title": title, "body": body, "labels": [self.label]}
-                )
-            except urllib.error.HTTPError as error:
-                if error.code != 422:
-                    self.log(f"  could not open an issue (HTTP {error.code})")
-                    return
-                # A label the repository does not define is not worth losing the
-                # report over; the marker in the body is what the watcher finds
-                # the issue by anyway.
-                self.log(f"  the '{self.label}' label was refused (HTTP 422)")
-                try:
-                    created = self.api.send("POST", "/issues", {"title": title, "body": body})
-                except urllib.error.HTTPError as retry_error:
-                    self.log(f"  could not open an issue (HTTP {retry_error.code})")
-                    return
+            created = self._open_issue(title, body)
             if created:
                 cache.section("listings", listing_id)["issue"] = created["number"]
                 self.log(f"  opened {self.api.repository}#{created['number']}")
@@ -387,7 +484,7 @@ class Issues:
         """The listing id of every open issue the watcher owns, to its issue."""
         found = {}
         for labelled in (True, False):
-            for issue in self._all_open(labelled):
+            for issue in self._all(labelled):
                 match = MARKED_LISTING.search(issue.get("body") or "")
                 if match:
                     found.setdefault(match.group(1), issue)
@@ -421,7 +518,9 @@ class Issues:
              or "The watcher stamped this listing without an error, so this is done."},
         )
         self.api.send("PATCH", f"/issues/{number}", {"state": "closed"})
-        cache.section("listings", listing_id).pop("issue", None)
+        state = cache.section("listings", listing_id)
+        state.pop("issue", None)
+        state["last_issue"] = number
         self.log(f"  closed {self.api.repository}#{number}")
 
     def attempted(self, listing_id, cache):
@@ -670,10 +769,14 @@ class Watcher:
         self.since_budget = options.since_budget
         self.mirror_budget = options.mirror_budget
         self.image_budget = options.image_budget
+        self.gone_budget = options.gone_budget
         self.images = None
         self.stamped = []
         self.mirrored = []
         self.noted = []
+        self.marked = []
+        self.unmarked = []
+        self.notes = {}
         self.failed = []
         self.lines = []
         self._mirror_lists = {}
@@ -858,7 +961,11 @@ class Watcher:
                         self.issues.report(listing_id, [problem], self.cache)
                         continue
                     self.log(f"{listing_id}:")
-                    self.one_listing(listing_id, authored)
+                    try:
+                        self.one_listing(listing_id, authored)
+                    finally:
+                        # A mark written before an error still reaches the author.
+                        self.tell(listing_id)
                 except tomllib.TOMLDecodeError as error:
                     # `report` never raises for API failures, which matters
                     # here: an exception inside an except clause would leave
@@ -931,6 +1038,7 @@ class Watcher:
             return
         if authority is None:
             self.log("  no [releases] section, so releases enter by pull request")
+            self.gone_by_request(listing_id, errors)
             if errors:
                 self.failed.append(listing_id)
                 self.report(listing_id, errors, state, images)
@@ -982,6 +1090,7 @@ class Watcher:
             self.changelog_pass(listing_id, releases, errors)
 
         self.mirror_pass(listing_id, mirrors, errors)
+        settled = self.gone_pass(listing_id, authority, releases, errors) and settled
 
         if settled:
             # The ETag stands for "every release behind this answer is
@@ -1372,9 +1481,9 @@ class Watcher:
 
         The signal is the size and URL the release list already carries; a swap
         keeping the byte count needs every archive re-downloaded per tick for an
-        answer `download.sha256` already gives the client. Two limits: SpaceDock
-        reports no size, so only the URL comparison remains there, and a deleted
-        asset reads as unchanged.
+        answer `download.sha256` already gives the client. SpaceDock reports no
+        size, so only the URL comparison remains there. A deleted asset is not
+        in the list at all, which `gone_pass` handles.
         """
         document = self.read_release(path, errors)
         if document is None:
@@ -1413,6 +1522,8 @@ class Watcher:
             seen["digest"] = None
             self.log(f"    {release.version}: the same bytes at a new URL")
             self.append_mirror(path, document, release.url)
+            if "unavailable_since" in download:
+                self.unmark(listing_id, path, document)
             return True
 
         seen["digest"] = digest
@@ -1662,6 +1773,238 @@ class Watcher:
             self.log(f"    appended {len(found)} mirror(s) to {version}")
             self.mirrored.append(f"{listing_id} {version}")
 
+    def gone_pass(self, listing_id, authority, releases, errors):
+        """Mark a stamped release the authority host no longer lists, and remove the mark once it lists it again (RFC 0078).
+
+        `releases` is None when the host answered unchanged, which repeats the
+        last answer, so a wait goes on and none starts or ends. In a truncated
+        answer, a release that is not in it is no observation.
+
+        Returns False when a marked release is listed again but its bytes could
+        not be checked, so that the next tick fetches the full list and checks
+        them, instead of an unchanged answer that keeps the mark.
+        """
+        settled = True
+        listed = None
+        if releases is not None:
+            listed = {
+                url for release in releases for url in (release.url, *release.archives) if url
+            }
+        truncated = getattr(authority, "truncated", False)
+        section = self.cache.data["gone"]
+        for version, path in self.stamped_versions(listing_id).items():
+            document = self.read_release(path, errors)
+            if document is None:
+                continue
+            key = f"{listing_id}/{version}"
+            download = document.get("download") or {}
+            marked = "unavailable_since" in download
+            found = [url for url in stamped_urls(download) if listed and url in listed]
+            if found:
+                if marked:
+                    size = next((item.size for item in releases if item.url == found[0]), None)
+                    if not self.restore(
+                        listing_id, authority.download, path, document, found[0], size, errors
+                    ):
+                        settled = False
+                else:
+                    section.pop(key, None)
+            elif marked:
+                if listed is None:
+                    self.report_swap(listing_id, document, errors)
+                else:
+                    section.pop(key, None)
+            elif listed is not None and not truncated:
+                wait = section.setdefault(key, {})
+                wait.setdefault("since", iso(now()))
+                self.confirm(listing_id, path, document, wait)
+            elif listed is None and "since" in section.get(key, {}):
+                self.confirm(listing_id, path, document, section[key])
+        return settled
+
+    def confirm(self, listing_id, path, document, wait):
+        """Ask every stamped URL of a release the host stopped listing, once the wait is over.
+
+        Every URL has to answer that the archive is gone. Any other answer
+        marks nothing, and the watcher asks again a day later.
+        """
+        version = document.get("version")
+        day = timedelta(hours=GONE_HOURS)
+        started = parse_iso(wait.get("since"))
+        asked = parse_iso(wait.get("asked"))
+        if started is None or now() - started < day or (asked and now() - asked < day):
+            return
+        urls = stamped_urls(document.get("download") or {})
+        answers = self.ask(urls)
+        if not answers:
+            return
+        wait["asked"] = iso(now())
+        if all(answer in hosts.GONE for answer in answers):
+            self.mark(listing_id, path, document)
+            return
+        self.log(f"    {version}: its host does not list it, and not every URL says it is gone")
+        if answers[0] in hosts.GONE and any(served(answer) for answer in answers[1:]):
+            if not wait.get("mirror"):
+                wait["mirror"] = True
+                self.tell_later(
+                    listing_id,
+                    f"`{version}` is gone from its host, and a mirror in `download.mirrors` "
+                    "still serves it, so it is not marked.",
+                )
+
+    def gone_by_request(self, listing_id, errors):
+        """Ask the stamped URLs of a listing without [releases] once a day, because no host lists its releases (RFC 0078).
+
+        A release is marked when every URL said that the archive is gone in
+        every answer over at least a day, and its mark goes once a URL serves
+        the stamped bytes again. A host that could not be evaluated is no
+        observation.
+        """
+        section = self.cache.data["gone"]
+        day = timedelta(hours=GONE_HOURS)
+        for version, path in self.stamped_versions(listing_id).items():
+            document = self.read_release(path, errors)
+            if document is None:
+                continue
+            entry = section.setdefault(f"{listing_id}/{version}", {})
+            download = document.get("download") or {}
+            marked = "unavailable_since" in download
+            urls = stamped_urls(download)
+            asked = parse_iso(entry.get("asked"))
+            answers = self.ask(urls) if asked is None or now() - asked >= day else None
+            if not answers:
+                self.report_swap(listing_id, document, errors)
+                continue
+            entry["asked"] = iso(now())
+            serving = [url for url, answer in zip(urls, answers) if served(answer)]
+            if serving:
+                # Asked once a day, so the bytes are downloaded again each time.
+                entry.pop("since", None)
+                entry.pop("swap", None)
+                if marked and not self.restore(
+                    listing_id, lambda release: hosts.download(self.http, release),
+                    path, document, serving[0], None, errors,
+                ):
+                    # The bytes are not checked yet, so the next tick asks again.
+                    entry.pop("asked", None)
+            elif all(answer in hosts.GONE for answer in answers):
+                entry.pop("swap", None)
+                since = parse_iso(entry.setdefault("since", iso(now())))
+                if not marked and now() - since >= day:
+                    self.mark(listing_id, path, document)
+            elif None not in answers:
+                entry.pop("since", None)
+
+    def ask(self, urls):
+        """The status each URL answers, None for one that could not be evaluated.
+
+        Nothing is asked, and None comes back, when the gone budget does not
+        cover every URL, because a mark needs the answer of each one.
+        """
+        if not urls or self.gone_budget < len(urls):
+            if urls:
+                self.log("    the gone budget is spent, the next tick carries on")
+            return None
+        self.gone_budget -= len(urls)
+        answers = []
+        for url in urls:
+            try:
+                answers.append(self.http.status(url))
+            except HostError as error:
+                self.log(f"    {url}: {error}")
+                answers.append(None)
+        return answers
+
+    def restore(self, listing_id, fetch, path, document, url, size, errors):
+        """Remove the gone mark once `url` serves the stamped bytes again.
+
+        Other bytes are a swap, reported like any other, and the mark stays.
+        The swap is remembered by URL and size, so it is not downloaded again
+        until one of them changes. Returns whether the bytes were checked, which
+        is False when the gone budget is spent or the download failed.
+        """
+        version = document.get("version")
+        entry = self.cache.section("gone", f"{listing_id}/{version}")
+        swap = entry.get("swap")
+        if swap and swap.get("url") == url and swap.get("size") == size:
+            self.report_swap(listing_id, document, errors)
+            return True
+        if self.gone_budget <= 0:
+            self.log(f"    {version}: the gone budget is spent, the next tick checks its bytes")
+            return False
+        self.gone_budget -= 1
+        try:
+            archive, _ = fetch(hosts.stamped_release(document, url))
+        except (HostError, StampError) as error:
+            self.log(f"    {version}: {error}, the next tick checks its bytes")
+            return False
+        with as_archive(archive) as archive:
+            digest = archive.sha256
+        if digest == (document["download"].get("sha256") or "").upper():
+            self.unmark(listing_id, path, document)
+            return True
+        entry["swap"] = {"url": url, "size": size, "digest": digest}
+        self.report_swap(listing_id, document, errors)
+        return True
+
+    def report_swap(self, listing_id, document, errors):
+        """Report the other bytes a marked release was last found with, which keeps its mark."""
+        version = document.get("version")
+        swap = self.cache.data["gone"].get(f"{listing_id}/{version}", {}).get("swap")
+        download = document.get("download") or {}
+        if swap and "unavailable_since" in download:
+            errors.append(
+                self.swap_error(version, (download.get("sha256") or "").upper(), swap["digest"])
+            )
+
+    def mark(self, listing_id, path, document):
+        """Write `download.unavailable_since`, which keeps its value while the mark stands."""
+        version = document["version"]
+        document["download"]["unavailable_since"] = iso(now())
+        self.write(path, serialize(document), f"Mark {listing_id} {version} as gone from its host")
+        self.log(f"    marked {version} as gone from its host")
+        self.marked.append(f"{listing_id} {version}")
+        self.tell_later(listing_id, f"`{version}` is gone from its host, so the watcher marked it.")
+
+    def unmark(self, listing_id, path, document):
+        """Remove `download.unavailable_since`, after the stamped bytes were found again."""
+        version = document["version"]
+        document["download"].pop("unavailable_since", None)
+        self.write(path, serialize(document), f"Remove the gone mark from {listing_id} {version}")
+        entry = self.cache.data["gone"].get(f"{listing_id}/{version}") or {}
+        for name in ("since", "mirror", "swap"):
+            entry.pop(name, None)
+        self.log(f"    removed the gone mark from {version}")
+        self.unmarked.append(f"{listing_id} {version}")
+        self.tell_later(
+            listing_id,
+            f"`{version}` is on its host again with the stamped bytes, so the watcher "
+            "removed its mark.",
+        )
+
+    def tell_later(self, listing_id, line):
+        self.notes.setdefault(listing_id, []).append(line)
+
+    def tell(self, listing_id):
+        """Post the notes of this listing as one comment, and keep them for the next tick when that fails."""
+        state = self.cache.section("listings", listing_id)
+        lines = state.pop("notes", []) + self.notes.pop(listing_id, [])
+        if not lines:
+            return
+        text = "\n".join(
+            [
+                "The watcher found a change in which releases can be downloaded:",
+                "",
+                *[f"- {line}" for line in lines],
+                "",
+                "A client does not offer a release marked as gone for a new install, and "
+                "it never changes an installed copy. Uploading the same archive again "
+                "removes the mark.",
+            ]
+        )
+        if not self.issues.note(listing_id, text, self.cache):
+            state["notes"] = lines
+
     def unreachable(self, listing_id, state, message):
         """A host that could not be evaluated. Latency, not data.
 
@@ -1694,27 +2037,28 @@ class Watcher:
             self.issues.resolve_if(listing_id, signature, self.cache)
 
     def summarize(self):
-        summary = [
-            "## Watcher",
-            "",
+        counts = [
             f"- stamped: {len(self.stamped)}",
             f"- mirrors appended: {len(self.mirrored)}",
             f"- changelog texts added, replaced or removed: {len(self.noted)}",
+            f"- marked as gone from their host: {len(self.marked)}",
+            f"- gone marks removed: {len(self.unmarked)}",
             f"- listings with an error: {len(set(self.failed))}",
             f"- host requests: {self.http.requests}",
         ]
-        if self.stamped:
-            summary += ["", "### Stamped", ""] + [f"- `{name}`" for name in self.stamped]
-        if self.mirrored:
-            summary += ["", "### Mirrors", ""] + [f"- `{name}`" for name in self.mirrored]
-        if self.noted:
-            summary += ["", "### Changelog texts", ""] + [f"- `{name}`" for name in self.noted]
-        if self.failed:
-            summary += ["", "### Reported", ""] + [
-                f"- `{name}`" for name in sorted(set(self.failed))
-            ]
+        summary = ["## Watcher", "", *counts]
+        for title, names in (
+            ("Stamped", self.stamped),
+            ("Mirrors", self.mirrored),
+            ("Changelog texts", self.noted),
+            ("Marked as gone", self.marked),
+            ("Gone marks removed", self.unmarked),
+            ("Reported", sorted(set(self.failed))),
+        ):
+            if names:
+                summary += ["", f"### {title}", ""] + [f"- `{name}`" for name in names]
 
-        print("\n".join(summary[2:7]))
+        print("\n".join(counts))
         path = os.environ.get("GITHUB_STEP_SUMMARY")
         if path:
             with open(path, "a", encoding="utf-8") as handle:
@@ -1762,6 +2106,11 @@ def parse_arguments(argv):
     parser.add_argument(
         "--mirror-budget", type=int, default=4,
         help="how many mirror candidates one tick verifies at most",
+    )
+    parser.add_argument(
+        "--gone-budget", type=int, default=20,
+        help="how many requests one tick spends at most on whether stamped archives "
+        "are gone from their host; the next tick carries on",
     )
     parser.add_argument(
         "--image-hours", type=int, default=24,
