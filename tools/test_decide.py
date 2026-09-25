@@ -37,6 +37,10 @@ class Result:
 
 def verify(document, login, author_id, api):
     return Result(VERIFIED, "", "stub")
+
+
+def owner_logins(document, api):
+    return ("someone",), ""
 '''
 
 
@@ -74,6 +78,7 @@ class LoadOwnership(unittest.TestCase):
         for name in ("VERIFIED", "UNVERIFIED", "COULD_NOT_EVALUATE", "TOPIC", "MARKER_PATH"):
             self.assertTrue(hasattr(ownership, name), name)
         self.assertTrue(callable(ownership.verify))
+        self.assertTrue(callable(ownership.owner_logins))
         self.assertTrue(issubclass(ownership.Unavailable, Exception))
         self.assertTrue(callable(ownership.Result))
 
@@ -757,6 +762,109 @@ class Act(Ownership):
             decide.act(api, self.ownership, self.arguments(head_sha="other")), 0
         )
         self.assertEqual(api.sent, [])
+
+    def comment_by(self, login, owners):
+        """The verdict comment on an amendment of Mod by `login`, when the lookup does `owners`."""
+        self.write_verdict()
+        api = self.api()
+        api.pulls[0]["user"] = {"login": login, "id": 2}
+        unverified = self.ownership.Result(self.ownership.UNVERIFIED, "no proof")
+        with unittest.mock.patch.object(self.ownership, "verify", return_value=unverified), \
+                unittest.mock.patch.object(self.ownership, "owner_logins", side_effect=owners):
+            self.assertEqual(decide.act(api, self.ownership, self.arguments()), 0)
+        statuses = [payload["state"] for method, path, payload in api.sent
+                    if method == "POST" and path.startswith("/statuses/")]
+        self.assertEqual(statuses, ["success"])
+        return api.comments[0]["body"]
+
+    def test_a_steward_amendment_of_another_persons_release_mentions_its_owner(self):
+        looked_up = []
+
+        def owners(document, api):
+            looked_up.append(document["releases"]["github"])
+            return ("someone",), ""
+
+        body = self.comment_by("a-steward", owners)
+        self.assertEqual(looked_up, ["someone/Mod"])
+        self.assertIn(
+            "- @someone owns `Mod`, whose release files this pull request changes.", body
+        )
+
+    def test_the_owners_own_amendment_mentions_nobody(self):
+        body = self.comment_by("Someone", lambda document, api: (("SOMEONE",), ""))
+        self.assertNotIn("@", body)
+        self.assertNotIn("Owners of what", body)
+
+    def test_a_listing_whose_owner_cannot_be_named_says_so_and_mentions_nobody(self):
+        reason = "no `ksa-index-<login>` topic and no marker file on Org/Mod names an owner"
+        body = self.comment_by("a-steward", lambda document, api: ((), reason))
+        self.assertIn(
+            f"- Nobody is told about `Mod`, because no owner could be named: {reason}.", body
+        )
+        self.assertNotIn("@", body)
+
+    def test_a_failed_owner_lookup_still_decides(self):
+        body = self.comment_by("a-steward", RuntimeError("boom"))
+        self.assertIn("the owner lookup failed with RuntimeError", body)
+
+
+class OwnerNotes(Ownership):
+    def notes(self, paths):
+        changes = [decide.check_scope.Change(path, "modified") for path in paths]
+        pull = {"user": {"login": "a-steward"}}
+        with unittest.mock.patch.object(
+            self.ownership, "owner_logins", return_value=(("owner",), "")
+        ) as lookup:
+            text = decide.owner_notes(self.ownership, FakeApi(), pull, changes, self.root)
+        return text, lookup
+
+    def listing(self, listing_id):
+        listings = self.root / "listings"
+        listings.mkdir(parents=True, exist_ok=True)
+        (listings / f"{listing_id}.toml").write_text(
+            f'id = "{listing_id}"\n[releases]\ngithub = "owner/{listing_id}"\n', encoding="utf-8"
+        )
+
+    def test_every_listing_is_named_once(self):
+        self.listing("Mod")
+        text, lookup = self.notes(["releases/Mod/1.0.0.json", "releases/Mod/1.1.0.json"])
+        self.assertEqual(lookup.call_count, 1)
+        self.assertEqual(text.count("@owner owns `Mod`"), 1)
+
+    def test_an_id_that_breaks_the_id_rules_is_not_looked_up_or_written(self):
+        text, lookup = self.notes(["releases/Mod`<b>/1.0.0.json"])
+        self.assertEqual(text, "")
+        self.assertEqual(lookup.call_count, 0)
+
+    def test_a_wide_change_looks_up_a_bounded_number_of_owners(self):
+        names = [f"Mod{number:02}" for number in range(decide.OWNER_LOOKUPS + 2)]
+        for name in names:
+            self.listing(name)
+        text, lookup = self.notes([f"releases/{name}/1.0.0.json" for name in names])
+        self.assertEqual(lookup.call_count, decide.OWNER_LOOKUPS)
+        self.assertIn("Nobody is told about 2 more listings", text)
+
+
+class OtherRepository(unittest.TestCase):
+    class Unavailable(Exception):
+        pass
+
+    def failure(self, error):
+        api = decide.Api(None, None, unavailable=self.Unavailable, public_token="t")
+        with unittest.mock.patch.object(api, "_call", side_effect=error):
+            with self.assertRaises(self.Unavailable) as caught:
+                api.repository_of("owner/Mod")
+        return str(caught.exception)
+
+    def test_a_timeout_gives_a_reason_that_a_comment_does_not_hide(self):
+        reason = self.failure(urllib.error.URLError(TimeoutError("timed out")))
+        self.assertIn("timed out", reason)
+        self.assertNotIn("<", reason)
+
+    def test_a_broken_answer_names_what_was_asked(self):
+        reason = self.failure(json.JSONDecodeError("Expecting value", "", 0))
+        self.assertIn("/repos/owner/Mod", reason)
+        self.assertIn("Expecting value", reason)
 
 
 class ChangedPaths(unittest.TestCase):
