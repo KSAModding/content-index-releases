@@ -88,6 +88,13 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 
 A release the watcher cannot stamp, a tag that does not parse or an archive whose install root is neither derivable nor authored, becomes one open issue per listing on the authored repository, kept current rather than reopened every tick.
 
+The issue mentions the owner of the listing with `@login` when it opens and when a comment says that the failure changed, so GitHub notifies them.
+A tick that finds the same failure again mentions nobody and asks no host about the owner.
+The owner is the account that the ownership proof on the listing's host names, as `tools/ownership.py` of the content-index checkout finds it.
+Nothing about the owner goes into the watcher's cache, and a tick with the same failure keeps the owner line that the issue body already carries.
+When no owner can be named, because the host does not answer or no proof passes, the issue says why and mentions nobody.
+The watcher mentions and does not assign, because GitHub assigns only people with access to the repository, and mod authors have none.
+
 A tag is read as a version by [RFC 0072](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0072-version-forms.md): an optional leading `v`, one to three numeric components without leading zeros, then the optional SemVer 2.0.0 pre-release and build parts.
 A missing component is filled with `0`, so the tag `0.5` is stamped as `0.5.0` and `v1` as `1.0.0`, and the stored `version` is always the full form.
 A tag with four components, a leading zero, or no version in it is refused.
@@ -108,7 +115,7 @@ A host that does not answer, or that does not serve the repository at all, start
 A listing without `[releases]` has no list to read, so the watcher asks each stamped URL once a day and marks a release when every URL said that the archive is gone for at least a day.
 The mark goes again when the host lists the archive at a stamped URL, or a stamped URL of a listing without `[releases]` answers, and the archive there has the stamped `sha256`.
 Other bytes are reported as a swap, and the mark stays.
-Each mark and each removal is one comment on the listing's issue, and a mark never keeps that issue open.
+Each mark and each removal is one comment on the listing's issue, which mentions the owner the same way, and a mark never keeps that issue open.
 Without an open issue, the comment goes to the last closed one, and a listing that never had an issue gets one that is closed at once.
 The release file stays in the index, a client stops offering the release for a new install, and an installed copy is never touched.
 The waits are derived cache, so losing the cache only starts them again, and `--gone-budget` limits the requests one tick spends on them.
@@ -202,6 +209,7 @@ The verified owner of the listing may also widen it (RFC 0079): lower `game_min`
 Such a pull request merges itself for the verified owner.
 Anyone else who widens a release, a steward included, acts on the owner's request and names it with the line `Requested by the author: <link>` in the pull request description, and a steward merges it after reading that request.
 A widening that neither comes from the verified owner nor names a request fails the `validate` status.
+When somebody other than the owner changes release files of a listing, a steward amendment for example, the verdict comment on the pull request mentions the owner of that listing, or says why no owner can be named.
 Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
 A dependency the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release.
 For a listing without `[releases]`, the verified owner also adds, changes or removes `changelog_text`, in the form the stamper writes.
@@ -232,7 +240,7 @@ Any other widening, such as removing `game_max` or an entry, changing `os` or a 
 | `tools/amendment-vectors.json` | Amendment cases with their verdict and written text, which clients test against too. |
 | `tools/check_scope.py` | Whether the change is narrow enough to merge itself, which is release files of one listing, or one new release file, and nothing else. |
 | `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
-| `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
+| `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge, and the mention of the listing's owner. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
 
 `check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: a dependency entry's `source` moves from `derived` to `authored` only together with a bound or a kind, and back to `derived` only exactly as the archive's `mod.toml` declares it, and a derived entry gives way only to an `any_of` entry that names it while it is optional, as the stamp's merge does.
 
