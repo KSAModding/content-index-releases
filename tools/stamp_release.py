@@ -40,12 +40,28 @@ UNREADABLE_ENTRY = (
     zipfile.BadZipFile, RuntimeError, NotImplementedError, EOFError, OSError, zlib.error
 )
 
-# SemVer 2.0.0, from semver.org, with the leading `v` a tag is allowed to carry.
-SEMVER = re.compile(
-    r"^v?(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)"
+# A version as the index stores it: SemVer 2.0.0, from semver.org, with all
+# three components.
+NUMBER = r"(?:0|[1-9]\d*)"
+SUFFIX = (
     r"(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)"
     r"(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
     r"(?:\+(?P<build>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
+)
+SEMVER = re.compile(
+    rf"^v?(?P<major>{NUMBER})\.(?P<minor>{NUMBER})\.(?P<patch>{NUMBER}){SUFFIX}"
+)
+
+# A release tag or an authored version bound (RFC 0072): SemVer 2.0.0 where the
+# minor and patch components may be left out, and are then filled with 0.
+TAG = re.compile(
+    rf"^v?(?P<major>{NUMBER})(?:\.(?P<minor>{NUMBER})(?:\.(?P<patch>{NUMBER}))?)?{SUFFIX}"
+)
+
+# What a tag may look like, in the words an author reads when it is refused.
+VERSION_FORMS = (
+    "a version is one to three numeric components without leading zeros, with an "
+    "optional leading `v` and the SemVer 2.0.0 pre-release and build parts"
 )
 
 # A KSA production version as the game displays it (RFC 0017). Only the fourth
@@ -136,16 +152,21 @@ def as_archive(archive):
 
 
 def normalize_version(tag):
-    """The tag as SemVer 2.0.0, with a leading `v` stripped.
+    """The tag as a full SemVer 2.0.0 version, per RFC 0072.
+
+    A leading `v` is stripped and a missing minor or patch component is filled
+    with 0, so `0.5` is `0.5.0` and `v1` is `1.0.0`.
 
     Raises StampError when it does not parse, which is what rejects the release
     at publish time with the error in front of the author.
     """
-    match = SEMVER.match((tag or "").strip())
+    match = TAG.match((tag or "").strip())
     if match is None:
-        raise StampError(f"version '{tag}' does not parse as SemVer 2.0.0")
+        raise StampError(f"version '{tag}' does not parse; {VERSION_FORMS}")
 
-    version = "{major}.{minor}.{patch}".format(**match.groupdict())
+    version = "{}.{}.{}".format(
+        match.group("major"), match.group("minor") or 0, match.group("patch") or 0
+    )
     if match.group("prerelease"):
         version += "-" + match.group("prerelease")
     if match.group("build"):
