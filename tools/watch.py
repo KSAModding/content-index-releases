@@ -3,10 +3,10 @@
 """One tick of the watcher (RFC 0033).
 
 Scan every authored listing's authority host, stamp every release that appeared
-after the newest one already stamped, commit it, add the release notes a stamped
-file does not carry yet, fetch the listing's images again, keep one error issue
-per listing current on the authored repository, and sweep that repository's open
-pull requests.
+after the newest one already stamped, commit it, keep the release notes of every
+stamped release the host lists equal to the notes on the host, fetch the
+listing's images again, keep one error issue per listing current on the authored
+repository, and sweep that repository's open pull requests.
 
 Older releases are left alone, and a listing's first tick takes its newest
 release only. RFC 0031 freezes the authored facts "current at release time", and
@@ -1365,33 +1365,43 @@ class Watcher:
             self.log(f"    resolved game_max {display} onto {version}")
 
     def changelog_pass(self, listing_id, releases, errors):
-        """Add `changelog_text` once to a stamped file that has none (RFC 0064).
+        """Keep `changelog_text` equal to the host's notes for every release the list carries (RFC 0064, RFC 0079).
 
         The notes come with the release list the tick already holds, so the pass
-        costs no request. They are the notes of the tag the version is stamped from.
+        costs no request. They are the notes of the tag the version is stamped
+        from. Notes that are empty or over the limit leave the field out, as a
+        fresh stamp does.
         """
         stamped = self.stamped_versions(listing_id)
         owners = self.version_owners(oldest_first(releases), stamped)
         for version, path in stamped.items():
             owner = owners.get(version)
-            text = changelog_text(owner.changelog_text) if owner else None
-            if text is None:
+            # None is a host answer that does not say, which changes nothing.
+            if owner is None or owner.changelog_text is None:
                 continue
+            text = changelog_text(owner.changelog_text) or ""
             document = self.read_release(path, errors)
-            if document is None or "changelog_text" in document:
+            if document is None:
+                continue
+            if document.get("changelog_text", "") == text:
                 continue
             updated = {}
             for key, value in document.items():
-                if key == "listing":
+                if key == "listing" and text:
                     updated["changelog_text"] = text
-                updated[key] = value
-            updated.setdefault("changelog_text", text)
-            self.write(
-                path,
-                serialize(updated),
-                f"Add the changelog text to {listing_id} {version}",
-            )
-            self.log(f"    added the changelog text to {version}")
+                if key != "changelog_text":
+                    updated[key] = value
+            if text:
+                updated.setdefault("changelog_text", text)
+
+            if not text:
+                action = "Remove the changelog text from"
+            elif "changelog_text" in document:
+                action = "Replace the changelog text of"
+            else:
+                action = "Add the changelog text to"
+            self.write(path, serialize(updated), f"{action} {listing_id} {version}")
+            self.log(f"    {action.lower()} {version}")
             self.noted.append(f"{listing_id} {version}")
 
     def append_mirror(self, path, document, url):
@@ -1574,7 +1584,7 @@ class Watcher:
             "",
             f"- stamped: {len(self.stamped)}",
             f"- mirrors appended: {len(self.mirrored)}",
-            f"- changelog texts added: {len(self.noted)}",
+            f"- changelog texts added, replaced or removed: {len(self.noted)}",
             f"- listings with an error: {len(set(self.failed))}",
             f"- host requests: {self.http.requests}",
         ]

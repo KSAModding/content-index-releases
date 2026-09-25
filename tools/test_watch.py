@@ -892,15 +892,46 @@ class ChangelogTexts(WatcherCase):
             self.assertEqual(watcher.noted, ["M 1.0.0"])
             self.assertEqual(errors, [])
 
-    def test_a_present_text_is_never_changed_or_removed(self):
+    def test_edited_notes_replace_the_text_in_its_place(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            path = stamped_file(folder, changelog_text="As stamped")
+            errors = []
+
+            watcher.changelog_pass("M", [release("1.0.0", "http://a", notes="Edited\r\n")], errors)
+
+            document = json.loads(path.read_text())
+            self.assertEqual(document["changelog_text"], "Edited")
+            self.assertEqual(list(document)[-3:], ["changelog", "changelog_text", "listing"])
+            self.assertEqual(watcher.noted, ["M 1.0.0"])
+            self.assertEqual(errors, [])
+
+    def test_notes_that_became_empty_or_too_long_remove_the_text(self):
+        for notes in ("", " \n ", "x" * (CHANGELOG_TEXT_LIMIT + 1)):
+            with tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                watcher = self.watcher(folder, ["--no-commit"])
+                path = stamped_file(folder, changelog_text="As stamped")
+
+                watcher.changelog_pass("M", [release("1.0.0", "http://a", notes=notes)], [])
+
+                document = json.loads(path.read_text())
+                self.assertNotIn("changelog_text", document, repr(notes[:8]))
+                self.assertEqual(list(document)[-2:], ["changelog", "listing"])
+                self.assertEqual(watcher.noted, ["M 1.0.0"])
+
+    def test_unchanged_notes_and_an_answer_without_notes_write_nothing(self):
+        # None is a host answer that does not carry the notes, not notes that were removed.
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             watcher = self.watcher(folder, ["--no-commit"])
             path = stamped_file(folder, changelog_text="As stamped")
             before = path.read_text()
 
-            for notes in ("Edited since", None):
+            for notes in ("  As stamped\r\n", None):
                 watcher.changelog_pass("M", [release("1.0.0", "http://a", notes=notes)], [])
+            watcher.changelog_pass("M", [release("2.0.0", "http://a", notes="")], [])
 
             self.assertEqual(path.read_text(), before)
             self.assertEqual(watcher.noted, [])
@@ -910,11 +941,13 @@ class ChangelogTexts(WatcherCase):
             folder = Path(name)
             watcher = self.watcher(folder, ["--no-commit"])
             path = stamped_file(folder)
+            before = path.read_text()
 
-            for notes in (None, " \n ", "x" * (CHANGELOG_TEXT_LIMIT + 1)):
+            for notes in (None, "", " \n ", "x" * (CHANGELOG_TEXT_LIMIT + 1)):
                 watcher.changelog_pass("M", [release("1.0.0", "http://a", notes=notes)], [])
 
-            self.assertNotIn("changelog_text", json.loads(path.read_text()))
+            self.assertEqual(path.read_text(), before)
+            self.assertEqual(watcher.noted, [])
 
     def test_two_tags_of_one_version_give_the_notes_of_the_stamped_tag(self):
         with tempfile.TemporaryDirectory() as name:
@@ -956,6 +989,42 @@ class ChangelogTexts(WatcherCase):
             self.assertEqual(json.loads(path.read_text())["changelog_text"], "## Changes")
             self.assertEqual(authority.downloads, 0)
             self.assertEqual(watcher.http.requests, 0)
+
+    def test_the_next_tick_follows_notes_edited_on_the_host(self):
+        class Authority(FakeAuthority):
+            key = "github:example/m"
+            notes = "As stamped"
+
+            def releases(self, etag=None):
+                # An edit on the host changes the answer, so its ETag changes too.
+                served = f'"{self.notes}"'
+                if etag == served:
+                    return None, etag
+                return [release("1.0.0", "http://a", size=5, notes=self.notes)], served
+
+        authority = Authority()
+        with tempfile.TemporaryDirectory() as name, patch.object(
+            watch.hosts, "build", return_value=(authority, [])
+        ):
+            folder = Path(name)
+            path = stamped_file(folder, changelog_text="As stamped")
+            (folder / ".authored" / "listings").mkdir(parents=True, exist_ok=True)
+            (folder / ".authored" / "listings" / "M.toml").write_text('id = "M"\n')
+
+            def tick():
+                watcher = self.watcher(folder, ["--no-sweep", "--no-commit"])
+                watcher.images = FakeImages()
+                watcher.issues = RecorderIssues()
+                watcher.tick()
+                watcher.cache.save()
+                return json.loads(path.read_text()).get("changelog_text")
+
+            self.assertEqual(tick(), "As stamped")
+            authority.notes = "## Changes\n- Fixed a typo"
+            self.assertEqual(tick(), "## Changes\n- Fixed a typo")
+            authority.notes = ""
+            self.assertIsNone(tick())
+            self.assertEqual(authority.downloads, 0)
 
 
 def moment(text):

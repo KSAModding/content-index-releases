@@ -96,7 +96,9 @@ A larger archive is rejected before its body is read when the host sends a lengt
 Release lists and other answers read into memory have their own limit of 64 MiB.
 
 `changelog_text` holds the release notes of the authority host (RFC 0064): whitespace trimmed at both ends, LF line endings, and left out when the notes are empty or longer than 16 KiB of UTF-8.
-The watcher adds it once to a release file that has none, from the release list the tick already read, and never changes or removes it.
+The watcher follows edits of the notes (RFC 0079).
+For every release in the release list the tick already read, it adds, replaces or removes the field so that it matches the notes on the host, which costs no request.
+A host answer that does not carry the notes of a release changes nothing.
 
 An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
 
