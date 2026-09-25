@@ -25,6 +25,8 @@ jobs:
       github.event.workflow_run.event == 'pull_request'
       && contains(fromJSON('["success", "failure"]'), github.event.workflow_run.conclusion)
     runs-on: ubuntu-latest
+    # The key of the org App is a secret of this environment, which only main may use.
+    environment: index-bot
     timeout-minutes: 10
     permissions:
       contents: read

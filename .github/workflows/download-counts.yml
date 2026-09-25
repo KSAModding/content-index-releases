@@ -27,6 +27,8 @@ jobs:
   refresh:
     name: refresh
     runs-on: ubuntu-latest
+    # The key of the org App is a secret of this environment, which only main may use.
+    environment: index-bot
     timeout-minutes: 15
     steps:
       - uses: actions/create-github-app-token@v3

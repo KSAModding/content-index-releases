@@ -18,6 +18,8 @@ jobs:
   update:
     name: update
     runs-on: ubuntu-latest
+    # The key of the org App is a secret of this environment, which only main may use.
+    environment: index-bot
     steps:
       # Only the org App may write to the default branch unattended.
       - uses: actions/create-github-app-token@v3
