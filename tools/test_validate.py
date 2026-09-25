@@ -15,6 +15,7 @@ import tomllib
 import types
 import unittest
 import unittest.mock
+import urllib.error
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -226,7 +227,7 @@ class RunAmendment(Repository):
         self.assertTrue(check.owner_only)
         self.assertTrue(any("falls" in message for message in check.messages))
 
-    def publish_with(self, dependency, mod_toml):
+    def publish_with(self, dependency, mod_toml, mirrors=()):
         """Publish the release with `dependency` authored, and serve an archive with `mod_toml`."""
         buffer = io.BytesIO()
         with zipfile.ZipFile(buffer, "w") as handle:
@@ -234,11 +235,28 @@ class RunAmendment(Repository):
             handle.writestr("Mod/mod.toml", mod_toml)
         payload = buffer.getvalue()
         download = {**RELEASE["download"], "sha256": hosts.Archive.of_bytes(payload).sha256}
+        if mirrors:
+            download["mirrors"] = list(mirrors)
         self.write(PATH, self.amended(download=download, dependencies=[dependency]))
         self.git("add", "-A")
         self.git("commit", "-m", "Amend Mod 1.0.0")
         self.write(PATH, self.amended(download=download))
-        return FakeHttp({RELEASE["download"]["url"]: payload})
+        return FakeHttp({url: payload for url in [RELEASE["download"]["url"], *mirrors]})
+
+    def test_a_mirror_stands_in_for_a_download_that_is_gone(self):
+        class Gone(FakeHttp):
+            def archive(self, url, api=False, limit=None):
+                if url == RELEASE["download"]["url"]:
+                    raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+                return super().archive(url, api, limit)
+
+        mirror = "https://example.invalid/mirror.zip"
+        http = self.publish_with(
+            {"id": "Lib", "kind": "required", "source": "authored"}, "", mirrors=[mirror]
+        )
+        check = validate.run_amendment([PATH], base_ref="main", http=Gone(http.routes))
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertTrue(check.owner_only)
 
     def test_an_authored_entry_the_mod_toml_does_not_declare_can_go(self):
         http = self.publish_with({"id": "Lib", "kind": "required", "source": "authored"}, "")

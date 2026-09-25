@@ -580,10 +580,23 @@ def download(http, release):
 def stamped_dependencies(http, document):
     """The dependencies the archive of a stamped release file declares in its mod.toml, read as a stamp reads them.
 
-    An archive that is no longer the stamped one raises StampError.
+    A mirror stands in for a download URL that is gone, because the bytes are the same.
+    HostError says a later run may succeed, and StampError that no URL serves the stamped archive.
     """
     download_section = document.get("download") or {}
-    url, digest = download_section.get("url"), (download_section.get("sha256") or "").upper()
+    problem = None
+    for url in [download_section.get("url"), *(download_section.get("mirrors") or [])]:
+        try:
+            return _declared_dependencies(http, document, url)
+        except (HostError, StampError) as error:
+            if problem is None or isinstance(error, HostError):
+                problem = error
+    raise problem
+
+
+def _declared_dependencies(http, document, url):
+    download_section = document.get("download") or {}
+    digest = (download_section.get("sha256") or "").upper()
     release = HostRelease(
         host="stamped",
         tag=document.get("version"),
