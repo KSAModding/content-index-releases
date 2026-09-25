@@ -42,6 +42,7 @@ import hosts
 from hosts import HostError
 from stamp_release import (
     GAME_MONTH,
+    VERSION_FORMS,
     StampError,
     as_archive,
     changelog_text,
@@ -115,6 +116,10 @@ def load_images(authored):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
+
+
+def oldest_first(releases):
+    return sorted(releases, key=lambda release: (release.release_date or "", release.tag))
 
 
 def is_history(date, frontier, newest):
@@ -1124,12 +1129,16 @@ class Watcher:
 
         # Oldest first, so a budget that runs out leaves a monotone history and
         # the next tick simply carries on.
-        ordered = sorted(releases, key=lambda release: (release.release_date or "", release.tag))
+        ordered = oldest_first(releases)
+        owners = self.version_owners(ordered, stamped)
         for release in ordered:
             date = parse_iso(release.release_date)
+            owner = owners.get(release.version, release)
 
             if release.version is not None and release.version in stamped:
-                if not self.check_for_a_swap(
+                if owner is not release:
+                    errors.append(self.collision_error(owner, release))
+                elif not self.check_for_a_swap(
                     listing_id, authority, release, stamped[release.version], errors
                 ):
                     settled = False
@@ -1153,8 +1162,12 @@ class Watcher:
             if release.version is None:
                 errors.append(
                     f"the tag `{release.tag}` does not parse as a version, so the release "
-                    "cannot be stamped; SemVer 2.0.0, with an optional leading `v`"
+                    f"cannot be stamped; {VERSION_FORMS}"
                 )
+                continue
+
+            if owner is not release:
+                errors.append(self.collision_error(owner, release))
                 continue
 
             if self.stamp_budget <= 0:
@@ -1185,6 +1198,38 @@ class Watcher:
                 "unstamped (--backfill stamps them)"
             )
         return settled
+
+    def version_owners(self, ordered, stamped):
+        """The one release each version is stamped from (RFC 0072).
+
+        Two tags that fill to the same version are one version. A stamped
+        version belongs to the tag whose URL its file names, and any other to
+        its oldest tag, so a tag that never parsed before cannot take a version
+        over from the tag it was stamped from.
+        """
+        groups = {}
+        for release in ordered:
+            if release.version is not None:
+                groups.setdefault(release.version, []).append(release)
+
+        owners = {}
+        for version, group in groups.items():
+            owner = group[0]
+            if len(group) > 1 and version in stamped:
+                # A corrupt file is reported by the swap check of the owner.
+                download = (self.read_release(stamped[version], []) or {}).get("download") or {}
+                urls = {download.get("url"), *(download.get("mirrors") or [])} - {None}
+                owner = next((release for release in group if release.url in urls), owner)
+            owners[version] = owner
+        return owners
+
+    @staticmethod
+    def collision_error(owner, release):
+        return (
+            f"the tag `{release.tag}` fills to `{release.version}`, the same version as "
+            f"the tag `{owner.tag}`, so it is refused. A version is stamped exactly once, "
+            "so the way forward is a new version."
+        )
 
     def stamp_one(self, listing_id, authored, authority, mirror_hosts, release):
         """Stamp one release, then look for its mirrors.
@@ -1323,23 +1368,18 @@ class Watcher:
         """Add `changelog_text` once to a stamped file that has none (RFC 0064).
 
         The notes come with the release list the tick already holds, so the pass
-        costs no request.
+        costs no request. They are the notes of the tag the version is stamped from.
         """
-        notes = {}
-        for release in releases:
-            if release.version is not None:
-                notes.setdefault(release.version, set()).add(
-                    changelog_text(release.changelog_text)
-                )
-
-        for version, path in self.stamped_versions(listing_id).items():
-            texts = notes.get(version) or {None}
-            if len(texts) != 1 or None in texts:
+        stamped = self.stamped_versions(listing_id)
+        owners = self.version_owners(oldest_first(releases), stamped)
+        for version, path in stamped.items():
+            owner = owners.get(version)
+            text = changelog_text(owner.changelog_text) if owner else None
+            if text is None:
                 continue
             document = self.read_release(path, errors)
             if document is None or "changelog_text" in document:
                 continue
-            (text,) = texts
             updated = {}
             for key, value in document.items():
                 if key == "listing":

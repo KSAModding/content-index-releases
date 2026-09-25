@@ -23,7 +23,7 @@ from unittest.mock import patch
 import watch
 from check_release import DEFAULT_AUTHORED
 from hosts import HostRelease
-from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, serialize
+from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, normalize_version, serialize
 from watch import (
     IMAGES_VERIFIED,
     Cache,
@@ -647,6 +647,14 @@ def release(version, url, size=None, date="2020-01-01T00:00:00Z", notes=None):
     )
 
 
+def tagged(tag, url, date, notes=None):
+    """A host release the way hosts.py reads a tag."""
+    return HostRelease(
+        host="github", tag=tag, version=normalize_version(tag), release_date=date, url=url,
+        changelog_text=notes,
+    )
+
+
 class SwapsAndMirrors(WatcherCase):
     def test_the_same_bytes_at_a_new_url_become_a_mirror(self):
         # download.url is immutable, so the proven-identical new address lands
@@ -908,7 +916,7 @@ class ChangelogTexts(WatcherCase):
 
             self.assertNotIn("changelog_text", json.loads(path.read_text()))
 
-    def test_a_version_listed_twice_with_different_notes_is_skipped(self):
+    def test_two_tags_of_one_version_give_the_notes_of_the_stamped_tag(self):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
             watcher = self.watcher(folder, ["--no-commit"])
@@ -917,13 +925,13 @@ class ChangelogTexts(WatcherCase):
             watcher.changelog_pass(
                 "M",
                 [
-                    release("1.0.0", "http://a", notes="One"),
-                    release("1.0.0", "http://b", notes="Two"),
+                    tagged("1.0", "http://b", "2020-01-01T00:00:00Z", notes="Other"),
+                    tagged("1.0.0", "http://a", "2020-02-01T00:00:00Z", notes="Stamped"),
                 ],
                 [],
             )
 
-            self.assertNotIn("changelog_text", json.loads(path.read_text()))
+            self.assertEqual(json.loads(path.read_text())["changelog_text"], "Stamped")
 
     def test_a_tick_adds_notes_without_a_further_request(self):
         class Authority(FakeAuthority):
@@ -1242,6 +1250,58 @@ class TheStampedFrontier(WatcherCase):
             self.assertFalse(complete)
             self.assertEqual(len(errors), 1)
             self.assertIn("1.0.0.json", errors[0])
+
+
+class OneVersionOneStamp(WatcherCase):
+    """Two tags that fill to the same version are one version (RFC 0072)."""
+
+    setup = TheStampedFrontier.setup
+
+    RELEASES = [
+        tagged("0.5", "http://short", "2026-02-01T00:00:00Z"),
+        tagged("0.5.0", "http://full", "2026-03-01T00:00:00Z"),
+    ]
+
+    def test_the_first_tag_is_stamped_and_the_second_is_refused_naming_both(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder, stamped=[("0.4.0", "2026-01-01T00:00:00Z", "http://old")]
+            )
+            errors = []
+            watcher.stamp_pass("M", {}, None, [], self.RELEASES, errors)
+            self.assertEqual(picked, ["0.5.0"])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("`0.5.0` fills to `0.5.0`, the same version as the tag `0.5`", errors[0])
+
+    def test_the_refusal_stays_once_the_first_tag_is_stamped(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder, stamped=[("0.5.0", "2026-02-01T00:00:00Z", "http://short")]
+            )
+            authority = FakeAuthority()
+            errors = []
+            watcher.stamp_pass("M", {}, authority, [], self.RELEASES, errors)
+            self.assertEqual(picked, [])
+            self.assertEqual(authority.downloads, 0)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("the tag `0.5.0` fills to", errors[0])
+
+    def test_a_version_stays_with_the_tag_it_was_stamped_from(self):
+        # 0.5.0 was stamped while 0.5 still did not parse, so 0.5 is the second tag.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(
+                folder, stamped=[("0.5.0", "2026-03-01T00:00:00Z", "http://full")]
+            )
+            authority = FakeAuthority()
+            errors = []
+            watcher.stamp_pass("M", {}, authority, [], self.RELEASES, errors)
+            self.assertEqual(picked, [])
+            self.assertEqual(authority.downloads, 0)
+            self.assertEqual(len(errors), 1)
+            self.assertIn("`0.5` fills to `0.5.0`, the same version as the tag `0.5.0`", errors[0])
 
 
 class TheLookback(WatcherCase):
