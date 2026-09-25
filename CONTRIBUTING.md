@@ -33,6 +33,8 @@ One amendment may touch several release files of one listing, which is what make
 
 You may amend a listing you are the verified owner of, through the same ownership check the authored repository uses.
 A steward may narrow any.
+A steward, or anyone else, who widens a release for its owner puts the owner's request into the pull request description as one line, `Requested by the author: <link>`, and a steward merges it after reading that request.
+A widening without the owner and without that line fails.
 
 ### Making an amendment
 

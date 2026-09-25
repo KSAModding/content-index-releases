@@ -171,7 +171,9 @@ Only the author knows that a release broke, and everything after that is arithme
 
 Anyone may narrow a release: yank it, add or lower `game_max`, raise `game_min`, tighten a loader or dependency bound, or add a dependency entry that was missing.
 The verified owner of the listing may also widen it (RFC 0079): lower `game_min`, raise or remove `game_max`, change `os`, loosen or remove a loader or dependency bound, change the kind of an entry, remove an authored entry, or take back a yank.
-Such a pull request merges itself for the verified owner, and a steward merges one only on the owner's behalf.
+Such a pull request merges itself for the verified owner.
+Anyone else who widens a release, a steward included, acts on the owner's request and names it with the line `Requested by the author: <link>` in the pull request description, and a steward merges it after reading that request.
+A widening that neither comes from the verified owner nor names a request fails the `validate` status.
 Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
 The loader id, a dependency the archive's `mod.toml` declares, `download.mirrors` and `changelog_text` stay out of reach of every amendment.
 

@@ -69,6 +69,10 @@ IMMUTABLE = (
 
 OS_VALUES = ("windows", "linux", "macos")
 
+# Whoever widens a release for its owner names the owner's request with this line in the
+# pull request description.
+REQUEST = "Requested by the author:"
+
 LOADER_KEYS = frozenset({"id", "min", "max", "source"})
 DEPENDENCY_KEYS = frozenset({"id", "any_of", "kind", "min", "max", "source"})
 MEMBER_KEYS = frozenset({"id", "min", "max"})

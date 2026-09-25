@@ -9,6 +9,7 @@ import os
 import tempfile
 import textwrap
 import unittest
+import unittest.mock
 import urllib.error
 from pathlib import Path
 
@@ -158,23 +159,61 @@ class Decide(Ownership):
         self.assertIn("no proof", decision.comment)
         self.assertIn("ksa-index-<your-github-username>", decision.comment)
 
-    def test_an_owner_only_amendment_tells_the_steward_it_needs_the_owner(self):
-        for owner_only in (True, False):
-            with self.subTest(owner_only=owner_only):
-                decision = decide.decide(
-                    self.verdict("pass", owner_only=owner_only), True, self.ownership,
-                    self.result(self.ownership.UNVERIFIED, "no proof"),
-                )
-                self.assertTrue(decision.needs_steward)
-                self.assertEqual("on the owner's behalf" in decision.comment, owner_only)
+    def test_a_stewards_own_widening_is_refused(self):
+        decision = decide.decide(
+            self.verdict("pass", owner_only=True), True, self.ownership,
+            self.result(self.ownership.UNVERIFIED, "no proof"),
+        )
+        self.assertEqual(decision.status, "failure")
+        self.assertFalse(decision.auto_merge)
+        self.assertFalse(decision.needs_steward)
+        self.assertIn("no proof", decision.comment)
+        self.assertIn("`Requested by the author: <link>`", decision.comment)
 
-    def test_an_owner_only_amendment_by_the_verified_owner_merges_itself(self):
+    def test_the_same_widening_on_the_owners_request_waits_for_a_steward(self):
+        decision = decide.decide(
+            self.verdict("pass", owner_only=True), True, self.ownership,
+            self.result(self.ownership.UNVERIFIED, "no proof"),
+            request="https://github.com/someone/Mod/issues/3",
+        )
+        self.assertEqual(decision.status, "success")
+        self.assertFalse(decision.auto_merge)
+        self.assertTrue(decision.needs_steward)
+        self.assertIn("names a request of the owner", decision.comment)
+
+    def test_a_widening_outside_the_candidate_shape_needs_a_request_too(self):
+        refused = decide.decide(
+            self.verdict("pass", owner_only=True, scope_reason="it touches tools/"), False,
+            self.ownership, self.result(self.ownership.UNVERIFIED, "not checked"),
+        )
+        self.assertEqual(refused.status, "failure")
+        self.assertNotIn("The ownership check reported", refused.comment)
+        self.assertIn("ownership is not checked because it touches tools/", refused.comment)
+        self.assertNotIn("neither comes from the verified owner", refused.comment)
+        requested = decide.decide(
+            self.verdict("pass", owner_only=True, scope_reason="it touches tools/"), False,
+            self.ownership, self.result(self.ownership.UNVERIFIED, "not checked"),
+            request="https://github.com/someone/Mod/issues/3",
+        )
+        self.assertTrue(requested.needs_steward)
+        self.assertIn("it touches tools/", requested.comment)
+
+    def test_a_widening_whose_ownership_could_not_be_checked_is_not_decided(self):
+        decision = decide.decide(
+            self.verdict("pass", owner_only=True), True, self.ownership,
+            self.result(self.ownership.COULD_NOT_EVALUATE, "the API is down"),
+        )
+        self.assertEqual(decision.status, "error")
+        self.assertFalse(decision.needs_steward)
+        self.assertIn("the API is down", decision.comment)
+
+    def test_a_widening_by_the_verified_owner_merges_itself(self):
         decision = decide.decide(
             self.verdict("pass", owner_only=True), True, self.ownership,
             self.result(self.ownership.VERIFIED),
         )
         self.assertTrue(decision.auto_merge)
-        self.assertNotIn("on the owner's behalf", decision.comment)
+        self.assertNotIn(decide.OWNER_ONLY, decision.comment)
 
     def test_ownership_that_could_not_be_checked_waits_for_a_steward(self):
         decision = decide.decide(
@@ -251,6 +290,35 @@ class Agrees(unittest.TestCase):
         agrees, reason = decide._agrees({"pull_request": 1, "head_sha": "a"}, 1, "a")
         self.assertTrue(agrees)
         self.assertEqual(reason, "")
+
+
+class NamedRequest(unittest.TestCase):
+    LINK = "https://github.com/someone/Mod/issues/3#issuecomment-1"
+
+    def test_the_line_names_the_link(self):
+        for body in (
+            f"Raises game_max.\n\nRequested by the author: {self.LINK}\n",
+            f"Raises game_max.\r\nrequested by the author:  {self.LINK} \r\n",
+            f"Requested by the author: {self.LINK}",
+            f"Requested by the author: <{self.LINK}>",
+        ):
+            with self.subTest(body=body):
+                self.assertEqual(decide.named_request(body), self.LINK)
+
+    def test_anything_else_names_no_request(self):
+        for body in (
+            None,
+            "",
+            "Requested by the author: <link>",
+            "Requested by the author: http://example.invalid/request",
+            f"See {self.LINK}",
+            f"Nobody was Requested by the author: {self.LINK}",
+            f"Requested by the author: {self.LINK} and more",
+            f"Requested by the author: <{self.LINK}",
+            f"Requested by the author: <{self.LINK}> and more",
+        ):
+            with self.subTest(body=body):
+                self.assertIsNone(decide.named_request(body))
 
 
 class ReadVerdict(unittest.TestCase):
@@ -472,7 +540,7 @@ class Act(Ownership):
             encoding="utf-8",
         )
 
-    def api(self):
+    def api(self, body=None):
         return FakeApi(
             pulls=[
                 {
@@ -481,6 +549,7 @@ class Act(Ownership):
                     "head": {"sha": "abc", "ref": "amend",
                              "repo": {"full_name": "someone/fork"}},
                     "user": {"login": "someone", "id": 1},
+                    "body": body,
                 }
             ],
             files=[{"filename": "releases/Mod/1.0.0.json", "status": "modified"}],
@@ -497,6 +566,32 @@ class Act(Ownership):
         self.assertEqual({status["context"] for status in statuses}, {decide.STATUS_CONTEXT})
         self.assertTrue(any(method == "graphql" for method, _, _ in api.sent))
         self.assertTrue(any(path == "/issues/7/comments" for _, path, _ in api.sent))
+
+    def test_a_widening_by_someone_else_merges_only_on_a_named_request(self):
+        unverified = self.ownership.Result(self.ownership.UNVERIFIED, "no proof")
+        for body, state in (
+            ("Bounds Mod 1.0.0 at a newer build.", "failure"),
+            (
+                "Bounds Mod 1.0.0.\r\n"
+                "Requested by the author: https://github.com/someone/Mod/issues/3\r\n",
+                "success",
+            ),
+        ):
+            with self.subTest(state=state):
+                self.write_verdict(owner_only=True)
+                api = self.api(body)
+                with unittest.mock.patch.object(self.ownership, "verify", return_value=unverified):
+                    self.assertEqual(decide.act(api, self.ownership, self.arguments()), 0)
+                statuses = [payload["state"] for method, path, payload in api.sent
+                            if method == "POST" and path.startswith("/statuses/")]
+                self.assertEqual(statuses, [state])
+                self.assertFalse(any(method == "graphql" for method, _, _ in api.sent))
+                self.assertEqual(
+                    decide.STEWARD_LABEL in {label for _, path, payload in api.sent
+                                             if path == "/issues/7/labels"
+                                             for label in payload["labels"]},
+                    state == "success",
+                )
 
     def test_a_verified_release_is_armed_for_merge(self):
         # One added file is the release pull request shape, and ownership binds

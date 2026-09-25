@@ -241,6 +241,12 @@ class GameMin(Tree):
         )
         self.assertEqual(self.read("Mod", "0.7.2")["game_min_revision"], 5117)
 
+    def test_the_owner_is_told_who_merges_a_widening(self):
+        self.write("Mod", "0.7.2")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.run_tool("--listing", "Mod", "--all", "--game-min", "2026.8.3.5117", "--owner")
+        self.assertIn("Requested by the author: <link>", output.getvalue())
 
 
 class Yank(Tree):
@@ -466,6 +472,9 @@ class Reminders(unittest.TestCase):
     def test_a_yank_needs_no_reminder(self):
         self.assertEqual(amend.reminders({"yank": True}), [])
 
+    def test_a_widening_names_the_line_of_a_request(self):
+        lines = amend.reminders({"yank": True}, ["releases/Mod/0.7.2.json: it widens"])
+        self.assertTrue(any("Requested by the author: <link>" in line for line in lines))
 
 
 if __name__ == "__main__":

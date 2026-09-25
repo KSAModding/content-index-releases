@@ -12,12 +12,14 @@ import os
 import subprocess
 import tempfile
 import tomllib
+import types
 import unittest
 import unittest.mock
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import decide
 import hosts
 import validate
 from stamp_release import stamp
@@ -250,6 +252,42 @@ class RunAmendment(Repository):
         check = validate.run_amendment([PATH], base_ref="main", http=http)
         self.assertEqual(check.outcome, validate.REJECT)
         self.assertTrue(any("mod.toml declares 'lib'" in message for message in check.messages))
+
+    def test_each_widening_of_the_verified_owner_merges_itself(self):
+        capped = {"game_max": "2026.8.19.5261", "game_max_revision": 5261}
+        cases = (
+            ("raises game_max", capped, {"game_max": "2026.9.1.5400", "game_max_revision": 5400}),
+            ("removes game_max", capped, {}),
+            ("lowers game_min", {}, {"game_min": "2026.8.3.5117", "game_min_revision": 5117}),
+            ("takes back a yank", {"yanked": True, "yanked_reason": "It broke."}, {}),
+            ("removes a dependency", None, None),
+        )
+        ownership = types.SimpleNamespace(
+            VERIFIED="verified", COULD_NOT_EVALUATE="could-not-evaluate",
+            TOPIC="ksa-index-{login}", MARKER_PATH=".github/ksa-content-index.toml",
+        )
+        for name, before, after in cases:
+            with self.subTest(name):
+                http = None
+                if before is None:
+                    http = self.publish_with(
+                        {"id": "Lib", "kind": "required", "source": "authored"}, ""
+                    )
+                else:
+                    self.write(PATH, self.amended(**before))
+                    self.git("add", "-A")
+                    self.git("commit", "--allow-empty", "-m", f"Publish before it {name}")
+                    self.write(PATH, self.amended(**after))
+                check = validate.run_amendment([PATH], base_ref="main", http=http)
+                self.assertEqual(check.outcome, validate.PASS, check.messages)
+                self.assertTrue(check.owner_only)
+                verdict = validate._verdict([check], True, [PATH])
+                for state, merges in (("verified", True), ("unverified", False)):
+                    decision = decide.decide(
+                        verdict, True, ownership, types.SimpleNamespace(state=state, reason="")
+                    )
+                    self.assertEqual(decision.auto_merge, merges)
+                    self.assertEqual(decision.status, "success" if merges else "failure")
 
     def test_a_derived_entry_changes_kind_and_is_never_removed(self):
         derived = {"id": "Lib", "kind": "optional", "source": "derived"}

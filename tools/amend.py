@@ -335,9 +335,15 @@ def build_amendment(arguments, game_versions, now):
     return amendment
 
 
-def reminders(amendment):
+def reminders(amendment, widenings=()):
     """What the index cannot do for the author, said once, at the end."""
     lines = []
+    if widenings:
+        lines.append(
+            "This widens what a release claims, so the pull request merges itself only for "
+            "the verified owner of the listing. Whoever acts on the owner's request "
+            f"puts '{check_amendment.REQUEST} <link>' into the pull request description."
+        )
     if amendment.get("loader_min") or amendment.get("loader_max"):
         lines.append(
             "The authored [loader] bounds in content-index are separate. Change them "
@@ -439,7 +445,7 @@ def main(argv=None):
                 handle.write(text)
             print(f"wrote {path}")
 
-    for line in reminders(amendment):
+    for line in reminders(amendment, widenings):
         print(f"\n{line}")
     return 0
 

@@ -6,6 +6,8 @@ name: checks
 
 on:
   pull_request:
+    # edited, because a widening on the owner's behalf names the owner's request in the description.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
   schedule:
