@@ -187,6 +187,7 @@ That takes every stamped release at or below `0.7.2` by SemVer precedence, resol
 |---|---|
 | `tools/amend.py` | Writes an amendment, and re-checks its own output before it reaches disk. |
 | `tools/check_amendment.py` | The invariant, per file: the published version against the proposed one. |
+| `tools/amendment-vectors.json` | Amendment cases with their verdict and written text, which clients test against too. |
 | `tools/check_scope.py` | Whether the change is narrow enough to merge itself, which is release files of one listing, or one new release file, and nothing else. |
 | `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
 | `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
@@ -198,6 +199,34 @@ To measure a change before opening anything:
 ```text
 python3 tools/validate.py --changed releases/<id>/<version>.json --base-ref main
 ```
+
+### Amendment test vectors
+
+`tools/amendment-vectors.json` holds amendment cases with the verdict of `tools/amend.py` and, for an accepted case, the exact text it writes.
+A client that writes amendments, such as Borea, tests against this file, so the client and the tools cannot disagree.
+`tools/test_amend.py` runs every vector through the tool and `tools/test_check_amendment.py` through the invariant, with the runner in `tools/amendment_vectors.py`.
+
+The file is an object with two keys.
+`game_versions` is the game release list that a game bound resolves against, as the `versions` of `game-versions.json`.
+`vectors` is a list of cases, and each case has these keys:
+
+| Key | What it holds |
+|---|---|
+| `name` | What the case shows. Unique in the file. |
+| `actor` | Who makes the amendment, `owner` or `steward`. Today both have the same amendment class. |
+| `base` | The text of the published release file. It is `releases/<id>/<version>.json` by its own `id` and `version`. |
+| `amendment` | The change, as the options of `tools/amend.py` without the leading `--`: `true` for a flag, a string for one value, and a list of strings for a repeatable option. The listing and the one selected release are the base's. |
+| `verdict` | `accepted` when the file changes, `unchanged` when the release already says this and nothing is written, and `rejected` when the amendment is refused and nothing is written. |
+| `reason` | Only when rejected: a text that the refusal of `tools/amend.py` contains. A client only has to refuse and does not have to repeat the text. |
+| `written` | Only when accepted: the exact text of the file after the amendment, in UTF-8. |
+
+The written text is `json.dumps(document, indent=2, ensure_ascii=False)` with a final newline, so non-ASCII characters and `<>&'+` are not escaped.
+A changed loader or dependency entry gets the stamper's key order, and every other key keeps its value and its place.
+The file itself is ASCII, so a non-ASCII character in a case is a `\u` escape that decodes to that character.
+A later key in the file is optional, and a reader ignores a key it does not know.
+
+A change to `amend.py` or `check_amendment.py` that moves a verdict or a byte changes this file in the same pull request.
+A vector whose written text differs prints the text that the tool writes now.
 
 ## A release by pull request
 
