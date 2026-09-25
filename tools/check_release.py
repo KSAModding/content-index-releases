@@ -22,12 +22,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import hosts
-from check_amendment import Outcome, check_path
+from check_amendment import Outcome, check_changelog_form, check_path
 from stamp_release import (
-    CHANGELOG_TEXT_LIMIT,
     StampError,
     as_archive,
-    changelog_text,
     prerelease_identifiers,
     stamp,
 )
@@ -149,23 +147,12 @@ def check_shape(path, head, errors):
     if changelog is not None and (not isinstance(changelog, str) or not changelog.strip()):
         errors.append("changelog is present and empty, and the stamper leaves an empty one out")
 
-    if "changelog_text" in head:
-        text = head["changelog_text"]
-        written = changelog_text(text)
-        if not isinstance(text, str):
-            errors.append("changelog_text is not a string")
-        elif not text.strip():
-            errors.append("changelog_text is present and empty, and the stamper leaves empty notes out")
-        elif written is None:
-            errors.append(
-                f"changelog_text is not UTF-8 text of at most {CHANGELOG_TEXT_LIMIT} bytes, "
-                "and the stamper leaves such notes out"
-            )
-        elif written != text:
-            errors.append(
-                "changelog_text has whitespace at an end or a CR line ending, and the "
-                "stamper writes neither"
-            )
+    check_changelog_form(head, errors)
+
+
+def watched(document):
+    """Whether the listing names a release host, so the watcher stamps its releases."""
+    return bool(document.get("releases"))
 
 
 def check_listing(folder, document, errors):
@@ -176,7 +163,7 @@ def check_listing(folder, document, errors):
             f"'{document.get('id')}' letter for letter, and the folder name is the "
             "identity the game sees"
         )
-    if document.get("releases"):
+    if watched(document):
         errors.append(
             "the listing names a release host under [releases], so the watcher stamps "
             "its releases from there; an older release is stamped by dispatching the "

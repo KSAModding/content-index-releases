@@ -307,6 +307,48 @@ class RunAmendment(Repository):
                     self.assertEqual(decision.auto_merge, merges)
                     self.assertEqual(decision.status, "success" if merges else "failure")
 
+    def publish_notes(self, listing_toml=LISTING_TOML):
+        (self.authored / "listings" / "Mod.toml").write_text(listing_toml, encoding="utf-8")
+        self.write(PATH, self.amended(changelog_text="## Changes\n- Fixes."))
+        self.git("add", "-A")
+        self.git("commit", "-m", "Publish with release notes")
+        self.write(PATH, self.amended(changelog_text="## Changes\n- Fixes a typo."))
+
+    def test_the_owner_amends_the_notes_of_a_release_pull_request_listing(self):
+        self.publish_notes()
+        check = validate.run_amendment([PATH], base_ref="main", authored=self.authored)
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertTrue(check.owner_only)
+        ownership = types.SimpleNamespace(
+            VERIFIED="verified", COULD_NOT_EVALUATE="could-not-evaluate",
+            TOPIC="ksa-index-{login}", MARKER_PATH=".github/ksa-content-index.toml",
+        )
+        verdict = validate._verdict([check], True, [PATH])
+        for state, merges in (("verified", True), ("unverified", False)):
+            decision = decide.decide(
+                verdict, True, ownership, types.SimpleNamespace(state=state, reason="")
+            )
+            self.assertEqual(decision.auto_merge, merges)
+            self.assertEqual(decision.status, "success" if merges else "failure")
+            if not merges:
+                self.assertIn("changes its release notes", decision.comment)
+
+    def test_the_same_amendment_on_a_watched_listing_is_refused(self):
+        self.publish_notes(LISTING_TOML + '\n[releases]\ngithub = "someone/Mod"\n')
+        check = validate.run_amendment([PATH], base_ref="main", authored=self.authored)
+        self.assertEqual(check.outcome, validate.REJECT)
+        self.assertFalse(check.owner_only)
+        self.assertTrue(any("the watcher alone" in message for message in check.messages))
+
+    def test_notes_whose_listing_cannot_be_read_reach_no_verdict(self):
+        self.publish_notes()
+        for authored in (self.root / "nowhere", self.authored):
+            if authored == self.authored:
+                (self.authored / "listings" / "Mod.toml").unlink()
+            with self.subTest(authored=authored.name):
+                check = validate.run_amendment([PATH], base_ref="main", authored=authored)
+                self.assertEqual(check.outcome, validate.COULD_NOT_EVALUATE, check.messages)
+
     def test_a_derived_entry_changes_kind_and_is_never_removed(self):
         derived = {"id": "Lib", "kind": "optional", "source": "derived"}
         self.write(PATH, self.amended(dependencies=[derived]))
@@ -546,6 +588,18 @@ class Verdict(Repository):
         validate.main(["--changed", PATH, "--base-ref", "main", "--output", str(output)])
         verdict = self.verdict(output)
         self.assertEqual(verdict["verdict"], validate.PASS)
+        self.assertTrue(verdict["owner_only"])
+
+    def test_amended_notes_are_measured_against_the_named_checkout(self):
+        self.write(PATH, self.amended(changelog_text="## Changes\n- Fixes."))
+        output = self.root / "verdict.json"
+        with unittest.mock.patch.dict(os.environ, {"CONTENT_INDEX": str(self.root / "nowhere")}):
+            validate.main([
+                "--changed", PATH, "--base-ref", "main", "--authored", str(self.authored),
+                "--output", str(output),
+            ])
+        verdict = self.verdict(output)
+        self.assertEqual(verdict["verdict"], validate.PASS, verdict["checks"])
         self.assertTrue(verdict["owner_only"])
 
     def test_a_rejection_leaves_a_non_zero_exit(self):

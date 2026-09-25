@@ -144,19 +144,51 @@ class ChangelogText(unittest.TestCase):
         base = head(changelog_text=self.TEXT)
         self.assertEqual(errors_for(head(changelog_text=self.TEXT, yanked=True), base=base), [])
 
-    def test_a_text_is_not_added_by_pull_request(self):
-        errors = errors_for(head(changelog_text=self.TEXT))
-        self.assertTrue(any("only the watcher" in message for message in errors))
+    CHANGES = (
+        ("added", None, TEXT),
+        ("changed", TEXT, "## Changes\n- Fixed a typo."),
+        ("removed", TEXT, None),
+    )
 
-    def test_a_text_never_changes(self):
-        errors = errors_for(head(changelog_text="Edited."), base=head(changelog_text=self.TEXT))
-        self.assertTrue(any("'changelog_text' changed" in message for message in errors))
+    def measured(self, before, after, watched):
+        base = head() if before is None else head(changelog_text=before)
+        document = head() if after is None else head(changelog_text=after)
+        errors, owner_only = [], []
+        check_document(PATH, base, document, errors, owner_only, watched=watched)
+        return errors, owner_only
 
-    def test_a_removed_text_says_to_rebase(self):
-        errors = errors_for(head(yanked=True), base=head(changelog_text=self.TEXT))
-        self.assertTrue(
-            any("changelog_text" in message and "rebase" in message for message in errors)
-        )
+    def test_the_owner_changes_the_text_of_a_listing_without_releases(self):
+        for name, before, after in self.CHANGES:
+            with self.subTest(name):
+                errors, owner_only = self.measured(before, after, watched=False)
+                self.assertEqual(errors, [])
+                self.assertTrue(any("only the verified owner" in line for line in owner_only))
+
+    def test_the_watcher_alone_writes_the_text_of_a_listing_with_releases(self):
+        for name, before, after in self.CHANGES:
+            with self.subTest(name):
+                errors, owner_only = self.measured(before, after, watched=True)
+                self.assertTrue(any("the watcher alone" in line for line in errors), errors)
+                self.assertTrue(any("rebase" in line for line in errors))
+                self.assertEqual(owner_only, [])
+
+    def test_a_listing_that_was_not_read_decides_nothing(self):
+        errors, _ = self.measured(self.TEXT, "Edited.", watched=None)
+        self.assertTrue(any("the listing was not read" in line for line in errors))
+
+    def test_an_amended_text_has_the_form_the_stamper_writes(self):
+        for text in (" \n", "Edited.\r\n", "x" * (check_amendment.CHANGELOG_TEXT_LIMIT + 1), 7):
+            with self.subTest(text=repr(text)[:12]):
+                errors, _ = self.measured(self.TEXT, text, watched=False)
+                self.assertTrue(any(line.startswith("changelog_text ") for line in errors))
+
+    def test_a_batch_names_the_owner_change_per_path(self):
+        base = head(changelog_text=self.TEXT)
+        document = head(changelog_text="Edited.")
+        for watched, outcome in ((False, "pass"), (True, "reject")):
+            result = check([(PATH, base, document)], watched={PATH: watched})[PATH]
+            self.assertEqual(result.outcome, outcome)
+            self.assertEqual(result.owner_only, not watched)
 
 
 class PathRules(unittest.TestCase):

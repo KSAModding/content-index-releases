@@ -127,10 +127,11 @@ def head_document(path):
         raise ValueError(f"{path} is not readable JSON: {error}") from error
 
 
-def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None):
+def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None, authored=None):
     """The changed release files, each measured against the published version.
 
     The archive is downloaded only for a file that drops an authored dependency entry, because only its mod.toml shows whether the loader still acts on that dependency.
+    The listing is read only for a file whose `changelog_text` changes, because its `[releases]` says who writes the text.
     """
     if not paths:
         return Check(
@@ -144,8 +145,10 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None):
 
     changes = []
     derived = {}
+    watched = {}
     unreadable_base = []
     unreadable_head = []
+    unreadable_listing = []
     unreadable_archive = []
     archive_problems = []
     for path in paths:
@@ -158,9 +161,13 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None):
         except ValueError as error:
             unreadable_head.append(str(error))
             continue
-        if isinstance(base, dict) and isinstance(head, dict) and check_amendment.reads_archive(
-            base, head
-        ):
+        both = isinstance(base, dict) and isinstance(head, dict)
+        if both and check_amendment.reads_listing(base, head):
+            watched[path], problem = listing_watched(authored, path)
+            if problem:
+                unreadable_listing.append(f"{path}: {problem}")
+                continue
+        if both and check_amendment.reads_archive(base, head):
             http = http or hosts.Http()
             try:
                 derived[path] = hosts.stamped_dependencies(http, base)
@@ -173,12 +180,15 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None):
                 archive_problems.append(f"{path}: {error}")
         changes.append((path, base, head))
 
-    results = check_amendment.check(changes, derived)
+    results = check_amendment.check(changes, derived, watched)
 
-    messages = unreadable_base + unreadable_head + unreadable_archive + archive_problems
+    messages = (
+        unreadable_base + unreadable_head + unreadable_listing + unreadable_archive
+        + archive_problems
+    )
     outcomes = []
     owner_only = any(outcome.owner_only for outcome in results.values())
-    if unreadable_base or unreadable_archive:
+    if unreadable_base or unreadable_listing or unreadable_archive:
         outcomes.append(COULD_NOT_EVALUATE)
     if unreadable_head:
         outcomes.append(REJECT)
@@ -188,6 +198,25 @@ def run_amendment(paths, base_ref=DEFAULT_BASE_REF, http=None):
     if not messages:
         messages.append(f"{len(paths)} release file(s) narrow what they claim, and nothing else")
     return Check("amendment", worst(outcomes), messages, owner_only)
+
+
+def no_checkout(root):
+    return (
+        f"content-index is not checked out at {root}: point --authored or "
+        "CONTENT_INDEX at a checkout of KSAModding/content-index, which holds "
+        "the listing a release belongs to"
+    )
+
+
+def listing_watched(authored, path):
+    """Whether the listing of a release file has `[releases]`, as (watched, problem)."""
+    root = check_release.authored_root(authored)
+    if not (root / "listings").is_dir():
+        return None, no_checkout(root)
+    document, problem = check_release.authored_document(root, check_scope.listing_of(path))
+    if document is None:
+        return None, problem
+    return check_release.watched(document), None
 
 
 def load_game_versions():
@@ -212,15 +241,7 @@ def run_release(paths, base_ref=DEFAULT_BASE_REF, authored=None, http=None, now=
 
     root = check_release.authored_root(authored)
     if not (root / "listings").is_dir():
-        return Check(
-            "release",
-            COULD_NOT_EVALUATE,
-            [
-                f"content-index is not checked out at {root}: point --authored or "
-                "CONTENT_INDEX at a checkout of KSAModding/content-index, which holds "
-                "the listing a release belongs to"
-            ],
-        )
+        return Check("release", COULD_NOT_EVALUATE, [no_checkout(root)])
     # No token on this path: the URL is the author's, and a release archive
     # needs no credential to download.
     http = http or hosts.Http()
@@ -396,7 +417,7 @@ def main(argv=None):
     try:
         checks = []
         if amended or not new:
-            checks.append(run_amendment(amended, arguments.base_ref))
+            checks.append(run_amendment(amended, arguments.base_ref, authored=arguments.authored))
         if len(new) == 1:
             checks.append(run_release(new, arguments.base_ref, arguments.authored))
         elif new:

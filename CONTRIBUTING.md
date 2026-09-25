@@ -22,12 +22,14 @@ The verified owner of the listing may also widen it (RFC 0079):
 - loosening or removing a loader or dependency bound, while the loader stays the same
 - removing a dependency entry, or changing its kind
 - taking back a yank
+- adding, changing or removing `changelog_text`, only for a listing without `[releases]`
 
 A dependency that the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release, because the loader acts on it.
 The check reads the archive to know which dependencies those are.
 
-Identity, the version, the download, the install data and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and `changelog_text`, are never amendments.
+Identity, the version, the download, the install data and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and, for a listing with `[releases]`, `changelog_text`, are never amendments.
 The way forward for those is a new version, or a yank.
+For a listing with `[releases]`, edit the release notes on the host, and the watcher copies them on its next tick.
 
 One amendment may touch several release files of one listing, which is what makes "this mod breaks above game build X" a single pull request instead of one per past release.
 

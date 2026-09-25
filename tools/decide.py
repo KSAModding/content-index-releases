@@ -70,14 +70,17 @@ def load_ownership(authored=None):
     return ownership
 
 
+# What only the verified owner of the listing changes (RFC 0079), as the verdict's messages name it.
+OWNER_CHANGE = "widens a release or changes its release notes"
+
 OWNER_ONLY = (
-    "This amendment widens a release, which only the verified owner of the listing does "
+    f"This amendment {OWNER_CHANGE}, which only the verified owner of the listing does "
     "(RFC 0079). The pull request names a request of the owner, and a steward merges it only "
     "when that request is the owner's."
 )
 
 NO_REQUEST = (
-    "This amendment widens a release, which only the verified owner of the listing does "
+    f"This amendment {OWNER_CHANGE}, which only the verified owner of the listing does "
     "(RFC 0079). Whoever acts on the owner's request puts the line "
     f"`{check_amendment.REQUEST} <link>` into the pull request description, and the checks "
     "run again."
@@ -127,10 +130,10 @@ def _comment(first, verdict, *paragraphs, run_url=""):
 
 
 def decide(verdict, candidate, ownership, ownership_result, run_url="", request=None):
-    """The status reports validation, and ownership only where a widening needs it.
+    """The status reports validation, and ownership only where an owner's change needs it.
 
     Ownership is a separate axis, so an amendment that validates but cannot prove who made it is green and waits for a steward.
-    A steward acting alone only narrows (RFC 0079), so a widening fails unless the verified owner makes it or the pull request names the owner's `request`.
+    A steward acting alone only narrows (RFC 0079), so an owner's change, such as a widening, fails unless the verified owner makes it or the pull request names the owner's `request`.
     """
     outcome = verdict.get("verdict")
     widens = bool(verdict.get("owner_only"))
@@ -168,9 +171,9 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
         if candidate and ownership_result.state == ownership.COULD_NOT_EVALUATE:
             return Decision(
                 "error",
-                "a widening, and ownership could not be checked",
+                "an owner's change, and ownership could not be checked",
                 comment=_comment(
-                    "Validation passed, but this amendment widens a release and the ownership check reached no verdict, so nothing is decided yet.",
+                    f"Validation passed, but this amendment {OWNER_CHANGE} and the ownership check reached no verdict, so nothing is decided yet.",
                     verdict,
                     checked,
                     NO_REQUEST,
@@ -178,16 +181,16 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                 ),
             )
         if candidate:
-            first = "This amendment widens a release, and it neither comes from the verified owner of the listing nor names the owner's request, so it cannot merge."
+            first = f"This amendment {OWNER_CHANGE}, and it neither comes from the verified owner of the listing nor names the owner's request, so it cannot merge."
         else:
             first = (
-                f"This amendment widens a release, and ownership is not checked because {scope_reason}. "
+                f"This amendment {OWNER_CHANGE}, and ownership is not checked because {scope_reason}. "
                 "Ownership is checked only for a pull request that changes release files of one listing and nothing else, "
                 "so this one cannot merge unless it names the owner's request."
             )
         return Decision(
             "failure",
-            "a widening, and neither the owner nor the owner's request",
+            "an owner's change, and neither the owner nor the owner's request",
             comment=_comment(
                 first,
                 verdict,

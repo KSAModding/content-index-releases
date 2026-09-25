@@ -164,7 +164,8 @@ A release that turns out to be broken is yanked, or superseded by a new version.
 
 The one exception is an amendment, which changes only what a release claims to work with: the game bounds, `os`, the loader bounds, the dependencies and a yank.
 Anyone may make a release claim less, and only the verified owner of the listing may make it claim more (RFC 0079).
-A check enforces both mechanically.
+The owner of a listing without `[releases]` may also change the release notes.
+A check enforces this mechanically.
 
 ## Amendments
 
@@ -178,7 +179,9 @@ Anyone else who widens a release, a steward included, acts on the owner's reques
 A widening that neither comes from the verified owner nor names a request fails the `validate` status.
 Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
 A dependency the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release.
-The loader id and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and `changelog_text`, stay out of reach of every amendment.
+For a listing without `[releases]`, the verified owner also adds, changes or removes `changelog_text`, in the form the stamper writes.
+The loader id and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and, for a listing with `[releases]`, `changelog_text`, stay out of reach of every amendment.
+The amendment check reads the listing from the content-index checkout to know which of the two it is.
 
 There are three ways to make the edit.
 
@@ -250,6 +253,7 @@ The checks do not trust the file.
 They download the archive from its `download.url`, stamp the release again, and reject the pull request when any field disagrees: the checksum, the sizes, the install root, the dependency merge against the authored document, and the compatibility bounds.
 The release date, the pre-release flag, the changelog link and the changelog text are the author's, because no archive carries them.
 The checks read the changelog text only for its form and its length.
+The owner changes that text later with an amendment.
 
 When it validates and the author's ownership of the listing verifies, through the repository the listing links to the way the listing flow does, it merges itself.
 A listing that names a release host is refused here, because the watcher stamps its releases from that host.
