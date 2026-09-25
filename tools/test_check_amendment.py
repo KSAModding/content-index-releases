@@ -7,6 +7,7 @@ import copy
 import json
 import unittest
 
+import amendment_vectors
 import check_amendment
 from check_amendment import check, check_document, precedence
 
@@ -534,6 +535,49 @@ class Batch(unittest.TestCase):
             json.dumps(head(game_max="2026.8.19.5261", game_max_revision=5261))
         )
         self.assertEqual(errors_for(document), [])
+
+
+class Vectors(unittest.TestCase):
+    """tools/amendment-vectors.json, measured by the invariant rather than by the tool."""
+
+    @classmethod
+    def setUpClass(cls):
+        document = amendment_vectors.load()
+        cls.game_versions = document["game_versions"]
+        cls.vectors = document["vectors"]
+
+    def named(self, name):
+        return copy.deepcopy(next(vector for vector in self.vectors if vector["name"] == name))
+
+    def test_the_invariant_agrees_with_each_vector(self):
+        for vector in self.vectors:
+            with self.subTest(vector["name"]):
+                self.assertEqual(
+                    amendment_vectors.invariant_mismatches(vector, self.game_versions), []
+                )
+
+    def test_an_accepted_vector_that_says_rejected_fails(self):
+        vector = self.named("a loader min is raised")
+        del vector["written"]
+        vector["verdict"] = "rejected"
+        vector["reason"] = "lowers its min"
+        self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
+
+    def test_a_widening_that_says_unchanged_fails(self):
+        vector = self.named("a game_min cannot be lowered")
+        del vector["reason"]
+        vector["verdict"] = "unchanged"
+        self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
+
+    def test_written_text_outside_the_class_fails(self):
+        vector = self.named("a game_max is added after game_min_revision")
+        vector["written"] = vector["written"].replace('"game_min_revision": 5117', '"game_min_revision": 5000')
+        self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
+
+    def test_a_refusal_with_a_wrong_reason_fails(self):
+        vector = self.named("a reason without a yank is refused")
+        vector["reason"] = "nothing to amend"
+        self.assertTrue(amendment_vectors.invariant_mismatches(vector, self.game_versions))
 
 
 class Outcome(unittest.TestCase):

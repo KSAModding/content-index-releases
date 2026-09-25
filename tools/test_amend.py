@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import amend
+import amendment_vectors
 from amend import AmendError
 
 GAME_VERSIONS = [
@@ -368,6 +369,63 @@ class Refusals(Tree):
         (folder / "latest.json").write_text("{}", encoding="utf-8")
         with self.assertRaises(AmendError):
             amend.stamped(self.root, "Mod")
+
+
+class Vectors(unittest.TestCase):
+    """tools/amendment-vectors.json, which a client that writes amendments tests against too."""
+
+    @classmethod
+    def setUpClass(cls):
+        document = amendment_vectors.load()
+        cls.game_versions = document["game_versions"]
+        cls.vectors = document["vectors"]
+
+    def named(self, name):
+        return copy.deepcopy(next(vector for vector in self.vectors if vector["name"] == name))
+
+    def test_the_file_is_written_as_a_program_writes_it(self):
+        # ASCII with escapes, so a non-ASCII case does not depend on how a reader decodes the file.
+        text = amendment_vectors.VECTORS.read_text(encoding="utf-8")
+        self.assertEqual(text, json.dumps(json.loads(text), indent=2) + "\n")
+
+    def test_each_vector_is_well_formed(self):
+        names = [vector["name"] for vector in self.vectors]
+        self.assertEqual(len(names), len(set(names)), "vector names are unique")
+        for vector in self.vectors:
+            with self.subTest(vector["name"]):
+                self.assertEqual(amendment_vectors.shape_errors(vector), [])
+
+    def test_every_verdict_and_every_actor_has_a_vector(self):
+        self.assertEqual(
+            {vector["verdict"] for vector in self.vectors}, set(amendment_vectors.VERDICTS)
+        )
+        self.assertEqual({vector["actor"] for vector in self.vectors}, set(amendment_vectors.ACTORS))
+
+    def test_the_tool_agrees_with_each_vector(self):
+        for vector in self.vectors:
+            with self.subTest(vector["name"]):
+                self.assertEqual(amendment_vectors.amend_mismatches(vector, self.game_versions), [])
+
+    def test_a_wrong_verdict_fails(self):
+        vector = self.named("a game_max is added after game_min_revision")
+        del vector["written"]
+        vector["verdict"] = "unchanged"
+        self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
+
+    def test_a_wrong_reason_fails(self):
+        vector = self.named("a game_min cannot be lowered")
+        vector["reason"] = "game_min_revision falls from 5117 to 5000"
+        self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
+
+    def test_escaped_non_ascii_is_wrong_bytes(self):
+        vector = self.named("fields the tool does not change or know keep their value and place")
+        vector["written"] = json.dumps(json.loads(vector["written"]), indent=2) + "\n"
+        self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
+
+    def test_a_missing_final_newline_is_wrong_bytes(self):
+        vector = self.named("a loader max gets the stamper's key order")
+        vector["written"] = vector["written"].rstrip("\n")
+        self.assertTrue(amendment_vectors.amend_mismatches(vector, self.game_versions))
 
 
 class Reminders(unittest.TestCase):
