@@ -86,6 +86,8 @@ Then stamp, with a checkout of [content-index](https://github.com/KSAModding/con
 python3 tools/stamp_release.py --listing ../content-index/listings/<id>.toml --archive MyMod-1.2.0.zip --release release.json --out releases/<id>/1.2.0.json
 ```
 
+The file is named after the stored version, which fills a short tag such as `v1.2` to `1.2.0`.
+
 Validate it the way the checks will, which downloads the archive from the URL the file names:
 
 ```sh

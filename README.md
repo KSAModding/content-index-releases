@@ -78,7 +78,13 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 
 A release the watcher cannot stamp, a tag that does not parse or an archive whose install root is neither derivable nor authored, becomes one open issue per listing on the authored repository, kept current rather than reopened every tick.
 
+A tag is read as a version by [RFC 0072](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0072-version-forms.md): an optional leading `v`, one to three numeric components without leading zeros, then the optional SemVer 2.0.0 pre-release and build parts.
+A missing component is filled with `0`, so the tag `0.5` is stamped as `0.5.0` and `v1` as `1.0.0`, and the stored `version` is always the full form.
+A tag with four components, a leading zero, or no version in it is refused.
+
 A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue.
+Two tags that fill to the same version, such as `0.5` and `0.5.0`, are one version.
+It is stamped from one of them only, the tag it was already stamped from or else the older one, and the other tag is refused with both tags named in that issue.
 
 The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
 A mirror that serves different bytes is remembered in the derived cache by URL and size, and is not downloaded again until one of them changes.
