@@ -936,6 +936,18 @@ class Dates(Fixture):
         self.assertEqual(entry["published_at"], "2026-08-01T10:00:00Z")
         self.assertEqual(entry["updated_at"], "2026-08-10T10:00:00Z")
 
+    def test_a_gone_mark_reaches_the_snapshot_verbatim_and_moves_no_date(self):
+        # Clients read download.unavailable_since from the release as the index holds it (RFC 0078).
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "1.0.0", release_date="2026-08-01T10:00:00Z")
+        gone = {"url": "https://example.invalid/a.zip", "unavailable_since": "2026-09-23T10:24:00Z"}
+        self.index.release(
+            "AutoStage", "1.1.0", release_date="2026-08-10T10:00:00Z", download=gone
+        )
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(entry["releases"][0]["download"], gone)
+        self.assertEqual(entry["updated_at"], "2026-08-10T10:00:00Z")
+
     def test_all_releases_yanked_leaves_only_published_at(self):
         self.index.listing("AutoStage")
         self.index.release(

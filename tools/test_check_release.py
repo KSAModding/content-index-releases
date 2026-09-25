@@ -270,6 +270,11 @@ class BeforeAnyRequest(Fixture):
         head["download"]["mirrors"] = ["https://example.invalid/other.zip"]
         self.assertIn("mirrors", self.refused(head))
 
+    def test_a_gone_mark_is_the_watchers(self):
+        head = self.stamped()
+        head["download"]["unavailable_since"] = "2026-09-23T10:24:00Z"
+        self.assertIn("download.unavailable_since is the watcher's", self.refused(head))
+
     def test_a_missing_download_object_is_refused(self):
         head = self.stamped()
         del head["download"]
