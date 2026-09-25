@@ -110,6 +110,13 @@ class Selection(Tree):
         paths = amend.select(amend.stamped(self.root, "Mod"), versions=["0.7.3"])
         self.assertEqual([path.stem for path in paths], ["0.7.3"])
 
+    def test_a_short_version_selects_its_filled_form(self):
+        self.write("Mod", "0.7.0", "0.7.2", "1.0.0")
+        paths = amend.select(amend.stamped(self.root, "Mod"), versions=["v1"])
+        self.assertEqual([path.stem for path in paths], ["1.0.0"])
+        paths = amend.select(amend.stamped(self.root, "Mod"), up_to="0.7")
+        self.assertEqual([path.stem for path in paths], ["0.7.0"])
+
     def test_a_version_that_is_not_stamped_is_named(self):
         self.write("Mod", "0.7.0")
         with self.assertRaises(AmendError) as raised:
@@ -302,6 +309,11 @@ class Bounds(Tree):
     def test_a_leading_v_on_a_bound_is_normalized(self):
         self.write("Mod", "0.7.2")
         self.run_tool("--listing", "Mod", "--all", "--dependency-min", "KittenExtensions=v0.4.0")
+        self.assertEqual(self.read("Mod", "0.7.2")["dependencies"][0]["min"], "0.4.0")
+
+    def test_a_short_bound_is_filled(self):
+        self.write("Mod", "0.7.2")
+        self.run_tool("--listing", "Mod", "--all", "--dependency-min", "KittenExtensions=0.4")
         self.assertEqual(self.read("Mod", "0.7.2")["dependencies"][0]["min"], "0.4.0")
 
     def test_a_loader_bound_on_a_release_with_no_loader_is_refused(self):

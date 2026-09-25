@@ -318,6 +318,10 @@ class BeforeAnyRequest(Fixture):
         self.assertIn("folder", self.refused(self.stamped(), path="releases/Other/1.0.0.json"))
         self.assertIn("file name", self.refused(self.stamped(), path="releases/Mod/2.0.0.json"))
 
+    def test_a_short_version_is_refused_before_the_download_with_its_stored_form(self):
+        refused = self.refused(self.stamped(version="1.0"), path="releases/Mod/1.0.json")
+        self.assertIn("releases/Mod/1.0.0.json", refused)
+
     def test_a_listing_that_is_not_there_is_refused(self):
         head = self.stamped(id="Other")
         self.assertIn("not in content-index", self.refused(head, path="releases/Other/1.0.0.json"))
