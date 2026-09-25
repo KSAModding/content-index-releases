@@ -228,6 +228,19 @@ class Streaming(unittest.TestCase):
             Http().archive("https://example.com/a b.zip")
         self.assertEqual(urlopen.call_count, 1)
 
+    def test_a_status_request_reads_no_body(self):
+        answer = Answer(b"x" * 100)
+        self.serve(answer)
+        self.assertEqual(Http().status(self.URL), 200)
+        self.assertEqual(answer.read_bytes, 0)
+
+    def test_a_status_request_returns_a_client_error_and_retries_a_server_error(self):
+        self.serve(http_error(404))
+        self.assertEqual(Http().status(self.URL), 404)
+        self.serve(http_error(503), http_error(503), http_error(503))
+        with self.assertRaises(HostError):
+            Http().status(self.URL)
+
     def test_an_api_answer_has_its_own_smaller_limit(self):
         # The archive limit is for files on disk. JSON is held in memory.
         self.assertLess(MAX_RESPONSE_BYTES, MAX_ARCHIVE_BYTES)
@@ -461,6 +474,25 @@ class AssetSelection(unittest.TestCase):
         chosen = host._release(self.payload(["Launcher.zip", "Standalone.zip"]))
         self.assertIsNone(chosen.url)
         self.assertEqual(len(chosen.candidates), 2)
+
+    def test_every_uploaded_asset_is_a_listed_archive(self):
+        # A stamped URL that is not the picked archive is still on the host.
+        payload = self.payload(["StarMap-0.4.6.zip", "Source.tar.gz", "Broken.zip"])
+        payload["assets"][2]["state"] = "starter"
+        chosen = GitHubHost("o/r", FakeHttp({}), listing_id="StarMap")._release(payload)
+        self.assertEqual(
+            chosen.archives,
+            (
+                "https://github.com/o/r/releases/download/0.4.6/StarMap-0.4.6.zip",
+                "https://github.com/o/r/releases/download/0.4.6/Source.tar.gz",
+            ),
+        )
+
+    def test_a_spacedock_version_lists_its_download(self):
+        body = json.dumps({"versions": [{"friendly_version": "1.0.0", "download_path": "/d/1"}]})
+        http = FakeHttp({"https://spacedock.info/api/mod/1": Response(200, {}, body.encode())})
+        releases, _ = SpaceDockHost(1, http).releases()
+        self.assertEqual(releases[0].archives, ("https://spacedock.info/d/1",))
 
 
 if __name__ == "__main__":
