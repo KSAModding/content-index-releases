@@ -73,6 +73,9 @@ OS_VALUES = ("windows", "linux", "macos")
 # pull request description.
 REQUEST = "Requested by the author:"
 
+# Only the watcher writes these, so no amendment touches them.
+WATCHER_DOWNLOAD_KEYS = ("mirrors", "unavailable_since")
+
 LOADER_KEYS = frozenset({"id", "min", "max", "source"})
 DEPENDENCY_KEYS = frozenset({"id", "any_of", "kind", "min", "max", "source"})
 MEMBER_KEYS = frozenset({"id", "min", "max"})
@@ -224,21 +227,26 @@ def check_immutable(base, head, errors):
             f"'{key}' changed, and identity, the version, the download and the "
             "install data never change after publish"
         )
-        if key == "download" and _only_mirrors_differ(base.get(key), head.get(key)):
-            # The author probably branched before the watcher added a mirror, so it
-            # now looks like their own edit. A rebase clears it up.
+        watched = _watcher_keys_only(base.get(key), head.get(key)) if key == "download" else None
+        if watched:
+            # The author probably branched before the watcher wrote these, so they
+            # now look like their own edit. A rebase clears it up.
             errors.append(
-                "only 'download.mirrors' differs, which the watcher appends on the "
+                f"the download differs only in {watched}, which the watcher writes on the "
                 "default branch: rebase and run tools/amend.py again"
             )
 
 
-def _only_mirrors_differ(base, head):
+def _watcher_keys_only(base, head):
+    """The watcher's download keys that differ, when nothing else in the download does."""
     if not isinstance(base, dict) or not isinstance(head, dict):
-        return False
-    return {key: value for key, value in base.items() if key != "mirrors"} == {
-        key: value for key, value in head.items() if key != "mirrors"
-    }
+        return None
+    if {key: value for key, value in base.items() if key not in WATCHER_DOWNLOAD_KEYS} != {
+        key: value for key, value in head.items() if key not in WATCHER_DOWNLOAD_KEYS
+    }:
+        return None
+    differ = [key for key in WATCHER_DOWNLOAD_KEYS if base.get(key) != head.get(key)]
+    return " and ".join(f"'download.{key}'" for key in differ)
 
 
 def check_changelog_text(base, head, errors):

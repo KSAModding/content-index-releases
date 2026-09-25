@@ -26,7 +26,7 @@ The verified owner of the listing may also widen it (RFC 0079):
 A dependency that the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release, because the loader acts on it.
 The check reads the archive to know which dependencies those are.
 
-Identity, the version, the download, the install data and `changelog_text` are never amendments.
+Identity, the version, the download, the install data and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and `changelog_text`, are never amendments.
 The way forward for those is a new version, or a yank.
 
 One amendment may touch several release files of one listing, which is what makes "this mod breaks above game build X" a single pull request instead of one per past release.

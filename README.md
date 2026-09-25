@@ -175,7 +175,8 @@ Such a pull request merges itself for the verified owner.
 Anyone else who widens a release, a steward included, acts on the owner's request and names it with the line `Requested by the author: <link>` in the pull request description, and a steward merges it after reading that request.
 A widening that neither comes from the verified owner nor names a request fails the `validate` status.
 Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
-The loader id, a dependency the archive's `mod.toml` declares, `download.mirrors` and `changelog_text` stay out of reach of every amendment.
+A dependency the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release.
+The loader id and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and `changelog_text`, stay out of reach of every amendment.
 
 There are three ways to make the edit.
 

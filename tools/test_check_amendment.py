@@ -100,6 +100,19 @@ class Immutable(unittest.TestCase):
         errors = errors_for(head(yanked=True), base=base)
         self.assertTrue(any("rebase" in message for message in errors))
 
+    def test_an_unavailable_mark_does_not_arrive_by_pull_request(self):
+        document = head()
+        document["download"]["unavailable_since"] = "2026-09-23T10:24:00Z"
+        self.assertTrue(any("'download'" in message for message in errors_for(document)))
+
+    def test_an_unavailable_mark_the_watcher_wrote_says_to_rebase(self):
+        base = copy.deepcopy(BASE)
+        base["download"]["unavailable_since"] = "2026-09-23T10:24:00Z"
+        errors = errors_for(head(yanked=True), base=base)
+        self.assertTrue(
+            any("'download.unavailable_since'" in m and "rebase" in m for m in errors), errors
+        )
+
     def test_the_install_data_never_changes(self):
         document = head()
         document["install"]["root"] = "Elsewhere"
@@ -683,7 +696,9 @@ class TheOwner(unittest.TestCase):
     def test_the_fields_of_the_watcher_stay_out_of_reach(self):
         mirrored = head()
         mirrored["download"] = {**BASE["download"], "mirrors": ["https://example.invalid/m.zip"]}
-        for document in (head(changelog_text="Fixed."), mirrored):
+        gone = head()
+        gone["download"] = {**BASE["download"], "unavailable_since": "2026-09-23T10:24:00Z"}
+        for document in (head(changelog_text="Fixed."), mirrored, gone):
             with self.subTest(document=document):
                 errors, _ = self.measured(document)
                 self.assertTrue(errors)
