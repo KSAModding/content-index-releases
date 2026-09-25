@@ -81,7 +81,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 |---|---|
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
 | `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
-| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
+| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
 | `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
@@ -98,6 +98,20 @@ It is stamped from one of them only, the tag it was already stamped from or else
 
 The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
 A mirror that serves different bytes is remembered in the derived cache by URL and size, and is not downloaded again until one of them changes.
+
+### A release gone from its host
+
+A stamped release whose archive the authority host no longer lists gets `download.unavailable_since`, the time the watcher marked it (RFC 0078).
+The watcher waits a day from the first tick that did not find the archive at any stamped URL, and then asks each stamped URL, `download.url` and every mirror.
+It marks the release only when every URL answers 404, 410 or 451, and otherwise asks again a day later, so a release that a mirror still serves is not marked.
+A host that does not answer, or that does not serve the repository at all, starts and ends no wait, and neither does a scan that stops before the end of the release list for a release it did not reach.
+A listing without `[releases]` has no list to read, so the watcher asks each stamped URL once a day and marks a release when every URL said that the archive is gone for at least a day.
+The mark goes again when the host lists the archive at a stamped URL, or a stamped URL of a listing without `[releases]` answers, and the archive there has the stamped `sha256`.
+Other bytes are reported as a swap, and the mark stays.
+Each mark and each removal is one comment on the listing's issue, and a mark never keeps that issue open.
+Without an open issue, the comment goes to the last closed one, and a listing that never had an issue gets one that is closed at once.
+The release file stays in the index, a client stops offering the release for a new install, and an installed copy is never touched.
+The waits are derived cache, so losing the cache only starts them again, and `--gone-budget` limits the requests one tick spends on them.
 
 A release archive may be up to 4 GiB.
 That is twice the largest KSA archive on SpaceDock and above GitHub's 2 GiB file limit, and one archive of that size fits the disk a runner guarantees and downloads inside the check timeouts.
@@ -170,6 +184,7 @@ A build fails closed: nothing is published, and clients keep the last good snaps
 ## A published release is immutable
 
 Identity, the version, the download and the install data never change.
+The watcher only adds a mirror to the download, and marks a download whose archive is gone from its host, because those are facts about the hosts and not claims of the release.
 A release that turns out to be broken is yanked, or superseded by a new version.
 
 The one exception is an amendment, which changes only what a release claims to work with: the game bounds, `os`, the loader bounds, the dependencies and a yank.

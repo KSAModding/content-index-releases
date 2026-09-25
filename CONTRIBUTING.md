@@ -117,6 +117,8 @@ Open a pull request with that one file and nothing else.
 When it validates and your ownership of the listing verifies, through the repository the listing links to, it merges itself.
 
 A version is stamped exactly once and a release that turns out to be broken is yanked, and a corrected one gets a new version.
+When every URL of a published release answers for a day that the archive is gone, the watcher marks the release as gone, and a client stops offering it for a new install (RFC 0078).
+Uploading the same archive to the same URL again removes the mark.
 A listing that names a release host under `[releases]` does not use this path, because the watcher stamps its releases.
 With `since` under `[releases]`, the watcher also stamps the older releases from that version on, and a dispatch with `backfill` stamps the rest.
 
