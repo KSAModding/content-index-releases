@@ -6,7 +6,9 @@ The API is a stub that records what the watcher would send, which is what makes
 "one open issue per listing" and the sweep's decisions testable at all.
 """
 
+import base64
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -20,6 +22,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import decide
 import watch
 from check_release import DEFAULT_AUTHORED
 from hosts import HostError, HostRelease
@@ -2391,6 +2394,221 @@ class Notes(unittest.TestCase):
         api = StubApi({"/issues/7": closed, "/issues": []})
         self.assertTrue(self.note(api, store))
         self.assertEqual(api.sent, [("POST", "/issues/7/comments", {"body": "gone"})])
+
+
+OWNER = "@alice, the watcher tells you because you own this listing."
+
+
+class OwnerMentions(unittest.TestCase):
+    """What notifies mentions the owner, and a tick that changes nothing asks no host."""
+
+    def issues(self, api, asked):
+        def owner(listing_id):
+            asked.append(listing_id)
+            return OWNER
+
+        return Issues(api, "watcher", log=lambda _: None, owner=owner)
+
+    def opened(self, store, errors):
+        api = StubApi({"/issues": []})
+        self.issues(api, []).report("M", errors, store)
+        return api.writes("POST", path="/issues")[0][2]["body"]
+
+    def test_a_new_issue_mentions_the_owner(self):
+        api = StubApi({"/issues": []})
+        asked = []
+        self.issues(api, asked).report("M", ["one thing"], cache())
+        body = api.writes("POST", path="/issues")[0][2]["body"]
+        self.assertIn(f"\n{OWNER} {watch.OWNER_MARKER}\n", body)
+        self.assertEqual(asked, ["M"])
+
+    def test_a_changed_failure_mentions_the_owner_in_its_comment(self):
+        store = cache()
+        body = self.opened(store, ["one thing"])
+        api = StubApi({"/issues/42": {"number": 42, "state": "open", "body": body},
+                       "/issues": []})
+        asked = []
+        self.issues(api, asked).report("M", ["something else"], store)
+        [(_, _, comment)] = api.writes("POST", path="/issues/42/comments")
+        self.assertIn("- something else", comment["body"])
+        self.assertTrue(comment["body"].endswith(f"\n\n{OWNER}"))
+        self.assertEqual(asked, ["M"])
+
+    def test_the_same_failure_again_adds_nothing_and_asks_no_host(self):
+        store = cache()
+        body = self.opened(store, ["one thing"])
+        api = StubApi({"/issues/42": {"number": 42, "state": "open", "body": body},
+                       "/issues": []})
+        asked = []
+        self.issues(api, asked).report("M", ["one thing"], store)
+        self.assertEqual(asked, [])
+        self.assertEqual(api.writes("POST"), [])
+        [(_, _, edited)] = api.writes("PATCH", path="/issues/42")
+        self.assertIn(f"\n{OWNER} {watch.OWNER_MARKER}\n", edited["body"])
+
+    def test_an_issue_from_before_the_owner_line_gets_none_on_an_unchanged_tick(self):
+        store = cache()
+        body = self.opened(store, ["one thing"]).replace(f"{OWNER} {watch.OWNER_MARKER}\n", "")
+        api = StubApi({"/issues/42": {"number": 42, "state": "open", "body": body},
+                       "/issues": []})
+        asked = []
+        self.issues(api, asked).report("M", ["one thing"], store)
+        self.assertEqual(asked, [])
+        self.assertNotIn("@", api.writes("PATCH", path="/issues/42")[0][2]["body"])
+
+    def test_a_note_mentions_the_owner(self):
+        issue = {"number": 7, "state": "open", "body": Notes.MARKED}
+        api = issue_routes([issue], [issue])
+        self.assertTrue(self.issues(api, []).note("M", "gone", cache()))
+        self.assertEqual(api.sent, [("POST", "/issues/7/comments", {"body": f"gone\n\n{OWNER}"})])
+
+    def test_a_note_that_opens_an_issue_mentions_the_owner_in_it(self):
+        api = issue_routes()
+        self.assertTrue(self.issues(api, []).note("M", "gone", cache()))
+        self.assertIn(f"gone\n\n{OWNER}", api.writes("POST", path="/issues")[0][2]["body"])
+
+    def test_a_note_that_waits_asks_no_host(self):
+        def failing(query):
+            raise http_error(500)
+
+        asked = []
+        self.assertFalse(self.issues(StubApi({"/issues": failing}), asked).note("M", "gone", cache()))
+        self.assertEqual(asked, [])
+
+
+def real_ownership():
+    """content-index's ownership.py, or None when no checkout is there.
+
+    It is loaded under a name of its own, because test_decide puts a stub into
+    sys.modules as `ownership`.
+    """
+    path = Path(os.environ.get("CONTENT_INDEX") or DEFAULT_AUTHORED) / "tools" / "ownership.py"
+    if not path.is_file():
+        return None
+    spec = importlib.util.spec_from_file_location("real_ownership_for_the_watcher", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def github(routes):
+    """GitHub as `decide.Api` asks it, answering from `routes` by path and 404 for the rest."""
+
+    def call(api, url, token, method="GET", payload=None):
+        answer = routes.get(url.removeprefix(decide.GITHUB_API))
+        if answer is None:
+            raise http_error(404)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    return patch.object(decide.Api, "_call", call)
+
+
+def contents(text):
+    return {"encoding": "base64", "content": base64.b64encode(text.encode()).decode()}
+
+
+ORGANIZATION = {"full_name": "Org/M", "owner": {"login": "Org", "type": "Organization"}}
+PERSONAL = {"/repos/alice/M": {"full_name": "alice/M", "owner": {"login": "alice", "type": "User"}}}
+
+
+class WhoIsTold(WatcherCase):
+    """The watcher names the owner that the proofs of content-index name, and says why when there is none."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.folder = Path(self.directory.name)
+        self.subject = self.watcher(self.folder, ["--no-commit"])
+
+    def prepare(self, repository):
+        proofs = real_ownership()
+        if proofs is None:
+            self.skipTest("content-index is not checked out next to this repository")
+        self.subject.proofs = proofs
+        self.subject.documents["M"] = {"id": "M", "releases": {"github": repository}}
+
+    def line(self, repository, routes):
+        self.prepare(repository)
+        with github(routes):
+            return self.subject.owner_line("M")
+
+    def test_the_owner_of_a_personal_repository_is_mentioned(self):
+        self.assertEqual(self.line("alice/M", PERSONAL), OWNER)
+
+    def test_the_login_of_a_topic_on_an_organization_repository_is_mentioned(self):
+        line = self.line(
+            "Org/M",
+            {"/repos/Org/M": ORGANIZATION,
+             "/repos/Org/M/topics": {"names": ["kitten", "ksa-index-bob"]}},
+        )
+        self.assertTrue(line.startswith("@bob, the watcher tells you"), line)
+
+    def test_the_login_of_a_marker_file_on_an_organization_repository_is_mentioned(self):
+        line = self.line(
+            "Org/M",
+            {"/repos/Org/M": ORGANIZATION,
+             "/repos/Org/M/topics": {"names": []},
+             "/repos/Org/M/contents/.github/ksa-content-index.toml":
+                 contents('login = "carol"\nid = "M"\n')},
+        )
+        self.assertTrue(line.startswith("@carol, the watcher tells you"), line)
+
+    def test_no_proof_names_nobody_and_says_why(self):
+        line = self.line(
+            "Org/M", {"/repos/Org/M": ORGANIZATION, "/repos/Org/M/topics": {"names": []}}
+        )
+        self.assertTrue(line.startswith("The watcher tells nobody, because no owner"), line)
+        self.assertIn("`ksa-index-<login>`", line)
+        self.assertNotIn("@", line)
+
+    def test_a_host_that_does_not_answer_names_nobody_and_says_why(self):
+        line = self.line("Org/M", {"/repos/Org/M": http_error(502)})
+        self.assertTrue(line.startswith("The watcher tells nobody"), line)
+        self.assertIn("HTTP 502", line)
+        self.assertNotIn("@", line)
+
+    def test_a_listing_the_tick_could_not_read_names_nobody(self):
+        line = self.subject.owner_line("M")
+        self.assertIn("could not read the listing", line)
+        self.assertNotIn("@", line)
+
+    def test_proofs_that_do_not_load_name_nobody(self):
+        self.subject.documents["M"] = {"id": "M", "releases": {"github": "alice/M"}}
+        line = self.subject.owner_line("M")
+        self.assertIn("ownership proofs of content-index did not load", line)
+        self.assertNotIn("@", line)
+
+    def test_a_problem_a_tick_reports_mentions_the_owner_of_the_listing(self):
+        self.prepare("alice/M")
+        (self.folder / ".authored" / "listings" / "M.toml").write_text(
+            'id = "Other"\n[releases]\ngithub = "alice/M"\n'
+        )
+        self.subject.options.no_sweep = True
+        self.subject.issues.api = StubApi({"/issues": []})
+        with github(PERSONAL):
+            self.subject.tick()
+        [(_, _, opened)] = self.subject.issues.api.writes("POST", path="/issues")
+        self.assertIn("the file name and the id must match", opened["body"])
+        self.assertIn(f"\n{OWNER} {watch.OWNER_MARKER}\n", opened["body"])
+
+    def test_a_mark_and_its_removal_mention_the_owner(self):
+        issue = {"number": 7, "state": "open", "body": Notes.MARKED}
+        self.subject.issues.api = StubApi({"/issues/7": issue, "/issues": [issue]})
+        path = self.folder / "releases" / "M" / "1.0.0.json"
+        document = {"version": "1.0.0", "download": {"url": GONE_URL}}
+        self.prepare("alice/M")
+        with github(PERSONAL):
+            self.subject.mark("M", path, document)
+            self.subject.tell("M")
+            self.subject.unmark("M", path, document)
+            self.subject.tell("M")
+        comments = self.subject.issues.api.writes("POST", path="/issues/7/comments")
+        self.assertEqual(len(comments), 2)
+        for (_, _, comment), change in zip(comments, ("marked it", "removed its mark")):
+            self.assertIn(change, comment["body"])
+            self.assertTrue(comment["body"].endswith(f"\n\n{OWNER}"))
 
 
 class RerunRefusingApi(StubApi):
