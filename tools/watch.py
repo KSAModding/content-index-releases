@@ -9,9 +9,10 @@ listing's images again, keep one error issue per listing current on the authored
 repository, and sweep that repository's open pull requests.
 
 Older releases are left alone, and a listing's first tick takes its newest
-release only. RFC 0031 freezes the authored facts "current at release time", and
-an amendment can only narrow a published release, so a `game_min` stamped too
-high can never be lowered again. `--backfill` opts out.
+release only, because RFC 0031 freezes the authored facts "current at release
+time". A listing that names `since` under `[releases]` opts in (RFC 0079), and
+every release at or above that version is stamped too, with today's facts, which
+the owner corrects with an amendment. `--backfill` stamps the whole history.
 
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
@@ -39,6 +40,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import hosts
+from check_amendment import precedence
 from hosts import HostError
 from stamp_release import (
     GAME_MONTH,
@@ -81,6 +83,10 @@ PENDING = frozenset({"queued", "in_progress", "waiting", "requested", "pending"}
 
 # Grace for a finished run to get its verdict posted.
 SETTLING_MINUTES = 5
+
+# How long a release that `since` reaches and the checks rejected is reported
+# again without a download, while nothing it was stamped from changed.
+REJECTION_HOURS = 24
 
 IMAGES_VERIFIED = (
     "The images of this listing verify again and the watcher found no other error, "
@@ -132,6 +138,18 @@ def is_history(date, frontier, newest):
     return date < frontier
 
 
+def filled(version):
+    """`version` with a missing minor or patch component filled with 0 (RFC 0072)."""
+    core, suffix = re.match(r"([^+-]*)(.*)", version.strip(), re.DOTALL).groups()
+    parts = core.split(".")
+    return ".".join(parts + ["0"] * (3 - len(parts))) + suffix
+
+
+def reaches(version, floor):
+    """Whether `version` is at or above `floor`, the precedence of `since`."""
+    return floor is not None and version is not None and precedence(version) >= floor
+
+
 class Cache:
     """Derived cache, never state.
 
@@ -155,7 +173,9 @@ class Cache:
                 loaded = {}
             if isinstance(loaded, dict) and loaded.get("version") == CACHE_VERSION:
                 self.data = loaded
-        for section in ("differs", "hosts", "images", "listings", "mirrors", "swaps", "sweep"):
+        for section in (
+            "differs", "hosts", "images", "listings", "mirrors", "rejected", "swaps", "sweep"
+        ):
             self.data.setdefault(section, {})
 
     def section(self, name, key):
@@ -647,6 +667,7 @@ class Watcher:
             Path(options.game_versions).read_text(encoding="utf-8")
         )["versions"]
         self.stamp_budget = options.stamp_budget
+        self.since_budget = options.since_budget
         self.mirror_budget = options.mirror_budget
         self.image_budget = options.image_budget
         self.images = None
@@ -1100,7 +1121,7 @@ class Watcher:
     def stamp_pass(
         self, listing_id, authored, authority, mirror_hosts, releases, errors, attempted=()
     ):
-        """Stamp every release that appeared after the stamped frontier.
+        """Stamp every release that appeared after the stamped frontier, and every older one `since` reaches.
 
         Returns whether every release behind this answer is settled, which means
         stamped, reported, or left as history. A host that could not be reached
@@ -1109,11 +1130,13 @@ class Watcher:
         stamped = self.stamped_versions(listing_id)
         backfill = self.options.backfill
         frontier, complete = (None, True)
+        floor = None
         if not backfill:
             frontier, complete = self.stamped_frontier(stamped, errors)
             if not complete:
                 self.log("    the stamped history could not be read in full, stamping nothing")
                 return False
+            floor = self.since(authored, errors)
         newest = max(
             (date for date in (parse_iso(item.release_date) for item in releases) if date),
             default=None,
@@ -1126,6 +1149,7 @@ class Watcher:
         settled = True
         outside_lookback = 0
         history = 0
+        waiting = 0
 
         # Oldest first, so a budget that runs out leaves a monotone history and
         # the next tick simply carries on.
@@ -1151,10 +1175,19 @@ class Watcher:
                 settled = False
                 continue
 
+            older = not backfill and is_history(date, frontier, newest)
+            from_since = older and reaches(release.version, floor)
+            # The open issue still names a release that `since` reached and
+            # the checks rejected after the author raised `since` above it or
+            # removed it. Such a release is history again, because retrying it
+            # would download it and report it on every tick. The cache entry
+            # stays, so an issue that could not be rewritten this tick does
+            # not bring the release back.
+            dropped = f"{listing_id}/{release.version}" in self.cache.data["rejected"]
             if (
-                not backfill
-                and release.version not in attempted
-                and is_history(date, frontier, newest)
+                older
+                and not from_since
+                and (release.version not in attempted or dropped)
             ):
                 history += 1
                 continue
@@ -1170,7 +1203,23 @@ class Watcher:
                 errors.append(self.collision_error(owner, release))
                 continue
 
-            if self.stamp_budget <= 0:
+            if from_since:
+                known = self.known_rejection(listing_id, authored, release)
+                if known:
+                    errors.append(known)
+                    continue
+                if self.since_budget <= 0:
+                    # A rejection older than REJECTION_HOURS stays in the
+                    # report until the release is downloaded again, so the
+                    # issue does not change twice for a failure that did not.
+                    stale = self.known_rejection(listing_id, authored, release, any_age=True)
+                    if stale:
+                        errors.append(stale)
+                    waiting += 1
+                    settled = False
+                    continue
+                self.since_budget -= 1
+            elif self.stamp_budget <= 0:
                 carries_on = (
                     "a further --backfill dispatch" if backfill else "the next tick"
                 )
@@ -1183,9 +1232,15 @@ class Watcher:
                 self.log(f"    {release.version}: {error}")
                 settled = False
             except StampError as error:
-                errors.append(f"`{release.version}`: {error}")
+                message = f"`{release.version}`: {error}"
+                errors.append(message)
+                if from_since:
+                    self.remember_rejection(listing_id, authored, release, message)
             else:
-                self.stamp_budget -= 1
+                if from_since:
+                    self.cache.data["rejected"].pop(f"{listing_id}/{release.version}", None)
+                else:
+                    self.stamp_budget -= 1
 
         if outside_lookback:
             self.log(
@@ -1195,7 +1250,12 @@ class Watcher:
         if history:
             self.log(
                 f"    {history} release(s) older than the stamped history, left "
-                "unstamped (--backfill stamps them)"
+                "unstamped (since under [releases] or --backfill stamps them)"
+            )
+        if waiting:
+            self.log(
+                f"    {waiting} older release(s) that since reaches wait for the "
+                "since budget of the next tick"
             )
         return settled
 
@@ -1230,6 +1290,61 @@ class Watcher:
             f"the tag `{owner.tag}`, so it is refused. A version is stamped exactly once, "
             "so the way forward is a new version."
         )
+
+    def since(self, authored, errors):
+        """The precedence of `since` under `[releases]`, or None (RFC 0079).
+
+        It is read with the filling rule of RFC 0072, so `1.2` is `1.2.0`. A
+        value that is not a version is reported, and the tick stamps as if the
+        key were not there.
+        """
+        section = authored.get("releases")
+        value = section.get("since") if isinstance(section, dict) else None
+        if value is None:
+            return None
+        try:
+            if not isinstance(value, str):
+                raise StampError(f"{value!r} is not a version string")
+            return precedence(normalize_version(filled(value)))
+        except StampError as error:
+            errors.append(
+                f"`since` under [releases]: {error}, so no older release is stamped from it"
+            )
+            return None
+
+    def stamp_inputs(self, authored):
+        """What a stamp reads besides the archive, so a rejection is retried once it changes."""
+        return self.authored_digest([authored, self.game_versions])
+
+    def known_rejection(self, listing_id, authored, release, any_age=False):
+        """The error an older release got from the same inputs within REJECTION_HOURS, or None.
+
+        A back catalogue can hold many releases the checks reject, and
+        downloading each of them again every tick costs time and traffic for
+        an answer that is already known. The cache is derived, so losing it
+        costs one more download. With `any_age`, a rejection older than
+        REJECTION_HOURS counts too.
+        """
+        seen = self.cache.data["rejected"].get(f"{listing_id}/{release.version}") or {}
+        checked = parse_iso(seen.get("checked"))
+        if (
+            checked is None
+            or (not any_age and now() - checked >= timedelta(hours=REJECTION_HOURS))
+            or seen.get("url") != release.url
+            or seen.get("size") != release.size
+            or seen.get("inputs") != self.stamp_inputs(authored)
+        ):
+            return None
+        return seen.get("error")
+
+    def remember_rejection(self, listing_id, authored, release, message):
+        self.cache.data["rejected"][f"{listing_id}/{release.version}"] = {
+            "url": release.url,
+            "size": release.size,
+            "inputs": self.stamp_inputs(authored),
+            "checked": iso(now()),
+            "error": message,
+        }
 
     def stamp_one(self, listing_id, authored, authority, mirror_hosts, release):
         """Stamp one release, then look for its mirrors.
@@ -1638,6 +1753,11 @@ def parse_arguments(argv):
     parser.add_argument(
         "--stamp-budget", type=int, default=20,
         help="how many releases one tick stamps at most; the next tick carries on",
+    )
+    parser.add_argument(
+        "--since-budget", type=int, default=10,
+        help="how many older releases that since reaches one tick tries at most, "
+        "apart from --stamp-budget so a back catalogue never holds up a new release",
     )
     parser.add_argument(
         "--mirror-budget", type=int, default=4,
