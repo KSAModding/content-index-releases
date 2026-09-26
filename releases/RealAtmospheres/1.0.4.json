@@ -1,0 +1,50 @@
+{
+  "spec_version": 1,
+  "id": "RealAtmospheres",
+  "type": "mod",
+  "version": "1.0.4",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-26T14:03:49Z",
+  "game_min": "2026.9.10.5438",
+  "game_min_revision": 5438,
+  "download": {
+    "url": "https://github.com/Brimfyr/RealAtmospheres/releases/download/v1.0.4/RealAtmospheres-v1.0.4-ksa2026.9.22.5482.zip",
+    "sha256": "295A55D34AB9F9617E7521CC2942C427F94230F63454262BD10AB1912FAD3668",
+    "size": 72679295,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4565/Real%20Atmospheres/download/1.0.4"
+    ]
+  },
+  "install_size": 110644702,
+  "install": {
+    "root": "RealAtmospheres",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Brimfyr/RealAtmospheres/releases/tag/v1.0.4",
+  "changelog_text": "**Requires:** [StarMap](https://github.com/StarMapLoader/StarMap) 0.4.7 or later\n**Tested on:** KSA v2026.9.22.5482\n\n### Fixed\n\n- The game failed to start on Windows set to a number format with a decimal comma, such as German, French or Spanish.\n\nInstall with Borea, or follow the [README](https://github.com/Brimfyr/RealAtmospheres#installation).\n\n### Credits\n\n- Saturn map mixed by JCP-JohnCarlo, from work by HellcatF6F, MrSpace43-Celestia, FarGetaNik and Snowfall-The-Cat.\n- Uranus map by Askaniy, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). Our modified Uranus map, cloud mask and flowmap are released under the same licence.\n- Neptune map by Askaniy, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), modified.\n- Mars cirrus, Titan haze and Triton cloud masks: *Produced in part with SpaceEngine PRO © Cosmographic Software LLC.*\n\nThe code is MIT. Because of the Uranus map, the release as a whole is for non-commercial use. [CREDITS.md](https://github.com/Brimfyr/RealAtmospheres/blob/main/CREDITS.md) gives the source and terms of every shipped file.",
+  "listing": {
+    "name": "Real Atmospheres",
+    "authors": [
+      "Brimfyr"
+    ],
+    "abstract": "Physically derived atmospheres, hazes and cloud layers for Kitten Space Agency's real Solar System",
+    "description": "# Real Atmospheres\n\nAtmospheres, hazes and clouds for Kitten Space Agency's Solar System, derived from each body's composition and particle optics. A [StarMap](https://github.com/StarMapLoader/StarMap) mod.\n\nNo game files are modified. At launch the mod builds patched copies of the game's shaders and system XML and loads those instead. If a game update changes a patched part of the XML, that patch is skipped. A game update that changes the atmosphere shaders can stop them compiling, so use a release built for your KSA version.\n\n## Features\n\n### Mars\n\n- Rayleigh scattering from a 95% CO₂ atmosphere at 6.1 mbar\n- Dust scattering from Mie theory, with a 9 km scale height\n- Exact Mie phase function for Martian dust, giving the blue sun halo and blue sunsets\n- Double-exponential dust density profile\n- Water-ice cirrus at 22–29 km, in 2D and volumetric\n\n![Mars from orbit](ksa-image:mars-orbit)\n![Mars's north pole](ksa-image:mars-north-pole)\n![Mars's dust scattering](ksa-image:mars-surface-dust)\n![Mars with clouds overhead](ksa-image:mars-clouds)\n![Mars's blue sunset](ksa-image:mars-sunset)\n\n### Venus\n\n- Dense CO₂ Rayleigh scattering, at 53× Earth's surface density\n- Blue-absorbing haze below the clouds\n\n![Venus from orbit](ksa-image:venus-orbit)\n![Venus's thick fog](ksa-image:venus-surface)\n\n### Jupiter\n\n- H₂/He Rayleigh scattering, with a 25 km scale height\n- Cloud decks at real altitudes: lower deck −1 to 12 km, main deck from 15 km, storms up to 96 km\n\n![Jupiter's clouds](ksa-image:jupiter-low)\n\n### Saturn\n\n- Rayleigh scattering above a thin haze, with methane colouring and a 52 km scale height\n- Volumetric clouds, with cloud height following the planet's map\n- Colour map at 2048 px per cube face (stock: 1024)\n\n![Saturn's clouds](ksa-image:saturn-low)\n\n### Uranus and Neptune\n\n- Methane absorption, with a thin Rayleigh limb and haze\n- Volumetric clouds, with cloud height following the planet's map\n- Colour maps at 2048 px per cube face (stock: 512)\n\n![Uranus's clouds](ksa-image:uranus-low)\n![Neptune's clouds](ksa-image:neptune-low)\n\n### Titan\n\n- Stratified upper haze, animated with simulation time\n- Detached haze layers at 230 and 290 km\n\n![Titan from orbit](ksa-image:titan-orbit)\n![Titan's terminator](ksa-image:titan-terminator)\n![Titan's hazes](ksa-image:titan-hazes)\n\n### Pluto and Triton\n\n- N₂ Rayleigh scattering from measured surface pressure and temperature\n- Forward-scattering haze, visible as a ring when looking toward the Sun\n- Stratified haze bands, animated with simulation time\n- Nitrogen-ice clouds on Triton at 4–6.5 km\n\n![Triton from orbit](ksa-image:triton-orbit)\n![Pluto's limb and hazes](ksa-image:pluto-hazes)\n\n## Installation\n\nRequires [StarMap](https://github.com/StarMapLoader/StarMap). Each release is named with the KSA build it was tested on.\n\n**With Borea:** install Real Atmospheres from the mod list.\n\n**Manually:**\n\n1. Install StarMap and run the game once through `StarMap.Loader.exe`.\n2. Extract the release into `Documents\\My Games\\Kitten Space Agency\\mods\\`, giving `mods\\RealAtmospheres\\RealAtmospheres.dll`.\n3. Launch the game once and close it. KSA adds new mods to `manifest.toml` disabled: set this mod's entry to `enabled = true`.\n4. Launch through StarMap.\n\nTo uninstall, delete `mods\\RealAtmospheres` and `mods\\_RealSharedShadow`.\n\n## Building\n\n`deploy.ps1` builds the mod and installs it into your mods folder. `package.ps1 -Version x.y.z -GameBuild vYYYY.M.D.NNNN` builds a release archive in `dist\\`. Set `StarMapDir` to your StarMap folder.\n\n## Credits\n\n- Saturn map mixed by JCP-JohnCarlo, from work by HellcatF6F, MrSpace43-Celestia, FarGetaNik and Snowfall-The-Cat.\n- Uranus map by Askaniy, [CC BY-NC-SA 3.0](https://creativecommons.org/licenses/by-nc-sa/3.0/). Our modified Uranus map, cloud mask and flowmap are released under the same licence.\n- Neptune map by Askaniy, [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/), modified.\n- Mars cirrus, Titan haze and Triton cloud masks: *Produced in part with SpaceEngine PRO © Cosmographic Software LLC.*\n\nThe code is MIT. Because of the Uranus map, the release as a whole is for non-commercial use. [CREDITS.md](https://github.com/Brimfyr/RealAtmospheres/blob/main/CREDITS.md) gives the source and terms of every shipped file.\n",
+    "license": "MIT AND CC-BY-NC-SA-3.0 AND CC-BY-3.0",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/real-atmospheres.1258/",
+      "repository": "https://github.com/Brimfyr/RealAtmospheres",
+      "bugtracker": "https://github.com/Brimfyr/RealAtmospheres/issues"
+    }
+  }
+}
