@@ -70,9 +70,10 @@ jobs:
           ref: main
           token: ${{ steps.app-token.outputs.token }}
 
-      # The authored documents the tick reads, and tools/images.py, the image
-      # fetch rules the checks there use. A checkout costs one clone instead of
-      # one API request per listing.
+      # The authored documents the tick reads, tools/images.py, the image fetch
+      # rules the checks there use, and tools/ownership.py, which names the
+      # owner an issue mentions. A checkout costs one clone instead of one API
+      # request per listing.
       - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/content-index

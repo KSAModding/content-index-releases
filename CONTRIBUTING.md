@@ -37,6 +37,7 @@ You may amend a listing you are the verified owner of, through the same ownershi
 A steward may narrow any.
 A steward, or anyone else, who widens a release for its owner puts the owner's request into the pull request description as one line, `Requested by the author: <link>`, and a steward merges it after reading that request.
 A widening without the owner and without that line fails.
+When somebody else changes a release of your listing, for example a steward who narrows it, the bot's comment on their pull request mentions you.
 
 ### Making an amendment
 
@@ -119,6 +120,7 @@ When it validates and your ownership of the listing verifies, through the reposi
 A version is stamped exactly once and a release that turns out to be broken is yanked, and a corrected one gets a new version.
 When every URL of a published release answers for a day that the archive is gone, the watcher marks the release as gone, and a client stops offering it for a new install (RFC 0078).
 Uploading the same archive to the same URL again removes the mark.
+The watcher tells you about a mark, its removal and every problem it finds with your listing in an issue on content-index, which mentions you.
 A listing that names a release host under `[releases]` does not use this path, because the watcher stamps its releases.
 With `since` under `[releases]`, the watcher also stamps the older releases from that version on, and a dispatch with `backfill` stamps the rest.
 

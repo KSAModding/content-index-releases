@@ -6,7 +6,8 @@ Scan every authored listing's authority host, stamp every release that appeared
 after the newest one already stamped, commit it, keep the release notes of every
 stamped release the host lists equal to the notes on the host, fetch the
 listing's images again, keep one error issue per listing current on the authored
-repository, and sweep that repository's open pull requests.
+repository, which mentions the owner of the listing, and sweep that repository's
+open pull requests.
 
 Older releases are left alone, and a listing's first tick takes its newest
 release only, because RFC 0031 freezes the authored facts "current at release
@@ -23,7 +24,8 @@ drops or cancels costs latency and not data, and a re-run stamps nothing twice.
 
 Per-release derivation is tools/stamp_release.py, the hosts are tools/hosts.py.
 The image fetch rules are tools/images.py of the authored checkout, the code the
-checks of RFC 0058 run, so the two cannot disagree.
+checks of RFC 0058 run, so the two cannot disagree. The owner an issue mentions
+is who tools/ownership.py of the authored checkout names, through tools/decide.py.
 """
 
 import argparse
@@ -43,6 +45,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import decide
 import hosts
 from check_amendment import precedence
 from hosts import HostError
@@ -74,6 +77,12 @@ NO_RUN_MARKER = "<!-- watcher:no-run={sha} -->"
 
 # The same marker read back, to find which listing an open issue belongs to.
 MARKED_LISTING = re.compile(r"<!-- watcher:listing=(\S+) -->")
+
+# Ends the line of an issue body that names the owner, so a tick that changes
+# nothing keeps that line without asking the host again. At the start of the
+# line, it would make GitHub render the whole line as HTML, mention included.
+OWNER_MARKER = "<!-- watcher:owner -->"
+OWNER_LINE = re.compile(rf"^(.+) {re.escape(OWNER_MARKER)}\r?$", re.MULTILINE)
 
 BACKTICKED = re.compile(r"`([^`]+)`")
 
@@ -293,12 +302,17 @@ class Issues:
     the body is rewritten to the current failure, and a comment is added only
     when the failure itself changed, so a host that stays down is one issue and
     no notifications.
+
+    `owner` gives the line that mentions the owner of a listing, or says why
+    nobody is told. It is asked only for what notifies: a new issue, a comment
+    on a changed failure, and a note.
     """
 
-    def __init__(self, api, label, log=print):
+    def __init__(self, api, label, log=print, owner=None):
         self.api = api
         self.label = label
         self.log = log
+        self.owner = owner or (lambda listing_id: "")
         self._open = {}
         self._degraded = False
 
@@ -409,10 +423,13 @@ class Issues:
         """
         try:
             issue = self.find(listing_id, cache) or self.last(listing_id, cache)
+            if issue is None and self._degraded:
+                self.log("  the note waits: the issue list could not be read this tick")
+                return False
+            owner = self.owner(listing_id)
+            if owner:
+                text = f"{text}\n\n{owner}"
             if issue is None:
-                if self._degraded:
-                    self.log("  the note waits: the issue list could not be read this tick")
-                    return False
                 body = f"{LISTING_MARKER.format(id=listing_id)}\n{text}"
                 created = self._open_issue(f"{listing_id}: releases gone from their host", body)
                 if not created:
@@ -451,7 +468,6 @@ class Issues:
 
     def _report(self, listing_id, errors, cache):
         signature = self.signature_of(errors)
-        body = self._body(listing_id, errors, signature)
         title = f"{listing_id}: the watcher found a problem"
         issue = self.find(listing_id, cache)
 
@@ -462,6 +478,7 @@ class Issues:
                     "this tick, and a blind create duplicates"
                 )
                 return
+            body = self._body(listing_id, errors, signature, self.owner(listing_id))
             created = self._open_issue(title, body)
             if created:
                 cache.section("listings", listing_id)["issue"] = created["number"]
@@ -470,14 +487,20 @@ class Issues:
 
         number = issue["number"]
         known = SIGNATURE_MARKER.format(signature=signature) in (issue.get("body") or "")
+        if known:
+            kept = OWNER_LINE.search(issue.get("body") or "")
+            owner = kept.group(1) if kept else ""
+        else:
+            owner = self.owner(listing_id)
+        body = self._body(listing_id, errors, signature, owner)
         self.api.send("PATCH", f"/issues/{number}", {"title": title, "body": body})
         if not known:
-            self.api.send(
-                "POST",
-                f"/issues/{number}/comments",
-                {"body": "The watcher is now failing on something else:\n\n"
-                         + "\n".join(f"- {error}" for error in errors)},
+            comment = "The watcher is now failing on something else:\n\n" + "\n".join(
+                f"- {error}" for error in errors
             )
+            if owner:
+                comment += f"\n\n{owner}"
+            self.api.send("POST", f"/issues/{number}/comments", {"body": comment})
         self.log(f"  kept {self.api.repository}#{number} current")
 
     def open_listings(self):
@@ -548,7 +571,7 @@ class Issues:
         if SIGNATURE_MARKER.format(signature=signature) in (issue.get("body") or ""):
             self.resolve(listing_id, cache, reason)
 
-    def _body(self, listing_id, errors, signature):
+    def _body(self, listing_id, errors, signature, owner=""):
         return "\n".join(
             [
                 LISTING_MARKER.format(id=listing_id),
@@ -557,6 +580,7 @@ class Issues:
                 "",
                 *[f"- {error}" for error in errors],
                 "",
+                *([f"{owner} {OWNER_MARKER}", ""] if owner else []),
                 "The watcher retries every tick and keeps this issue current rather than",
                 "opening a new one. It closes by itself once a tick evaluates the listing",
                 "without an error.",
@@ -761,7 +785,7 @@ class Watcher:
         self.cache = Cache(options.cache, log=self.log)
         self.http = hosts.Http(token=options.token, log=self.log)
         self.api = Api(self.http, options.authored_repo, options.dry_run, self.log)
-        self.issues = Issues(self.api, options.issue_label, self.log)
+        self.issues = Issues(self.api, options.issue_label, self.log, owner=self.owner_line)
         self.game_versions = json.loads(
             Path(options.game_versions).read_text(encoding="utf-8")
         )["versions"]
@@ -771,6 +795,11 @@ class Watcher:
         self.image_budget = options.image_budget
         self.gone_budget = options.gone_budget
         self.images = None
+        self.proofs = None
+        # The authored document of every listing this tick read, and the owner
+        # line of every listing it told something. Neither outlives the tick.
+        self.documents = {}
+        self.owners = {}
         self.stamped = []
         self.mirrored = []
         self.noted = []
@@ -954,6 +983,7 @@ class Watcher:
                     with path.open("rb") as handle:
                         authored = tomllib.load(handle)
                     listing_id = (authored.get("id") or path.stem).strip()
+                    self.documents[listing_id] = authored
                     problem = self.listing_problem(path, listing_id)
                     if problem:
                         self.log(f"{listing_id}: {problem}")
@@ -1137,6 +1167,48 @@ class Watcher:
                 self.log(f"the images are not checked this tick: {error!r}")
                 self.images = False
         return self.images or None
+
+    def owner_proofs(self):
+        """`ownership.py` of the authored checkout, or None when it does not load."""
+        if self.proofs is None:
+            try:
+                self.proofs = decide.load_ownership(self.authored_root)
+            except Exception as error:  # noqa: BLE001 - no owner is not a failed tick
+                self.log(f"the owners are not looked up this tick: {error!r}")
+                self.proofs = False
+        return self.proofs or None
+
+    def owner_line(self, listing_id):
+        """The line that mentions the owner of the listing, or says why nobody is told.
+
+        The owner is who the proofs on the listing's host name today. The memo
+        in `self.owners` does not outlive the tick and nothing goes into the
+        cache, but an issue body keeps the line it was written with, and a tick
+        with the same failure takes it back from there.
+        """
+        if listing_id not in self.owners:
+            document = self.documents.get(listing_id)
+            proofs = self.owner_proofs() if document is not None else None
+            if document is None:
+                logins, reason = (), "the watcher could not read the listing"
+            elif proofs is None:
+                logins, reason = (), "the ownership proofs of content-index did not load"
+            else:
+                api = decide.Api(
+                    None, None, unavailable=proofs.Unavailable, public_token=self.http.token
+                )
+                logins, reason = decide.owner_logins(proofs, document, api)
+            if logins:
+                self.owners[listing_id] = (
+                    f"{decide.mentions(logins)}, the watcher tells you because you own this "
+                    "listing."
+                )
+            else:
+                self.owners[listing_id] = (
+                    "The watcher tells nobody, because no owner of this listing could be "
+                    f"named: {reason}."
+                )
+        return self.owners[listing_id]
 
     def image_pass(self, listing_id, authored):
         """The image problems of a listing, fetched again once they are due.

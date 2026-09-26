@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import check_amendment
 import check_scope
 from check_release import DEFAULT_AUTHORED, authored_document, authored_root  # noqa: F401
+from stamp_release import valid_id
 
 GITHUB_API = "https://api.github.com"
 GRAPHQL = "https://api.github.com/graphql"
@@ -129,11 +130,12 @@ def _comment(first, verdict, *paragraphs, run_url=""):
     return "\n\n".join(sections)
 
 
-def decide(verdict, candidate, ownership, ownership_result, run_url="", request=None):
+def decide(verdict, candidate, ownership, ownership_result, run_url="", request=None, owners=""):
     """The status reports validation, and ownership only where an owner's change needs it.
 
     Ownership is a separate axis, so an amendment that validates but cannot prove who made it is green and waits for a steward.
     A steward acting alone only narrows (RFC 0079), so an owner's change, such as a widening, fails unless the verified owner makes it or the pull request names the owner's `request`.
+    `owners` is the paragraph of `owner_notes`, which every outcome carries.
     """
     outcome = verdict.get("verdict")
     widens = bool(verdict.get("owner_only"))
@@ -146,6 +148,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                 "The validation rejected this change.",
                 verdict,
                 "Push a fix to run the checks again.",
+                owners,
                 run_url=run_url,
             ),
         )
@@ -158,6 +161,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                 "The validation could not reach a verdict, so nothing is decided yet.",
                 verdict,
                 "Push a fix to run the checks again.",
+                owners,
                 run_url=run_url,
             ),
         )
@@ -177,6 +181,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                     verdict,
                     checked,
                     NO_REQUEST,
+                    owners,
                     run_url=run_url,
                 ),
             )
@@ -196,6 +201,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                 verdict,
                 checked,
                 NO_REQUEST,
+                owners,
                 run_url=run_url,
             ),
         )
@@ -210,6 +216,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                 f"Validation passed, but a steward has to merge this one because {scope_reason}.",
                 verdict,
                 owner_only,
+                owners,
                 run_url=run_url,
             ),
         )
@@ -222,6 +229,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
             comment=_comment(
                 "Validation passed, so this pull request will merge automatically after the required checks finish, and the snapshot rebuild starts after the merge.",
                 verdict,
+                owners,
                 run_url=run_url,
             ),
         )
@@ -236,6 +244,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
                 verdict,
                 f"The ownership check reported: {ownership_result.reason}.",
                 owner_only,
+                owners,
                 run_url=run_url,
             ),
         )
@@ -253,6 +262,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
             f"Set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on it, "
             f"or commit `{ownership.MARKER_PATH}` naming your username.",
             owner_only,
+            owners,
             run_url=run_url,
         ),
     )
@@ -322,7 +332,10 @@ class Api:
                 return None
             raise self.unavailable(f"HTTP {error.code} asking for {path}")
         except (OSError, json.JSONDecodeError) as error:
-            raise self.unavailable(str(error)) from error
+            # A URLError prints as "<urlopen error ...>", which a GitHub comment hides as an
+            # HTML tag, so the reason carries only what went wrong.
+            detail = error.reason if isinstance(error, urllib.error.URLError) else error
+            raise self.unavailable(f"GitHub did not answer about {path}: {detail}") from error
 
     def repository_of(self, full_name):
         return self._other(f"/repos/{full_name}")
@@ -359,7 +372,7 @@ class Api:
 
 
 class OwnershipApi:
-    """`ownership.verify` talks to the target repository through this."""
+    """`ownership.verify` and `ownership.owner_logins` talk to the target repository through this."""
 
     def __init__(self, api):
         self.api = api
@@ -372,6 +385,68 @@ class OwnershipApi:
 
     def file(self, full_name, path):
         return self.api.file(full_name, path)
+
+
+# How many listings one verdict comment names owners for, so a wide pull request does not spend the rate limit of the token.
+OWNER_LOOKUPS = 10
+
+
+def mentions(logins):
+    """Every login as `@login`, which makes GitHub notify that account."""
+    return " ".join(f"@{login}" for login in logins)
+
+
+def owner_logins(ownership, document, api):
+    """`ownership.owner_logins` for one listing, as (logins, reason).
+
+    It says why nobody is named when it fails, because a mention never holds up what the caller does.
+    """
+    try:
+        return ownership.owner_logins(document, OwnershipApi(api))
+    except Exception as error:  # noqa: BLE001 - see the docstring
+        return (), f"the owner lookup failed with {type(error).__name__}"
+
+
+def owner_notes(ownership, api, pull, changes, authored=None):
+    """Tell the owners of the listings whose release files somebody else changes.
+
+    The owner is the account the proofs on the listing's host name, read from the content-index checkout, and the owner's own pull request tells nobody.
+    Only an id that satisfies the id rules is looked up or written into Markdown, because the path comes from the pull request.
+    """
+    author = ((pull.get("user") or {}).get("login") or "").lower()
+    listings = {}
+    for path in check_scope.releases(changes):
+        listing_id = check_scope.listing_of(path)
+        if valid_id(listing_id):
+            listings.setdefault(listing_id.lower(), listing_id)
+
+    lines = []
+    for listing_id in list(listings.values())[:OWNER_LOOKUPS]:
+        document, reason = authored_document(authored_root(authored), listing_id)
+        logins = ()
+        if document is not None:
+            logins, reason = owner_logins(ownership, document, api)
+        if any(login.lower() == author for login in logins):
+            continue
+        if logins:
+            own = "owns" if len(logins) == 1 else "own"
+            lines.append(
+                f"- {mentions(logins)} {own} `{listing_id}`, whose release files this pull "
+                "request changes."
+            )
+        else:
+            lines.append(
+                f"- Nobody is told about `{listing_id}`, because no owner could be named: {reason}."
+            )
+    if len(listings) > OWNER_LOOKUPS:
+        lines.append(
+            f"- Nobody is told about {len(listings) - OWNER_LOOKUPS} more listings, because one "
+            f"comment looks up the owners of at most {OWNER_LOOKUPS}."
+        )
+
+    if not lines:
+        return ""
+    return "Owners of what this pull request changes:\n" + "\n".join(lines)
 
 
 AUTO_MERGE = """
@@ -697,9 +772,10 @@ def act(api, ownership, arguments):
                 OwnershipApi(api),
             )
 
+    owners = owner_notes(ownership, api, pull, changes, arguments.authored)
     decision = decide(
         {**verdict, "scope_reason": reason}, candidate, ownership, result, arguments.run_url,
-        named_request(pull.get("body")),
+        named_request(pull.get("body")), owners,
     )
 
     if decision.auto_merge:
@@ -716,6 +792,7 @@ def act(api, ownership, arguments):
                 comment=_comment(
                     "Validation and ownership passed, but auto-merge could not be armed, so a steward has to merge this pull request.",
                     verdict,
+                    owners,
                     run_url=arguments.run_url,
                 ),
             )
