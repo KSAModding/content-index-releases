@@ -282,7 +282,7 @@ class RunAmendment(Repository):
         )
         ownership = types.SimpleNamespace(
             VERIFIED="verified", COULD_NOT_EVALUATE="could-not-evaluate",
-            TOPIC="ksa-index-{login}", MARKER_PATH=".github/ksa-content-index.toml",
+            ADVICE="Prove it on the release host.",
         )
         for name, before, after in cases:
             with self.subTest(name):
@@ -321,7 +321,7 @@ class RunAmendment(Repository):
         self.assertTrue(check.owner_only)
         ownership = types.SimpleNamespace(
             VERIFIED="verified", COULD_NOT_EVALUATE="could-not-evaluate",
-            TOPIC="ksa-index-{login}", MARKER_PATH=".github/ksa-content-index.toml",
+            ADVICE="Prove it on the release host.",
         )
         verdict = validate._verdict([check], True, [PATH])
         for state, merges in (("verified", True), ("unverified", False)):
