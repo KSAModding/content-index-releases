@@ -396,9 +396,15 @@ class ReleaseNotes(unittest.TestCase):
         found = host._release({"tag_name": "v1.0.0", "body": "## Changes\r\n- A", "assets": []})
         self.assertEqual(found.changelog_text, "## Changes\r\n- A")
         self.assertEqual(found.facts()["changelog_text"], "## Changes\r\n- A")
-        for body in (None, 7, ["x"]):
+        self.assertEqual(host._release({"tag_name": "v1.0.0", "body": None}).changelog_text, "")
+        for body in (7, ["x"]):
             payload = {"tag_name": "v1.0.0", "body": body}
             self.assertIsNone(host._release(payload).changelog_text, msg=repr(body))
+
+    def test_notes_the_answer_does_not_carry_are_not_empty_notes(self):
+        # The watcher removes a stamped text only when the host says the notes are empty.
+        host = GitHubHost("o/r", FakeHttp({}), listing_id="Mod")
+        self.assertIsNone(host._release({"tag_name": "v1.0.0"}).changelog_text)
 
     def test_spacedock_reads_the_changelog_of_each_version(self):
         body = json.dumps({
@@ -408,11 +414,13 @@ class ReleaseNotes(unittest.TestCase):
                  "created": "2020-02-01T00:00:00Z", "download_path": "/mod/1/d/1.0.1"},
                 {"friendly_version": "1.0.0", "changelog": None,
                  "created": "2020-01-01T00:00:00Z", "download_path": "/mod/1/d/1.0.0"},
+                {"friendly_version": "0.9.0",
+                 "created": "2019-01-01T00:00:00Z", "download_path": "/mod/1/d/0.9.0"},
             ],
         }).encode()
         http = FakeHttp({"https://spacedock.info/api/mod/1": Response(200, {}, body)})
         releases, _ = SpaceDockHost(1, http).releases()
-        self.assertEqual([entry.changelog_text for entry in releases], ["Fixes.", None])
+        self.assertEqual([entry.changelog_text for entry in releases], ["Fixes.", "", None])
 
 
 class Timestamps(unittest.TestCase):

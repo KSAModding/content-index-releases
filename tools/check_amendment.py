@@ -4,6 +4,7 @@
 
 A steward may narrow a release: a yank, adding or lowering `game_max`, raising `game_min`, tightening a dependency or loader bound, and adding a dependency entry that was missing.
 The owner may also lower `game_min`, raise or remove `game_max`, change `os`, loosen or remove a loader or dependency bound, change the kind of an entry, remove an authored entry, and take back a yank.
+For a listing without `[releases]`, the owner also changes the release notes, which the watcher writes for any other listing.
 A dependency the archive's mod.toml declares stays in the file, and anything else is not an amendment at all.
 """
 
@@ -14,9 +15,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from stamp_release import (
+    CHANGELOG_TEXT_LIMIT,
     DEPENDENCY_KINDS,
     SEMVER,
     StampError,
+    changelog_text,
     game_revision,
     normalize_version,
     valid_id,
@@ -249,22 +252,64 @@ def _watcher_keys_only(base, head):
     return " and ".join(f"'download.{key}'" for key in differ)
 
 
-def check_changelog_text(base, head, errors):
-    """Only the watcher adds `changelog_text`, and nobody changes or removes it (RFC 0064)."""
-    absent = object()
-    before = base.get("changelog_text", absent)
-    after = head.get("changelog_text", absent)
-    if before == after:
+def check_changelog_form(document, errors):
+    """A `changelog_text` in the form the stamper writes, or none (RFC 0064)."""
+    if "changelog_text" not in document:
         return
-    if before is absent:
-        errors.append("'changelog_text' is added, and only the watcher adds it, from the release host")
-    elif after is absent:
+    text = document["changelog_text"]
+    written = changelog_text(text)
+    if not isinstance(text, str):
+        errors.append("changelog_text is not a string")
+    elif not text.strip():
+        errors.append("changelog_text is present and empty, and the stamper leaves empty notes out")
+    elif written is None:
         errors.append(
-            "'changelog_text' is removed, and nobody removes it. The watcher adds it on "
-            "the default branch: rebase and run tools/amend.py again"
+            f"changelog_text is not UTF-8 text of at most {CHANGELOG_TEXT_LIMIT} bytes, "
+            "and the stamper leaves such notes out"
+        )
+    elif written != text:
+        errors.append(
+            "changelog_text has whitespace at an end or a CR line ending, and the "
+            "stamper writes neither"
+        )
+
+
+def reads_listing(base, head):
+    """Whether `changelog_text` changes, which only the listing shows the writer of."""
+    absent = object()
+    return base.get("changelog_text", absent) != head.get("changelog_text", absent)
+
+
+def check_changelog_text(base, head, errors, owner_only, watched=None):
+    """The watcher writes `changelog_text` for a listing with `[releases]`, and the owner for any other (RFC 0079).
+
+    `watched` says whether the listing has `[releases]`, and None means the listing was not read.
+    """
+    if not reads_listing(base, head):
+        return
+    if "changelog_text" not in base:
+        change = "is added"
+    elif "changelog_text" not in head:
+        change = "is removed"
+    else:
+        change = "changed"
+    if watched is None:
+        errors.append(
+            f"'changelog_text' {change}, and the listing was not read, so nothing shows "
+            "whether the watcher writes it"
+        )
+    elif watched:
+        errors.append(
+            f"'changelog_text' {change}, and for a listing with [releases] the watcher alone "
+            "writes it from the notes on the release host: edit the notes there, or rebase "
+            "when the watcher changed the file after this branch was made"
         )
     else:
-        errors.append("'changelog_text' changed, and it never changes after it was added")
+        check_changelog_form(head, errors)
+        owner_only.append(
+            f"'changelog_text' {change}, and for a listing without [releases] only the "
+            "verified owner changes the release notes"
+        )
 
 
 def check_os(base, head, errors, owner_only):
@@ -631,11 +676,12 @@ def _check_source(before, entry, what, errors, owner_only, derived=None):
     )
 
 
-def check_document(path, base, head, errors, owner_only=None, derived=None):
+def check_document(path, base, head, errors, owner_only=None, derived=None, watched=None):
     """One release file. `base` is the default branch's version, and is required.
 
     What only the verified owner of the listing may change goes to `owner_only`, or to `errors` without it, which is the class of a steward acting alone.
     `derived` is what the archive's mod.toml declares, needed when `reads_archive` says so.
+    `watched` says whether the listing has `[releases]`, needed when `reads_listing` says so.
     """
     if owner_only is None:
         owner_only = errors
@@ -649,7 +695,7 @@ def check_document(path, base, head, errors, owner_only=None, derived=None):
     _unknown(head, TOP_LEVEL, path, errors)
     check_path(path, head, errors)
     check_immutable(base, head, errors)
-    check_changelog_text(base, head, errors)
+    check_changelog_text(base, head, errors, owner_only, watched)
     check_os(base, head, errors, owner_only)
     check_game_bounds(base, head, errors, owner_only)
     check_yank(base, head, errors, owner_only)
@@ -670,11 +716,11 @@ def reads_archive(base, head):
     )
 
 
-def check(changes, derived=None):
+def check(changes, derived=None, watched=None):
     """Every changed release file, as `{path: Outcome}`.
 
     `changes` is an iterable of `(path, base, head)`, where a document is None when the file does not exist on that side.
-    `derived` maps a path to what its archive's mod.toml declares.
+    `derived` maps a path to what its archive's mod.toml declares, and `watched` maps a path to whether its listing has `[releases]`.
     """
     results = {}
     for path, base, head in changes:
@@ -689,7 +735,10 @@ def check(changes, derived=None):
             # against, and the scope rule already hands it to a steward.
             notes.append(f"{path} is a new release file rather than an amendment")
         else:
-            check_document(path, base, head, errors, owner_only, (derived or {}).get(path))
+            check_document(
+                path, base, head, errors, owner_only,
+                (derived or {}).get(path), (watched or {}).get(path),
+            )
         results[path] = Outcome(
             "reject" if errors else "pass", errors + notes + owner_only, owner_only=bool(owner_only)
         )

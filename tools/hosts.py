@@ -87,6 +87,8 @@ class HostRelease:
     size: int | None = None
     prerelease: bool = False
     changelog: str | None = None
+    # "" when the host reports no notes, and None when its answer does not say, which the
+    # watcher must not read as notes that were removed.
     changelog_text: str | None = None
     asset_name: str | None = None
     # The archives the host offered when none could be picked, so the error the
@@ -279,8 +281,13 @@ def _count(value):
     return value
 
 
-def _text(value):
-    """A string the host reports, or None."""
+def _notes(payload, key):
+    """The release notes under `key`, "" when the host reports none, or None when it does not say."""
+    if key not in payload:
+        return None
+    value = payload[key]
+    if value is None:
+        return ""
     return value if isinstance(value, str) else None
 
 
@@ -424,7 +431,7 @@ class GitHubHost(Host):
             size=(asset or {}).get("size"),
             prerelease=bool(payload.get("prerelease")),
             changelog=payload.get("html_url"),
-            changelog_text=_text(payload.get("body")),
+            changelog_text=_notes(payload, "body"),
             asset_name=(asset or {}).get("name"),
             candidates=() if asset else tuple(candidates),
             downloads=_count((asset or {}).get("download_count")),
@@ -525,7 +532,7 @@ class SpaceDockHost(Host):
                     content_type="application/zip",
                     prerelease=False,
                     changelog=changelog,
-                    changelog_text=_text(version.get("changelog")),
+                    changelog_text=_notes(version, "changelog"),
                     downloads=_count(version.get("downloads")),
                 )
             )
