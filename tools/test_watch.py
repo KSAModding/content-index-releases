@@ -15,7 +15,7 @@ import tempfile
 import unittest
 import urllib.error
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -23,13 +23,15 @@ from unittest.mock import patch
 import watch
 from check_release import DEFAULT_AUTHORED
 from hosts import HostRelease
-from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, normalize_version, serialize
+from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize
 from watch import (
     IMAGES_VERIFIED,
+    REJECTION_HOURS,
     Cache,
     Issues,
     Sweep,
     Watcher,
+    filled,
     is_history,
     iso,
     load_images,
@@ -1371,6 +1373,207 @@ class OneVersionOneStamp(WatcherCase):
             self.assertEqual(authority.downloads, 0)
             self.assertEqual(len(errors), 1)
             self.assertIn("`0.5` fills to `0.5.0`, the same version as the tag `0.5.0`", errors[0])
+
+
+def catalogue():
+    return [
+        release("0.4.0", "http://a", date="2026-01-01T00:00:00Z"),
+        release("0.5.0-rc.1", "http://b", date="2026-02-01T00:00:00Z"),
+        release("0.5.0", "http://c", date="2026-03-01T00:00:00Z"),
+        release("0.6.0", "http://d", date="2026-04-01T00:00:00Z"),
+    ]
+
+
+def since(value):
+    return {"id": "M", "releases": {"github": "example/m", "since": value}}
+
+
+class OlderReleasesFromSince(WatcherCase):
+    """`since` under [releases] opts a listing into its older releases (RFC 0079)."""
+
+    def setup(self, folder, stamped=(), argv=(), rejects=()):
+        """A watcher whose stamp_one records, and rejects the versions in `rejects`."""
+        for version in stamped:
+            (host,) = [item for item in catalogue() if item.version == version]
+            path = folder / "releases" / "M"
+            path.mkdir(parents=True, exist_ok=True)
+            (path / f"{version}.json").write_text(
+                json.dumps(
+                    {
+                        "id": "M",
+                        "version": version,
+                        "release_date": host.release_date,
+                        "download": {"url": host.url},
+                    }
+                )
+            )
+        watcher = self.watcher(folder, ["--no-commit", *argv])
+        picked = []
+
+        def stamp_one(listing_id, authored, authority, mirror_hosts, release):
+            picked.append(release.version)
+            if release.version in rejects:
+                raise StampError("the archive is not a readable zip")
+
+        watcher.stamp_one = stamp_one
+        return watcher, picked
+
+    def test_every_release_from_since_on_is_stamped(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher, picked = self.setup(Path(name))
+            errors = []
+            settled = watcher.stamp_pass("M", since("0.5"), None, [], catalogue(), errors)
+            self.assertEqual(picked, ["0.5.0", "0.6.0"])
+            self.assertEqual(errors, [])
+            self.assertTrue(settled)
+
+    def test_a_listing_without_since_stamps_as_before(self):
+        for authored in ({"id": "M"}, {"id": "M", "releases": {"github": "example/m"}}):
+            with tempfile.TemporaryDirectory() as name:
+                watcher, picked = self.setup(Path(name))
+                errors = []
+                watcher.stamp_pass("M", authored, None, [], catalogue(), errors)
+                self.assertEqual(picked, ["0.6.0"])
+                self.assertEqual(errors, [])
+
+    def test_since_is_filled_by_the_rule_of_rfc_0072(self):
+        self.assertEqual(filled("1"), "1.0.0")
+        self.assertEqual(filled("v0.5-rc.1+build"), "v0.5.0-rc.1+build")
+        self.assertEqual(filled("1.2.3"), "1.2.3")
+        with tempfile.TemporaryDirectory() as name:
+            watcher, picked = self.setup(Path(name))
+            watcher.stamp_pass("M", since("v0"), None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.4.0", "0.5.0-rc.1", "0.5.0", "0.6.0"])
+
+    def test_a_since_that_is_not_a_version_is_reported_and_stamps_as_before(self):
+        for value in ("0.5.x", 0.5):
+            with tempfile.TemporaryDirectory() as name:
+                watcher, picked = self.setup(Path(name))
+                errors = []
+                watcher.stamp_pass("M", since(value), None, [], catalogue(), errors)
+                self.assertEqual(picked, ["0.6.0"])
+                self.assertEqual(len(errors), 1)
+                self.assertIn("`since` under [releases]", errors[0])
+
+    def test_lowering_since_stamps_more_and_raising_it_removes_nothing(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(folder, stamped=["0.5.0", "0.6.0"])
+            watcher.stamp_pass("M", since("0.4"), None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.4.0", "0.5.0-rc.1"])
+
+            watcher, picked = self.setup(folder)
+            watcher.stamp_pass("M", since("0.6"), None, [], catalogue(), [])
+            self.assertEqual(picked, [])
+            self.assertEqual(sorted(watcher.stamped_versions("M")), ["0.5.0", "0.6.0"])
+
+    def test_a_new_release_below_since_is_still_stamped(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher, picked = self.setup(Path(name), stamped=["0.6.0"])
+            watcher.stamp_pass(
+                "M", since("0.5"), None, [],
+                catalogue() + [release("0.4.1", "http://e", date="2026-05-01T00:00:00Z")],
+                [],
+            )
+            self.assertEqual(picked, ["0.5.0", "0.4.1"])
+
+    def test_older_releases_have_a_budget_of_their_own(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher, picked = self.setup(
+                Path(name), argv=["--since-budget", "1", "--stamp-budget", "1"]
+            )
+            settled = watcher.stamp_pass("M", since("0.1"), None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.4.0", "0.6.0"])
+            self.assertFalse(settled)
+
+    def test_a_rejected_release_is_reported_and_the_others_are_stamped(self):
+        class Authority(FakeAuthority):
+            key = "github:example/m"
+
+            def releases(self, etag=None):
+                return catalogue(), None
+
+        with tempfile.TemporaryDirectory() as name, patch.object(
+            watch.hosts, "build", return_value=(Authority(), [])
+        ):
+            folder = Path(name)
+            watcher, picked = self.setup(folder, rejects={"0.5.0"})
+            (folder / ".authored" / "listings" / "M.toml").write_text(
+                'id = "M"\n\n[releases]\ngithub = "example/m"\nsince = "0.4"\n'
+            )
+            watcher.options.no_sweep = True
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+
+            watcher.tick()
+
+            self.assertEqual(picked, ["0.4.0", "0.5.0-rc.1", "0.5.0", "0.6.0"])
+            self.assertEqual(
+                watcher.issues.reported,
+                [("M", ["`0.5.0`: the archive is not a readable zip"])],
+            )
+
+    def test_a_rejection_is_reported_again_without_a_download_until_an_input_changes(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, picked = self.setup(folder, stamped=["0.6.0"], rejects={"0.5.0"})
+            watcher.stamp_pass("M", since("0.5"), None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.5.0"])
+
+            errors = []
+            settled = watcher.stamp_pass("M", since("0.5"), None, [], catalogue(), errors)
+            self.assertEqual(picked, ["0.5.0"])
+            self.assertEqual(errors, ["`0.5.0`: the archive is not a readable zip"])
+            self.assertTrue(settled)
+
+            edited = {**since("0.5"), "name": "M"}
+            watcher.stamp_pass("M", edited, None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.5.0", "0.5.0"])
+
+            later = now() + timedelta(hours=REJECTION_HOURS)
+            with patch.object(watch, "now", return_value=later):
+                watcher.stamp_pass("M", edited, None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.5.0", "0.5.0", "0.5.0"])
+
+    def test_a_rejection_since_no_longer_reaches_is_not_retried(self):
+        # The author cannot fix an old archive, so raising or removing `since`
+        # is how a rejection goes away, even while the issue still names it.
+        for raised in (since("0.6"), {"id": "M"}):
+            with tempfile.TemporaryDirectory() as name:
+                watcher, picked = self.setup(Path(name), stamped=["0.6.0"], rejects={"0.5.0"})
+                watcher.stamp_pass("M", since("0.5"), None, [], catalogue(), [])
+                self.assertEqual(picked, ["0.5.0"])
+
+                errors = []
+                settled = watcher.stamp_pass(
+                    "M", raised, None, [], catalogue(), errors, attempted={"0.5.0"}
+                )
+                self.assertEqual(picked, ["0.5.0"])
+                self.assertEqual(errors, [])
+                self.assertTrue(settled)
+
+    def test_an_expired_rejection_stays_reported_while_it_waits_for_the_budget(self):
+        rejects = {"0.4.0", "0.5.0-rc.1", "0.5.0"}
+        with tempfile.TemporaryDirectory() as name:
+            watcher, picked = self.setup(
+                Path(name), stamped=["0.6.0"], argv=["--since-budget", "1"], rejects=rejects
+            )
+            for _ in rejects:
+                watcher.since_budget = 1
+                watcher.stamp_pass("M", since("0.4"), None, [], catalogue(), [])
+            self.assertEqual(picked, ["0.4.0", "0.5.0-rc.1", "0.5.0"])
+
+            watcher.since_budget = 1
+            errors = []
+            later = now() + timedelta(hours=REJECTION_HOURS)
+            with patch.object(watch, "now", return_value=later):
+                settled = watcher.stamp_pass("M", since("0.4"), None, [], catalogue(), errors)
+            self.assertEqual(picked, ["0.4.0", "0.5.0-rc.1", "0.5.0", "0.4.0"])
+            self.assertEqual(
+                sorted(errors),
+                sorted(f"`{version}`: the archive is not a readable zip" for version in rejects),
+            )
+            self.assertFalse(settled)
 
 
 class TheLookback(WatcherCase):

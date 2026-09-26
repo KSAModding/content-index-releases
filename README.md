@@ -65,6 +65,16 @@ Each tick asks every listing's authority host for its releases and stamps every 
 
 A listing's first tick stamps its newest release only, and its back catalogue stays unstamped.
 
+A listing that names `since` under `[releases]` opts into its back catalogue (RFC 0079).
+The watcher then also stamps every release of the authority host whose version is at least `since` and that has no release file yet, with the same checks as every stamp.
+`since` is read with the filling rule of RFC 0072, so `since = "1.2"` means `1.2.0`.
+It only adds releases, so a new release below `since` is still stamped, lowering `since` later stamps more releases, and raising it removes nothing.
+An older release gets the listing facts of the tick that stamps it, and the owner corrects them with an amendment.
+Older releases come from a budget of their own, ten per tick, so a long back catalogue does not hold up a new release of another listing.
+A release that fails its checks is reported in the listing's issue and does not stop the others.
+It is downloaded again when its archive, the listing or the game release list changes, and otherwise once a day.
+Raising `since` above a rejected release, or removing `since`, takes that release out of the report.
+
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
 | Tool | What it does |
