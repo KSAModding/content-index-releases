@@ -1,0 +1,40 @@
+{
+  "spec_version": 1,
+  "id": "KSA_SeaDragon",
+  "type": "mod",
+  "version": "0.2.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-26T09:21:47Z",
+  "game_min": "2026.9.22.5482",
+  "game_min_revision": 5482,
+  "download": {
+    "url": "https://spacedock.info/mod/4593/Sea%20Dragon/download/0.2.1",
+    "sha256": "ABD17491F7841A7402626D657362C2834B821BF003AF96C44D7A503AA04D1E23",
+    "size": 932702,
+    "content_type": "application/zip"
+  },
+  "install_size": 2458439,
+  "install": {
+    "root": "KSA_SeaDragon",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4593/Sea%20Dragon",
+  "changelog_text": "Fixed TVC on Stage 1 and Vernier thrusters",
+  "listing": {
+    "name": "Sea Dragon",
+    "authors": [
+      "Spaceman_3D"
+    ],
+    "abstract": "Adds the Sea Dragon Rocket to KSA",
+    "license": "GPL-3.0",
+    "tags": [
+      "parts"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/sea-dragon.1263/",
+      "spacedock": "https://spacedock.info/mod/4593/Sea%20Dragon"
+    }
+  }
+}
