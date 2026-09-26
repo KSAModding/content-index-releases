@@ -20,8 +20,7 @@ STUB = '''
 VERIFIED = "verified"
 UNVERIFIED = "unverified"
 COULD_NOT_EVALUATE = "could-not-evaluate"
-MARKER_PATH = ".github/ksa-content-index.toml"
-TOPIC = "ksa-index-{login}"
+ADVICE = "Prove it on the release host."
 
 
 class Unavailable(Exception):
@@ -51,6 +50,22 @@ def stub_ownership(root):
     return Path(root)
 
 
+def real_ownership(test):
+    """content-index's `ownership.py`, or a skip where it is not checked out."""
+    # The same two places load_ownership looks, so this runs wherever it can.
+    # CI checks the authored half out and sets CONTENT_INDEX.
+    root = Path(os.environ.get("CONTENT_INDEX") or decide.DEFAULT_AUTHORED)
+    path = root / "tools" / "ownership.py"
+    if not path.is_file():
+        test.skipTest("content-index is not checked out next to this repository")
+    # Loaded under its own name: another test has put the stub into
+    # sys.modules as `ownership`, and load_ownership would hand that back.
+    spec = importlib.util.spec_from_file_location("real_ownership_under_test", path)
+    ownership = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(ownership)
+    return ownership
+
+
 class LoadOwnership(unittest.TestCase):
     def test_a_missing_checkout_is_named(self):
         with tempfile.TemporaryDirectory() as folder:
@@ -64,18 +79,8 @@ class LoadOwnership(unittest.TestCase):
         self.assertEqual(ownership.VERIFIED, "verified")
 
     def test_the_real_ownership_module_carries_what_this_repository_uses(self):
-        # The same two places load_ownership looks, so this runs wherever it can.
-        # CI checks the authored half out and sets CONTENT_INDEX.
-        root = Path(os.environ.get("CONTENT_INDEX") or decide.DEFAULT_AUTHORED)
-        path = root / "tools" / "ownership.py"
-        if not path.is_file():
-            self.skipTest("content-index is not checked out next to this repository")
-        # Loaded under its own name: another test has put the stub into
-        # sys.modules as `ownership`, and load_ownership would hand that back.
-        spec = importlib.util.spec_from_file_location("real_ownership_under_test", path)
-        ownership = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(ownership)
-        for name in ("VERIFIED", "UNVERIFIED", "COULD_NOT_EVALUATE", "TOPIC", "MARKER_PATH"):
+        ownership = real_ownership(self)
+        for name in ("VERIFIED", "UNVERIFIED", "COULD_NOT_EVALUATE", "ADVICE"):
             self.assertTrue(hasattr(ownership, name), name)
         self.assertTrue(callable(ownership.verify))
         self.assertTrue(callable(ownership.owner_logins))
@@ -162,7 +167,7 @@ class Decide(Ownership):
         self.assertFalse(decision.auto_merge)
         self.assertTrue(decision.needs_steward)
         self.assertIn("no proof", decision.comment)
-        self.assertIn("ksa-index-<your-github-username>", decision.comment)
+        self.assertIn(self.ownership.ADVICE, decision.comment)
 
     def test_a_stewards_own_widening_is_refused(self):
         decision = decide.decide(
@@ -269,6 +274,44 @@ class Decide(Ownership):
                 self.result(self.ownership.UNVERIFIED, "x"),
             )
             self.assertLessEqual(len(decision.description), 140)
+
+
+class Advice(unittest.TestCase):
+    """The unverified comment against the real `ownership.py`, whose advice it shows."""
+
+    def setUp(self):
+        self.ownership = real_ownership(self)
+
+    def comments(self):
+        unverified = self.ownership.Result(self.ownership.UNVERIFIED, "no proof")
+        release = decide.decide({"verdict": "pass"}, True, self.ownership, unverified)
+        amendment = decide.decide(
+            {"verdict": "pass", "owner_only": True}, True, self.ownership, unverified,
+            request="https://github.com/KSAModding/content-index-releases/issues/1",
+        )
+        for name, decision in (("release", release), ("amendment", amendment)):
+            self.assertTrue(decision.needs_steward, name)
+            yield name, decision.comment
+
+    def test_the_advice_names_the_fork_rule_and_the_spacedock_step(self):
+        for name, comment in self.comments():
+            with self.subTest(name):
+                self.assertIn("when it is not a fork", comment)
+                self.assertIn("A fork also passes when your account owns it", comment)
+                self.assertIn("source code link on SpaceDock", comment)
+
+    def test_the_advice_is_the_text_of_content_index(self):
+        for name, comment in self.comments():
+            with self.subTest(name):
+                self.assertIn(self.ownership.ADVICE, comment)
+                self.assertEqual(comment.count(self.ownership.MARKER_PATH), 1)
+
+    def test_a_plain_github_listing_still_gets_the_topic_and_the_marker_file(self):
+        topic = self.ownership.TOPIC.format(login="<your-github-username>")
+        for name, comment in self.comments():
+            with self.subTest(name):
+                self.assertIn(f"Either set the topic `{topic}` on it", comment)
+                self.assertIn(f"commit `{self.ownership.MARKER_PATH}` naming your username", comment)
 
 
 class Agrees(unittest.TestCase):

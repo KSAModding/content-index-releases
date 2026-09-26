@@ -258,9 +258,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url="", request=
             verdict,
             f"The ownership check reported: {ownership_result.reason}.",
             "A release file is submitted or amended by the verified owner of the listing, or by a steward. "
-            "The proof is something only you can put on the release repository. "
-            f"Set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on it, "
-            f"or commit `{ownership.MARKER_PATH}` naming your username.",
+            f"{ownership.ADVICE}",
             owner_only,
             owners,
             run_url=run_url,
