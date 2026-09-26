@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "RealStars",
+  "type": "mod",
+  "version": "1.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-26T13:44:27Z",
+  "game_min": "2026.9.22.5482",
+  "game_min_revision": 5482,
+  "download": {
+    "url": "https://github.com/Brimfyr/RealStars/releases/download/v1.1.0/RealStars-v1.1.0-ksa2026.9.22.5482.zip",
+    "sha256": "CC78546E1F1872E81F15A876B6B059CBF28DF9AE3B01B7232B6B72BAB4D22EC6",
+    "size": 3451251,
+    "content_type": "application/zip"
+  },
+  "install_size": 4668716,
+  "install": {
+    "root": "RealStars",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Brimfyr/RealStars/releases/tag/v1.1.0",
+  "changelog_text": "**Requires:** [StarMap](https://github.com/StarMapLoader/StarMap) 0.4.7 or later\n**Tested on:** KSA v2026.9.22.5482\n\n### Added\n\n- Proper motion: stars are placed for the game's date and move on as game time passes.\n- A soft glow around bright sources, the eye's veiling glare, which gives the Sun a corona.\n- The Sun's starburst comes from the part of the Sun still in view, past vessels, planets and the edge of the screen.\n\n### Changed\n\n- Star catalogue of 123,568 AT-HYG v3.2 stars to magnitude 9, with Gaia DR3 distances, replacing the 83,337 Hipparcos stars. The catalogue file is now CC BY-SA 4.0; the code stays MIT.\n- Starbursts rebuilt from a simulation of the human eye (Ritschel et al., 2009): about a thousand fine needles with coloured fringes.\n- One starburst model for every source: needles grow with brightness, and Jupiter, Sirius and the brightest stars now show small starbursts.\n- The game's Threshold Bloom and Global Bloom no longer bury the starbursts or put grey halos around bright stars and planets.\n\n### Fixed\n\n- The Sun's starburst showed through clouds, even from Venus's surface, and stayed white at sunset. It now dims with the clouds and takes the colour of the sunlight reaching you.\n- Stars and planets were dimmed by the atmosphere twice, by most of a magnitude at 10° up.\n- Coloured stars and planets were drawn up to 0.6 magnitudes too faint.\n- Planets' halos and starbursts were drawn too faint.\n- Up close, the Sun's sprite showed around its 3D sphere as a bright ring. It now shrinks into the sphere as the sphere fades in.\n- Switching the stars off in the settings also removed the Sun.\n\nInstall with Borea, or follow the [README](https://github.com/Brimfyr/RealStars#installation).\n\n### Credits\n\n- Star catalogue built from [AT-HYG](https://www.astronexus.com/projects/at-hyg) v3.2 by David Nash (CC BY-SA 4.0), with positions from the Hipparcos Catalogue (ESA 1997, ESA SP-1200), retrieved from [VizieR](https://vizier.cds.unistra.fr/) (CDS, Strasbourg), catalogue I/239. Most distances and motions in AT-HYG come from ESA's Gaia DR3.\n- Starbursts after T. Ritschel, M. Ihrke, J. R. Frisvad, J. Coppens, K. Myszkowski and H.-P. Seidel, \"Temporal Glare: Real-Time Dynamic Simulation of the Scattering in the Human Eye\", Eurographics 2009.\n\nThe code is MIT; the star catalogue is CC BY-SA 4.0. [CREDITS.md](https://github.com/Brimfyr/RealStars/blob/main/CREDITS.md) gives its sources and terms.",
+  "listing": {
+    "name": "Real Stars",
+    "authors": [
+      "Brimfyr"
+    ],
+    "abstract": "Draws stars, planets and the Sun with their real brightness, colour and position.",
+    "description": "# Real Stars\n\nStars, planets and the Sun drawn with their real brightness, colour and position, for Kitten Space Agency. A [StarMap](https://github.com/StarMapLoader/StarMap) mod.\n\nNo game files are modified. At launch the mod builds patched copies of the game's star, planet and Sun shaders and loads those instead. If a game update changes one of those shaders, it is left stock until the mod is updated. Works alongside Real Atmospheres.\n\n## Features\n\n### Stars\n\n- 123,568 stars from the AT-HYG catalogue, to magnitude 9, coloured from their B−V index\n- Brightness from magnitude, drawn with a realistic point spread function\n- Parallax: stars sit at their real distances and shift as you travel\n- Proper motion: stars are placed for the game's date and move on as time passes\n- Twinkling through atmospheres, stronger and more colourful toward the horizon, following simulation time\n\n### Planets\n\n- Brightness from albedo, phase and distance, on the same magnitude scale as the stars\n- Saturn's rings add to its brightness\n- Planets and moons dim in their parent's shadow\n- Twinkling reduced by apparent size\n\n### The Sun\n\n- Drawn as a star at every distance, at its real angular size, shrinking into the 3D sphere up close\n- Sphere at its real size and photosphere colour, with limb darkening\n- Dims as it fills more of the screen\n- Replaces the stock sun sprite and lens flare\n\n### Occlusion and starbursts\n\n- Stars, planets and the Sun fade behind planets, atmospheres and vessels, and the Sun's starburst behind clouds\n- Starbursts modelled on a simulation of the human eye: about a thousand fine needles with coloured fringes, on the Sun, the bright planets and the brightest stars\n- A soft glow around bright sources, the eye's veiling glare, gives the Sun a corona\n- The Sun's starburst comes from the part of the Sun still in view, in the colour of the sunlight reaching you\n- Starbursts fade as their source is covered or leaves the screen\n- The Sun's starburst is drawn over everything else\n- Starbursts follow the game's lens flare setting, and the game's bloom settings no longer bury them\n\n## Screenshots\n\n![Earth and Orion](ksa-image:earth-and-orion)\n![The Sun from the Moon's surface](ksa-image:moon-surface)\n![Sunset from orbit](ksa-image:orbit-sunset)\n\n## Installation\n\nRequires [StarMap](https://github.com/StarMapLoader/StarMap). Each release is named with the KSA build it was tested on.\n\n**With Borea:** install Real Stars from the mod list.\n\n**Manually:**\n\n1. Install StarMap and run the game once through `StarMap.Loader.exe`.\n2. Extract the release into `Documents\\My Games\\Kitten Space Agency\\mods\\`, giving `mods\\RealStars\\RealStars.dll`.\n3. Launch the game once and close it. KSA adds new mods to `manifest.toml` disabled: set this mod's entry to `enabled = true`.\n4. Launch through StarMap.\n\nTo uninstall, delete `mods\\RealStars`.\n\n## Building\n\n`deploy.ps1` builds the mod and installs it into your mods folder. `package.ps1 -Version x.y.z -GameBuild vYYYY.M.D.NNNN` builds a release archive in `dist\\`. Set `StarMapDir` to your StarMap folder. `make_star_binary.py` rebuilds the star catalogue from AT-HYG v3.2 (`athyg_32_reduced_m10.csv.gz`, in `assets`) and the Hipparcos main catalogue (`hip_main.dat`).\n\n## Credits\n\n- Star catalogue built from [AT-HYG](https://www.astronexus.com/projects/at-hyg) v3.2 by David Nash (CC BY-SA 4.0), with positions from the Hipparcos Catalogue (ESA 1997, ESA SP-1200), retrieved from [VizieR](https://vizier.cds.unistra.fr/) (CDS, Strasbourg), catalogue I/239. Most distances and motions in AT-HYG come from ESA's Gaia DR3.\n- Starbursts after T. Ritschel, M. Ihrke, J. R. Frisvad, J. Coppens, K. Myszkowski and H.-P. Seidel, \"Temporal Glare: Real-Time Dynamic Simulation of the Scattering in the Human Eye\", Eurographics 2009.\n\nThe code is MIT; the star catalogue is CC BY-SA 4.0. [CREDITS.md](https://github.com/Brimfyr/RealStars/blob/main/CREDITS.md) gives its sources and terms.\n",
+    "license": "MIT AND CC-BY-SA-4.0",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/real-stars.1285/",
+      "repository": "https://github.com/Brimfyr/RealStars",
+      "bugtracker": "https://github.com/Brimfyr/RealStars/issues"
+    }
+  }
+}
