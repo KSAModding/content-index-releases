@@ -221,8 +221,10 @@ def apply(document, amendment):
     return changed
 
 
-def amend(paths, amendment):
+def amend(paths, amendment, widenings=None):
     """Apply the amendment to each file and check the result. Returns the writes.
+
+    What only the verified owner of the listing may change goes to `widenings`, and without it the amendment only narrows.
     """
     writes = []
     for path in paths:
@@ -232,10 +234,15 @@ def amend(paths, amendment):
         if not apply(head, amendment):
             continue
 
-        errors = []
+        errors, widened = [], []
 
         where = f"releases/{path.parent.name}/{path.name}"
-        check_amendment.check_document(where, base, head, errors)
+        check_amendment.check_document(where, base, head, errors, widened)
+        if widened and widenings is None:
+            errors.extend(widened)
+            errors.append("only the verified owner of the listing widens a release, with --owner")
+        elif widened:
+            widenings.extend(f"{where}: {message}" for message in widened)
         if errors:
             raise AmendError(
                 f"the amendment to {where} would be rejected:\n  "
@@ -328,9 +335,15 @@ def build_amendment(arguments, game_versions, now):
     return amendment
 
 
-def reminders(amendment):
+def reminders(amendment, widenings=()):
     """What the index cannot do for the author, said once, at the end."""
     lines = []
+    if widenings:
+        lines.append(
+            "This widens what a release claims, so the pull request merges itself only for "
+            "the verified owner of the listing. Whoever acts on the owner's request "
+            f"puts '{check_amendment.REQUEST} <link>' into the pull request description."
+        )
     if amendment.get("loader_min") or amendment.get("loader_max"):
         lines.append(
             "The authored [loader] bounds in content-index are separate. Change them "
@@ -376,6 +389,11 @@ def parse_arguments(argv):
     parser.add_argument("--loader-min", help="raise the loader's min")
     parser.add_argument("--loader-max", help="add or lower the loader's max")
     parser.add_argument(
+        "--owner", action="store_true",
+        help="as the verified owner of the listing, or on the owner's request: a bound may "
+        "also move the other way (RFC 0079)",
+    )
+    parser.add_argument(
         "--dependency-min", action="append", default=[], metavar="ID=VERSION", help="repeatable"
     )
     parser.add_argument(
@@ -409,7 +427,8 @@ def main(argv=None):
             up_to=arguments.up_to,
             everything=arguments.all,
         )
-        writes = amend(paths, amendment)
+        widenings = [] if arguments.owner else None
+        writes = amend(paths, amendment, widenings)
     except AmendError as error:
         print(error, file=sys.stderr)
         return 1
@@ -426,7 +445,7 @@ def main(argv=None):
                 handle.write(text)
             print(f"wrote {path}")
 
-    for line in reminders(amendment):
+    for line in reminders(amendment, widenings):
         print(f"\n{line}")
     return 0
 

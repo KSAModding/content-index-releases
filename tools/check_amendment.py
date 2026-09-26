@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""RFC 0031's amendment class.
+"""The amendment class of RFC 0031, and what RFC 0079 adds for the verified owner of the listing.
 
-Allowed is a yank, adding or lowering `game_max`, raising `game_min`, tightening a dependency or loader bound, and adding a dependency entry that was missing.
-Anything else widens the release, or is not in the class at all.
+A steward may narrow a release: a yank, adding or lowering `game_max`, raising `game_min`, tightening a dependency or loader bound, and adding a dependency entry that was missing.
+The owner may also lower `game_min`, raise or remove `game_max`, change `os`, loosen or remove a loader or dependency bound, change the kind of an entry, remove an authored entry, and take back a yank.
+A dependency the archive's mod.toml declares stays in the file, and anything else is not an amendment at all.
 """
 
 import re
@@ -59,7 +60,6 @@ IMMUTABLE = (
     "version_scheme",
     "release_status",
     "release_date",
-    "os",
     "download",
     "install_size",
     "install",
@@ -67,19 +67,35 @@ IMMUTABLE = (
     "listing",
 )
 
+OS_VALUES = ("windows", "linux", "macos")
+
+# Whoever widens a release for its owner names the owner's request with this line in the
+# pull request description.
+REQUEST = "Requested by the author:"
+
+# Only the watcher writes these, so no amendment touches them.
+WATCHER_DOWNLOAD_KEYS = ("mirrors", "unavailable_since")
+
 LOADER_KEYS = frozenset({"id", "min", "max", "source"})
 DEPENDENCY_KEYS = frozenset({"id", "any_of", "kind", "min", "max", "source"})
 MEMBER_KEYS = frozenset({"id", "min", "max"})
 
 SOURCES = ("authored", "derived")
 
+# The kinds an `any_of` entry may have (RFC 0031), as the stamp also enforces.
+ANY_OF_KINDS = ("required", "recommends")
+
 
 class Outcome:
-    """One file's verdict, in the shape `validate.py` reports."""
+    """One file's verdict, in the shape `validate.py` reports.
 
-    def __init__(self, outcome, messages=()):
+    `owner_only` says that only the verified owner of the listing may make this amendment.
+    """
+
+    def __init__(self, outcome, messages=(), owner_only=False):
         self.outcome = outcome
         self.messages = list(messages)
+        self.owner_only = owner_only
 
 
 def precedence(version):
@@ -124,32 +140,36 @@ def _bound(value, what, errors, side="proposed"):
     return precedence(normalized)
 
 
-def _compare_min(base, head, what, errors):
-    """A `min` may be added or raised, never lowered and never removed."""
+def _compare_min(base, head, what, errors, owner_only):
+    """A `min` that is lowered or removed widens the release."""
     if head is None:
         if base is not None:
-            errors.append(f"{what} removes its min '{base}', which widens the release")
+            owner_only.append(f"{what} removes its min '{base}', which widens the release")
         return
     high = _bound(head, f"{what} min", errors)
     if high is None or base is None:
         return
     low = _bound(base, f"{what} min", errors, side="published")
     if low is not None and high < low:
-        errors.append(f"{what} lowers its min from '{base}' to '{head}', which widens the release")
+        owner_only.append(
+            f"{what} lowers its min from '{base}' to '{head}', which widens the release"
+        )
 
 
-def _compare_max(base, head, what, errors):
-    """A `max` may be added or lowered, never raised and never removed."""
+def _compare_max(base, head, what, errors, owner_only):
+    """A `max` that is raised or removed widens the release."""
     if head is None:
         if base is not None:
-            errors.append(f"{what} removes its max '{base}', which widens the release")
+            owner_only.append(f"{what} removes its max '{base}', which widens the release")
         return
     low = _bound(head, f"{what} max", errors)
     if low is None or base is None:
         return
     high = _bound(base, f"{what} max", errors, side="published")
     if high is not None and low > high:
-        errors.append(f"{what} raises its max from '{base}' to '{head}', which widens the release")
+        owner_only.append(
+            f"{what} raises its max from '{base}' to '{head}', which widens the release"
+        )
 
 
 def _bounds_agree(entry, what, errors):
@@ -207,21 +227,26 @@ def check_immutable(base, head, errors):
             f"'{key}' changed, and identity, the version, the download and the "
             "install data never change after publish"
         )
-        if key == "download" and _only_mirrors_differ(base.get(key), head.get(key)):
-            # The author probably branched before the watcher added a mirror, so it
-            # now looks like their own edit. A rebase clears it up.
+        watched = _watcher_keys_only(base.get(key), head.get(key)) if key == "download" else None
+        if watched:
+            # The author probably branched before the watcher wrote these, so they
+            # now look like their own edit. A rebase clears it up.
             errors.append(
-                "only 'download.mirrors' differs, which the watcher appends on the "
+                f"the download differs only in {watched}, which the watcher writes on the "
                 "default branch: rebase and run tools/amend.py again"
             )
 
 
-def _only_mirrors_differ(base, head):
+def _watcher_keys_only(base, head):
+    """The watcher's download keys that differ, when nothing else in the download does."""
     if not isinstance(base, dict) or not isinstance(head, dict):
-        return False
-    return {key: value for key, value in base.items() if key != "mirrors"} == {
-        key: value for key, value in head.items() if key != "mirrors"
-    }
+        return None
+    if {key: value for key, value in base.items() if key not in WATCHER_DOWNLOAD_KEYS} != {
+        key: value for key, value in head.items() if key not in WATCHER_DOWNLOAD_KEYS
+    }:
+        return None
+    differ = [key for key in WATCHER_DOWNLOAD_KEYS if base.get(key) != head.get(key)]
+    return " and ".join(f"'download.{key}'" for key in differ)
 
 
 def check_changelog_text(base, head, errors):
@@ -242,8 +267,28 @@ def check_changelog_text(base, head, errors):
         errors.append("'changelog_text' changed, and it never changes after it was added")
 
 
-def check_game_bounds(base, head, errors):
-    """`game_min` may be raised and `game_max` added or lowered, never the reverse."""
+def check_os(base, head, errors, owner_only):
+    """Only the owner changes `os`, and absent means no known restriction (RFC 0031)."""
+    if base.get("os") == head.get("os"):
+        return
+    platforms = head.get("os")
+    if platforms is not None and (
+        not isinstance(platforms, list)
+        or not platforms
+        or any(platform not in OS_VALUES for platform in platforms)
+        or len(set(platforms)) != len(platforms)
+    ):
+        errors.append(f"os is absent or a list of distinct platforms from {', '.join(OS_VALUES)}")
+        return
+    owner_only.append(f"os changes from {_platforms(base)} to {_platforms(head)}")
+
+
+def _platforms(document):
+    return ", ".join(document.get("os") or []) or "no restriction"
+
+
+def check_game_bounds(base, head, errors, owner_only):
+    """Lowering `game_min`, or raising or removing `game_max`, widens the release."""
     base_min, head_min = base.get("game_min_revision"), head.get("game_min_revision")
     if not isinstance(base_min, int):
         # The stamper always writes one, so a file without it was never stamped.
@@ -254,20 +299,20 @@ def check_game_bounds(base, head, errors):
     if not isinstance(head_min, int):
         errors.append("game_min_revision is missing or is not a number")
     elif isinstance(base_min, int) and head_min < base_min:
-        errors.append(
+        owner_only.append(
             f"game_min_revision falls from {base_min} to {head_min}, which widens the release"
         )
 
     base_max, head_max = base.get("game_max_revision"), head.get("game_max_revision")
     if head_max is None:
         if base_max is not None:
-            errors.append(
+            owner_only.append(
                 f"game_max_revision {base_max} is removed, which widens the release"
             )
     elif not isinstance(head_max, int):
         errors.append("game_max_revision is not a number")
     elif isinstance(base_max, int) and head_max > base_max:
-        errors.append(
+        owner_only.append(
             f"game_max_revision rises from {base_max} to {head_max}, which widens the release"
         )
 
@@ -295,14 +340,14 @@ def check_game_bounds(base, head, errors):
         )
 
 
-def check_yank(base, head, errors):
-    """A yank is the author retracting one build, and it is not reversible here."""
+def check_yank(base, head, errors, owner_only):
+    """A yank is the author retracting one build, and only the owner takes it back."""
     base_yanked, head_yanked = base.get("yanked"), head.get("yanked")
 
     if head_yanked is not None and head_yanked is not True:
         errors.append("yanked is true on a retracted release and absent otherwise")
-    if base_yanked is True and head_yanked is not True:
-        errors.append("the release is un-yanked, which widens the release")
+    elif base_yanked is True and head_yanked is not True:
+        owner_only.append("the release is un-yanked, which widens the release")
 
     reason = head.get("yanked_reason")
     if reason is None:
@@ -313,8 +358,8 @@ def check_yank(base, head, errors):
         errors.append("yanked_reason is empty")
 
 
-def check_loader(base, head, errors):
-    """Loader bounds tighten on an existing entry, and the entry itself is fixed."""
+def check_loader(base, head, errors, owner_only):
+    """Loader bounds move on an existing entry, and the entry itself is fixed."""
     base_loader, head_loader = base.get("loader"), head.get("loader")
 
     if head_loader is None:
@@ -342,8 +387,8 @@ def check_loader(base, head, errors):
     if head_loader.get("source") != base_loader.get("source"):
         errors.append("the loader's source changed, and it records where the bounds came from")
 
-    _compare_min(base_loader.get("min"), head_loader.get("min"), "the loader", errors)
-    _compare_max(base_loader.get("max"), head_loader.get("max"), "the loader", errors)
+    _compare_min(base_loader.get("min"), head_loader.get("min"), "the loader", errors, owner_only)
+    _compare_max(base_loader.get("max"), head_loader.get("max"), "the loader", errors, owner_only)
     _bounds_agree(head_loader, "the loader", errors)
 
 
@@ -390,6 +435,11 @@ def _check_entry_shape(entry, what, errors):
     if "any_of" in entry:
         if entry.get("id"):
             errors.append(f"{what} carries both id and any_of")
+        if entry.get("kind") in DEPENDENCY_KINDS and entry.get("kind") not in ANY_OF_KINDS:
+            errors.append(
+                f"{what} carries any_of with kind '{entry.get('kind')}', and any_of is valid "
+                "with kind required or recommends"
+            )
         members = entry.get("any_of")
         if not isinstance(members, list) or not members:
             errors.append(f"{what} names no members")
@@ -406,7 +456,7 @@ def _check_entry_shape(entry, what, errors):
     _bounds_agree(entry, what, errors)
 
 
-def _check_members(base_entry, head_entry, what, errors):
+def _check_members(base_entry, head_entry, what, errors, owner_only):
     """An `any_of` set is fixed, and each alternative's own bounds may tighten."""
     base_members = {
         (member.get("id") or "").lower(): member
@@ -428,12 +478,17 @@ def _check_members(base_entry, head_entry, what, errors):
         where = f"{what} member '{name}'"
         if head_members[name].get("id") != base_members[name].get("id"):
             errors.append(f"{where} is renamed, and an id is not rewritten after publish")
-        _compare_min(base_members[name].get("min"), head_members[name].get("min"), where, errors)
-        _compare_max(base_members[name].get("max"), head_members[name].get("max"), where, errors)
+        before, after = base_members[name], head_members[name]
+        _compare_min(before.get("min"), after.get("min"), where, errors, owner_only)
+        _compare_max(before.get("max"), after.get("max"), where, errors, owner_only)
 
 
-def check_dependencies(base, head, errors):
-    """Entries tighten or arrive. None is ever removed or repointed."""
+def check_dependencies(base, head, errors, owner_only, derived=None):
+    """Entries tighten or arrive, and only the owner loosens, re-kinds or removes one.
+
+    A derived entry is never removed, because the loader acts on it, unless an `any_of` entry names it, as the stamp's merge does with an optional one.
+    `derived` is what the archive's mod.toml declares, which shows whether removing an authored entry drops a dependency the loader acts on.
+    """
     head_list = head.get("dependencies")
     base_list = base.get("dependencies")
     if not isinstance(head_list, list):
@@ -457,15 +512,36 @@ def check_dependencies(base, head, errors):
         entry_key(entry): entry for entry in base_list if isinstance(entry, dict)
     }
 
-    for key in sorted(set(base_entries) - set(head_entries), key=str):
-        errors.append(f"{_describe(key)} is removed, which widens the release")
+    alternatives = {name for key in head_entries if key[0] == "any_of" for name in key[1]}
+    ids = {key[1] for key in head_entries if key[0] == "id"}
+    removed = set(base_entries) - set(head_entries)
+    # The names of a removed authored `any_of`, whose declared entries come back as derived.
+    freed = {
+        name
+        for key in removed
+        if key[0] == "any_of" and base_entries[key].get("source") == "authored"
+        for name in key[1]
+    }
+    for key in sorted(removed, key=str):
+        before = base_entries[key]
+        if before.get("source") != "derived":
+            owner_only.append(f"{_describe(key)} is removed, which widens the release")
+            _check_declared(key, ids, alternatives, derived, errors)
+        elif before.get("kind") != "optional" or key[1] not in alternatives:
+            errors.append(
+                f"{_describe(key)} is removed, and a derived entry stays, because the "
+                "loader acts on it"
+            )
 
     for key, entry in sorted(head_entries.items(), key=lambda item: str(item[0])):
         what = _describe(key)
         _check_entry_shape(entry, what, errors)
 
         if key not in base_entries:
-            if entry.get("source") != "authored":
+            restored = (
+                key[0] == "id" and key[1] in freed and derived is not None and entry in derived
+            )
+            if entry.get("source") != "authored" and not restored:
                 errors.append(f"{what} is added with source '{entry.get('source')}', and an "
                               "added entry is authored")
             _check_added_bounds(entry, what, errors)
@@ -473,46 +549,96 @@ def check_dependencies(base, head, errors):
 
         before = base_entries[key]
         if entry.get("kind") != before.get("kind"):
-            errors.append(
-                f"{what} changes kind from '{before.get('kind')}' to '{entry.get('kind')}', "
-                "which is a different relationship rather than a tighter one"
+            owner_only.append(
+                f"{what} changes kind from '{before.get('kind')}' to '{entry.get('kind')}'"
             )
         if "any_of" not in entry and entry.get("id") != before.get("id"):
             errors.append(f"{what} is renamed, and an id is not rewritten after publish")
 
-        _check_source(before, entry, what, errors)
-        _compare_min(before.get("min"), entry.get("min"), what, errors)
-        _compare_max(before.get("max"), entry.get("max"), what, errors)
+        _check_source(before, entry, what, errors, owner_only, derived)
+        _compare_min(before.get("min"), entry.get("min"), what, errors, owner_only)
+        _compare_max(before.get("max"), entry.get("max"), what, errors, owner_only)
         if "any_of" in entry and "any_of" in before:
-            _check_members(before, entry, what, errors)
+            _check_members(before, entry, what, errors, owner_only)
 
 
 def _check_added_bounds(entry, what, errors):
     """The bounds of an added entry, which no comparison ever parses."""
-    _compare_min(None, entry.get("min"), what, errors)
-    _compare_max(None, entry.get("max"), what, errors)
+    _compare_min(None, entry.get("min"), what, errors, errors)
+    _compare_max(None, entry.get("max"), what, errors, errors)
     for member in entry.get("any_of") or []:
         if isinstance(member, dict) and member.get("id"):
             where = f"{what} member '{member['id']}'"
-            _compare_min(None, member.get("min"), where, errors)
-            _compare_max(None, member.get("max"), where, errors)
+            _compare_min(None, member.get("min"), where, errors, errors)
+            _compare_max(None, member.get("max"), where, errors, errors)
 
 
-def _check_source(before, entry, what, errors):
-    """`derived` to `authored` records a bound authored onto the entry."""
-    if entry.get("source") == before.get("source"):
+def _check_declared(key, ids, alternatives, derived, errors):
+    """A removed authored entry may have stood in for one the archive's mod.toml declares, which stays.
+
+    An entry of its id keeps it, and an `any_of` that names it keeps it only when it is optional, as in the stamp's merge, because the loader refuses to start without a required one.
+    """
+    what = _describe(key)
+    if derived is None:
+        errors.append(
+            f"{what} is removed, and the archive was not read, so nothing shows that its "
+            "mod.toml does not declare it"
+        )
         return
-    gained = entry.get("min") != before.get("min") or entry.get("max") != before.get("max")
-    if before.get("source") == "derived" and entry.get("source") == "authored" and gained:
+    declared = {entry["id"].lower(): entry.get("kind") for entry in derived}
+    names = key[1] if key[0] == "any_of" else (key[1],)
+    for name in names:
+        if name not in declared or name in ids:
+            continue
+        if name in alternatives:
+            if declared[name] != "optional":
+                errors.append(
+                    f"{what} is removed, and the archive's mod.toml declares '{name}' as "
+                    "required, so an any_of entry cannot take its place"
+                )
+        else:
+            errors.append(
+                f"{what} is removed, and the archive's mod.toml declares '{name}', so the "
+                "release keeps it as a derived entry"
+            )
+
+
+def _check_source(before, entry, what, errors, owner_only, derived=None):
+    """`derived` to `authored` records a bound or a kind authored onto the entry.
+
+    The way back is the owner turning it derived again, exactly as the archive's mod.toml declares it.
+    """
+    if entry.get("source") == before.get("source"):
+        if entry.get("source") == "derived" and entry.get("kind") != before.get("kind"):
+            errors.append(
+                f"{what} changes kind and stays derived, and a kind the archive's mod.toml "
+                "does not declare is authored"
+            )
+        return
+    changed = any(entry.get(key) != before.get(key) for key in ("kind", "min", "max"))
+    if before.get("source") == "derived" and entry.get("source") == "authored" and changed:
+        return
+    if before.get("source") == "authored" and entry.get("source") == "derived":
+        owner_only.append(f"{what} changes back to what the archive's mod.toml declares")
+        if derived is None:
+            errors.append(f"{what} turns derived, and the archive was not read to confirm it")
+        elif entry not in derived:
+            errors.append(f"{what} turns derived, and the archive's mod.toml does not declare it so")
         return
     errors.append(
         f"{what} changes source from '{before.get('source')}' to '{entry.get('source')}', "
-        "and only a derived entry gaining a bound does that"
+        "and only a derived entry gaining a bound or a kind does that"
     )
 
 
-def check_document(path, base, head, errors):
-    """One release file. `base` is the default branch's version, and is required."""
+def check_document(path, base, head, errors, owner_only=None, derived=None):
+    """One release file. `base` is the default branch's version, and is required.
+
+    What only the verified owner of the listing may change goes to `owner_only`, or to `errors` without it, which is the class of a steward acting alone.
+    `derived` is what the archive's mod.toml declares, needed when `reads_archive` says so.
+    """
+    if owner_only is None:
+        owner_only = errors
     if not isinstance(head, dict):
         errors.append(f"{path} is not a JSON object")
         return
@@ -524,20 +650,35 @@ def check_document(path, base, head, errors):
     check_path(path, head, errors)
     check_immutable(base, head, errors)
     check_changelog_text(base, head, errors)
-    check_game_bounds(base, head, errors)
-    check_yank(base, head, errors)
-    check_loader(base, head, errors)
-    check_dependencies(base, head, errors)
+    check_os(base, head, errors, owner_only)
+    check_game_bounds(base, head, errors, owner_only)
+    check_yank(base, head, errors, owner_only)
+    check_loader(base, head, errors, owner_only)
+    check_dependencies(base, head, errors, owner_only, derived)
 
 
-def check(changes):
+def reads_archive(base, head):
+    """Whether an authored dependency entry is removed or turns derived, which only the archive's mod.toml can vouch for."""
+    base_list, head_list = base.get("dependencies"), head.get("dependencies")
+    if not isinstance(base_list, list) or not isinstance(head_list, list):
+        return False
+    sources = {entry_key(entry): entry.get("source") for entry in head_list if isinstance(entry, dict)}
+    return any(
+        entry.get("source") == "authored" and sources.get(entry_key(entry)) != "authored"
+        for entry in base_list
+        if isinstance(entry, dict)
+    )
+
+
+def check(changes, derived=None):
     """Every changed release file, as `{path: Outcome}`.
 
     `changes` is an iterable of `(path, base, head)`, where a document is None when the file does not exist on that side.
+    `derived` maps a path to what its archive's mod.toml declares.
     """
     results = {}
     for path, base, head in changes:
-        errors, notes = [], []
+        errors, notes, owner_only = [], [], []
         if head is None:
             errors.append(
                 f"{path} is deleted, and a published release stays. "
@@ -548,6 +689,8 @@ def check(changes):
             # against, and the scope rule already hands it to a steward.
             notes.append(f"{path} is a new release file rather than an amendment")
         else:
-            check_document(path, base, head, errors)
-        results[path] = Outcome("reject" if errors else "pass", errors + notes)
+            check_document(path, base, head, errors, owner_only, (derived or {}).get(path))
+        results[path] = Outcome(
+            "reject" if errors else "pass", errors + notes + owner_only, owner_only=bool(owner_only)
+        )
     return results

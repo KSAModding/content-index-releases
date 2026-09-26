@@ -10,6 +10,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.parse
@@ -18,6 +19,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import check_amendment
 import check_scope
 from check_release import DEFAULT_AUTHORED, authored_document, authored_root  # noqa: F401
 
@@ -68,6 +70,34 @@ def load_ownership(authored=None):
     return ownership
 
 
+OWNER_ONLY = (
+    "This amendment widens a release, which only the verified owner of the listing does "
+    "(RFC 0079). The pull request names a request of the owner, and a steward merges it only "
+    "when that request is the owner's."
+)
+
+NO_REQUEST = (
+    "This amendment widens a release, which only the verified owner of the listing does "
+    "(RFC 0079). Whoever acts on the owner's request puts the line "
+    f"`{check_amendment.REQUEST} <link>` into the pull request description, and the checks "
+    "run again."
+)
+
+REQUEST_LINE = re.compile(
+    rf"^[ \t]*{re.escape(check_amendment.REQUEST)}[ \t]*(?:<(https://[^\s<>]+)>|(https://\S+))[ \t\r]*$",
+    re.MULTILINE | re.IGNORECASE,
+)
+
+
+def named_request(body):
+    """The link to the owner's request that the pull request description names, or None.
+
+    The link may stand bare or in angle brackets, which is how Markdown writes an autolink.
+    """
+    match = REQUEST_LINE.search(body or "")
+    return (match.group(1) or match.group(2)) if match else None
+
+
 class Decision:
     def __init__(self, status, description, auto_merge=False, needs_steward=False, comment=None):
         self.status = status
@@ -96,12 +126,14 @@ def _comment(first, verdict, *paragraphs, run_url=""):
     return "\n\n".join(sections)
 
 
-def decide(verdict, candidate, ownership, ownership_result, run_url=""):
-    """The status reports validation alone.
+def decide(verdict, candidate, ownership, ownership_result, run_url="", request=None):
+    """The status reports validation, and ownership only where a widening needs it.
 
     Ownership is a separate axis, so an amendment that validates but cannot prove who made it is green and waits for a steward.
+    A steward acting alone only narrows (RFC 0079), so a widening fails unless the verified owner makes it or the pull request names the owner's `request`.
     """
     outcome = verdict.get("verdict")
+    widens = bool(verdict.get("owner_only"))
 
     if outcome == REJECT:
         return Decision(
@@ -127,22 +159,59 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
             ),
         )
 
-    if not candidate:
-        reason = verdict.get("scope_reason") or (
-            "the change is neither an amendment nor a release pull request"
+    scope_reason = verdict.get("scope_reason") or (
+        "the change is neither an amendment nor a release pull request"
+    )
+    verified = candidate and ownership_result.state == ownership.VERIFIED
+    if widens and not verified and not request:
+        checked = f"The ownership check reported: {ownership_result.reason}." if candidate else ""
+        if candidate and ownership_result.state == ownership.COULD_NOT_EVALUATE:
+            return Decision(
+                "error",
+                "a widening, and ownership could not be checked",
+                comment=_comment(
+                    "Validation passed, but this amendment widens a release and the ownership check reached no verdict, so nothing is decided yet.",
+                    verdict,
+                    checked,
+                    NO_REQUEST,
+                    run_url=run_url,
+                ),
+            )
+        if candidate:
+            first = "This amendment widens a release, and it neither comes from the verified owner of the listing nor names the owner's request, so it cannot merge."
+        else:
+            first = (
+                f"This amendment widens a release, and ownership is not checked because {scope_reason}. "
+                "Ownership is checked only for a pull request that changes release files of one listing and nothing else, "
+                "so this one cannot merge unless it names the owner's request."
+            )
+        return Decision(
+            "failure",
+            "a widening, and neither the owner nor the owner's request",
+            comment=_comment(
+                first,
+                verdict,
+                checked,
+                NO_REQUEST,
+                run_url=run_url,
+            ),
         )
+    owner_only = OWNER_ONLY if widens else ""
+
+    if not candidate:
         return Decision(
             "success",
             "validated, and a steward decides",
             needs_steward=True,
             comment=_comment(
-                f"Validation passed, but a steward has to merge this one because {reason}.",
+                f"Validation passed, but a steward has to merge this one because {scope_reason}.",
                 verdict,
+                owner_only,
                 run_url=run_url,
             ),
         )
 
-    if ownership_result.state == ownership.VERIFIED:
+    if verified:
         return Decision(
             "success",
             "validated, arming auto-merge",
@@ -163,6 +232,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
                 "Validation passed, but the ownership check reached no verdict, so this pull request waits for a steward.",
                 verdict,
                 f"The ownership check reported: {ownership_result.reason}.",
+                owner_only,
                 run_url=run_url,
             ),
         )
@@ -179,6 +249,7 @@ def decide(verdict, candidate, ownership, ownership_result, run_url=""):
             "The proof is something only you can put on the release repository. "
             f"Set the topic `{ownership.TOPIC.format(login='<your-github-username>')}` on it, "
             f"or commit `{ownership.MARKER_PATH}` naming your username.",
+            owner_only,
             run_url=run_url,
         ),
     )
@@ -624,7 +695,8 @@ def act(api, ownership, arguments):
             )
 
     decision = decide(
-        {**verdict, "scope_reason": reason}, candidate, ownership, result, arguments.run_url
+        {**verdict, "scope_reason": reason}, candidate, ownership, result, arguments.run_url,
+        named_request(pull.get("body")),
     )
 
     if decision.auto_merge:

@@ -12,12 +12,15 @@ import os
 import subprocess
 import tempfile
 import tomllib
+import types
 import unittest
 import unittest.mock
+import urllib.error
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import decide
 import hosts
 import validate
 from stamp_release import stamp
@@ -216,11 +219,117 @@ class RunAmendment(Repository):
         check = validate.run_amendment([PATH], base_ref="main")
         self.assertEqual(check.outcome, validate.PASS)
 
-    def test_a_widening_change_is_rejected(self):
+    def test_a_widening_change_passes_and_says_so(self):
+        # Only the verified owner may widen, which the ownership workflow decides.
         self.write(PATH, self.amended(game_min="2026.8.3.5117", game_min_revision=5117))
         check = validate.run_amendment([PATH], base_ref="main")
-        self.assertEqual(check.outcome, validate.REJECT)
+        self.assertEqual(check.outcome, validate.PASS)
+        self.assertTrue(check.owner_only)
         self.assertTrue(any("falls" in message for message in check.messages))
+
+    def publish_with(self, dependency, mod_toml, mirrors=()):
+        """Publish the release with `dependency` authored, and serve an archive with `mod_toml`."""
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as handle:
+            handle.writestr("Mod/Mod.dll", "x")
+            handle.writestr("Mod/mod.toml", mod_toml)
+        payload = buffer.getvalue()
+        download = {**RELEASE["download"], "sha256": hosts.Archive.of_bytes(payload).sha256}
+        if mirrors:
+            download["mirrors"] = list(mirrors)
+        self.write(PATH, self.amended(download=download, dependencies=[dependency]))
+        self.git("add", "-A")
+        self.git("commit", "-m", "Amend Mod 1.0.0")
+        self.write(PATH, self.amended(download=download))
+        return FakeHttp({url: payload for url in [RELEASE["download"]["url"], *mirrors]})
+
+    def test_a_mirror_stands_in_for_a_download_that_is_gone(self):
+        class Gone(FakeHttp):
+            def archive(self, url, api=False, limit=None):
+                if url == RELEASE["download"]["url"]:
+                    raise urllib.error.HTTPError(url, 404, "Not Found", None, None)
+                return super().archive(url, api, limit)
+
+        mirror = "https://example.invalid/mirror.zip"
+        http = self.publish_with(
+            {"id": "Lib", "kind": "required", "source": "authored"}, "", mirrors=[mirror]
+        )
+        check = validate.run_amendment([PATH], base_ref="main", http=Gone(http.routes))
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertTrue(check.owner_only)
+
+    def test_an_authored_entry_the_mod_toml_does_not_declare_can_go(self):
+        http = self.publish_with({"id": "Lib", "kind": "required", "source": "authored"}, "")
+        check = validate.run_amendment([PATH], base_ref="main", http=http)
+        self.assertEqual(check.outcome, validate.PASS)
+        self.assertTrue(check.owner_only)
+
+    def test_an_authored_entry_over_a_mod_toml_dependency_stays(self):
+        mod_toml = '[[StarMap.ModDependencies]]\nModId = "Lib"\n'
+        http = self.publish_with({"id": "Lib", "kind": "required", "source": "authored"}, mod_toml)
+        check = validate.run_amendment([PATH], base_ref="main", http=http)
+        self.assertEqual(check.outcome, validate.REJECT)
+        self.assertTrue(any("mod.toml declares 'lib'" in message for message in check.messages))
+
+    def test_each_widening_of_the_verified_owner_merges_itself(self):
+        capped = {"game_max": "2026.8.19.5261", "game_max_revision": 5261}
+        cases = (
+            ("raises game_max", capped, {"game_max": "2026.9.1.5400", "game_max_revision": 5400}),
+            ("removes game_max", capped, {}),
+            ("lowers game_min", {}, {"game_min": "2026.8.3.5117", "game_min_revision": 5117}),
+            ("takes back a yank", {"yanked": True, "yanked_reason": "It broke."}, {}),
+            ("removes a dependency", None, None),
+        )
+        ownership = types.SimpleNamespace(
+            VERIFIED="verified", COULD_NOT_EVALUATE="could-not-evaluate",
+            TOPIC="ksa-index-{login}", MARKER_PATH=".github/ksa-content-index.toml",
+        )
+        for name, before, after in cases:
+            with self.subTest(name):
+                http = None
+                if before is None:
+                    http = self.publish_with(
+                        {"id": "Lib", "kind": "required", "source": "authored"}, ""
+                    )
+                else:
+                    self.write(PATH, self.amended(**before))
+                    self.git("add", "-A")
+                    self.git("commit", "--allow-empty", "-m", f"Publish before it {name}")
+                    self.write(PATH, self.amended(**after))
+                check = validate.run_amendment([PATH], base_ref="main", http=http)
+                self.assertEqual(check.outcome, validate.PASS, check.messages)
+                self.assertTrue(check.owner_only)
+                verdict = validate._verdict([check], True, [PATH])
+                for state, merges in (("verified", True), ("unverified", False)):
+                    decision = decide.decide(
+                        verdict, True, ownership, types.SimpleNamespace(state=state, reason="")
+                    )
+                    self.assertEqual(decision.auto_merge, merges)
+                    self.assertEqual(decision.status, "success" if merges else "failure")
+
+    def test_a_derived_entry_changes_kind_and_is_never_removed(self):
+        derived = {"id": "Lib", "kind": "optional", "source": "derived"}
+        self.write(PATH, self.amended(dependencies=[derived]))
+        self.git("add", "-A")
+        self.git("commit", "-m", "Publish with a derived dependency")
+        self.write(PATH, self.amended(dependencies=[{**derived, "kind": "required",
+                                                     "source": "authored"}]))
+        check = validate.run_amendment([PATH], base_ref="main")
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertTrue(check.owner_only)
+        self.write(PATH, self.amended(dependencies=[]))
+        check = validate.run_amendment([PATH], base_ref="main")
+        self.assertEqual(check.outcome, validate.REJECT)
+        self.assertTrue(any("a derived entry stays" in message for message in check.messages))
+
+    def test_an_archive_out_of_reach_reaches_no_verdict(self):
+        class Down(FakeHttp):
+            def archive(self, url, api=False, limit=None):
+                raise hosts.HostError("the host is down")
+
+        self.publish_with({"id": "Lib", "kind": "required", "source": "authored"}, "")
+        check = validate.run_amendment([PATH], base_ref="main", http=Down({}))
+        self.assertEqual(check.outcome, validate.COULD_NOT_EVALUATE)
 
     def test_a_message_names_the_file_it_is_about(self):
         self.write(PATH, self.amended(version="9.9.9"))
@@ -429,6 +538,15 @@ class Verdict(Repository):
         self.assertTrue(verdict["auto_merge_candidate"])
         self.assertEqual(verdict["documents"], [PATH])
         self.assertEqual(verdict["schema_version"], validate.VERDICT_SCHEMA_VERSION)
+        self.assertFalse(verdict["owner_only"])
+
+    def test_a_widening_is_named_in_the_verdict(self):
+        self.write(PATH, self.amended(game_min="2026.8.3.5117", game_min_revision=5117))
+        output = self.root / "verdict.json"
+        validate.main(["--changed", PATH, "--base-ref", "main", "--output", str(output)])
+        verdict = self.verdict(output)
+        self.assertEqual(verdict["verdict"], validate.PASS)
+        self.assertTrue(verdict["owner_only"])
 
     def test_a_rejection_leaves_a_non_zero_exit(self):
         self.write(PATH, self.amended(version="9.9.9"))

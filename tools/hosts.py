@@ -27,7 +27,15 @@ import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
 
-from stamp_release import Archive, StampError, normalize_version
+from stamp_release import (
+    Archive,
+    StampError,
+    as_archive,
+    derived_dependencies,
+    normalize_version,
+    open_archive,
+    read_mod_toml,
+)
 
 GITHUB_API = "https://api.github.com"
 GITHUB_API_HOST = urllib.parse.urlsplit(GITHUB_API).hostname
@@ -567,6 +575,49 @@ def download(http, release):
     # the stamper has the bytes to fall back on either way.
     content_type = release.content_type or served
     return archive, content_type
+
+
+def stamped_dependencies(http, document):
+    """The dependencies the archive of a stamped release file declares in its mod.toml, read as a stamp reads them.
+
+    A mirror stands in for a download URL that is gone, because the bytes are the same.
+    HostError says a later run may succeed, and StampError that no URL serves the stamped archive.
+    """
+    download_section = document.get("download") or {}
+    problem = None
+    for url in [download_section.get("url"), *(download_section.get("mirrors") or [])]:
+        try:
+            return _declared_dependencies(http, document, url)
+        except (HostError, StampError) as error:
+            if problem is None or isinstance(error, HostError):
+                problem = error
+    raise problem
+
+
+def _declared_dependencies(http, document, url):
+    download_section = document.get("download") or {}
+    digest = (download_section.get("sha256") or "").upper()
+    release = HostRelease(
+        host="stamped",
+        tag=document.get("version"),
+        version=document.get("version"),
+        release_date=document.get("release_date"),
+        url=url,
+        content_type=download_section.get("content_type"),
+        size=download_section.get("size"),
+    )
+    try:
+        archive, _ = download(http, release)
+    except ValueError as error:
+        raise StampError(f"the archive at {url} cannot be requested: {error}") from error
+    mod_toml = None
+    with as_archive(archive) as archive:
+        if archive.sha256 != digest:
+            raise StampError(f"the archive at {url} no longer matches the stamped sha256")
+        if document.get("type") == "mod":
+            root = (document.get("install") or {}).get("root", "")
+            mod_toml = read_mod_toml(open_archive(archive), root)
+    return derived_dependencies(mod_toml)
 
 
 def named(releases_section, http, listing_id=None):

@@ -160,14 +160,23 @@ A build fails closed: nothing is published, and clients keep the last good snaps
 Identity, the version, the download and the install data never change.
 A release that turns out to be broken is yanked, or superseded by a new version.
 
-The one narrow exception is an amendment, which can only make a release claim less than it claimed before: a yank, a tightened game or dependency bound, or a dependency entry that was missing.
-
-A release file can never become more permissive after publish, and a check enforces that mechanically.
+The one exception is an amendment, which changes only what a release claims to work with: the game bounds, `os`, the loader bounds, the dependencies and a yank.
+Anyone may make a release claim less, and only the verified owner of the listing may make it claim more (RFC 0079).
+A check enforces both mechanically.
 
 ## Amendments
 
-An amendment is a small edit to a release file that is already published, and it can only ever make the release claim less.
+An amendment is a small edit to a release file that is already published.
 Only the author knows that a release broke, and everything after that is arithmetic.
+
+Anyone may narrow a release: yank it, add or lower `game_max`, raise `game_min`, tighten a loader or dependency bound, or add a dependency entry that was missing.
+The verified owner of the listing may also widen it (RFC 0079): lower `game_min`, raise or remove `game_max`, change `os`, loosen or remove a loader or dependency bound, change the kind of an entry, remove an authored entry, or take back a yank.
+Such a pull request merges itself for the verified owner.
+Anyone else who widens a release, a steward included, acts on the owner's request and names it with the line `Requested by the author: <link>` in the pull request description, and a steward merges it after reading that request.
+A widening that neither comes from the verified owner nor names a request fails the `validate` status.
+Removing an authored dependency entry, or turning one back into the derived entry, reads the release archive, because only its `mod.toml` shows which dependencies the loader acts on.
+A dependency the archive's `mod.toml` declares can be tightened and can change its kind, but it stays in the release.
+The loader id and the fields the watcher writes, `download.mirrors`, `download.unavailable_since` and `changelog_text`, stay out of reach of every amendment.
 
 There are three ways to make the edit.
 
@@ -182,6 +191,9 @@ python3 tools/amend.py --listing AdvancedFlightComputer --up-to 0.7.2 --game-max
 ```
 
 That takes every stamped release at or below `0.7.2` by SemVer precedence, resolves the bound against the game release list, and writes the files.
+Without `--owner` it only narrows.
+With `--owner`, for the verified owner of the listing or on the owner's request, a bound may also move the other way.
+Any other widening, such as removing `game_max` or an entry, changing `os` or a kind, or taking back a yank, is made by hand.
 
 | Tool | What it does |
 |---|---|
@@ -192,7 +204,7 @@ That takes every stamped release at or below `0.7.2` by SemVer precedence, resol
 | `tools/validate.py` | The unprivileged verdict, with a read-only token and no secrets. |
 | `tools/decide.py` | The privileged half: ownership, the `validate` status, auto-merge. It imports the proofs from a checkout of [content-index](https://github.com/KSAModding/content-index), the way that repository imports the stamper from here. |
 
-`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: `os` is immutable, and a dependency entry's `source` moves from `derived` to `authored` only together with a bound.
+`check_amendment.py` reads two things into the amendment class that RFC 0031's field tables do not state: a dependency entry's `source` moves from `derived` to `authored` only together with a bound or a kind, and back to `derived` only exactly as the archive's `mod.toml` declares it, and a derived entry gives way only to an `any_of` entry that names it while it is optional, as the stamp's merge does.
 
 To measure a change before opening anything:
 
@@ -213,7 +225,7 @@ The file is an object with two keys.
 | Key | What it holds |
 |---|---|
 | `name` | What the case shows. Unique in the file. |
-| `actor` | Who makes the amendment, `owner` or `steward`. Today both have the same amendment class. |
+| `actor` | Who makes the amendment. `owner` is the verified owner of the listing, or anyone who acts on the owner's request, and may also widen (RFC 0079). `steward` is a steward acting alone, who only narrows. `tools/amend.py` runs an `owner` case with `--owner`. |
 | `base` | The text of the published release file. It is `releases/<id>/<version>.json` by its own `id` and `version`. |
 | `amendment` | The change, as the options of `tools/amend.py` without the leading `--`: `true` for a flag, a string for one value, and a list of strings for a repeatable option. The listing and the one selected release are the base's. |
 | `verdict` | `accepted` when the file changes, `unchanged` when the release already says this and nothing is written, and `rejected` when the amendment is refused and nothing is written. |
