@@ -154,6 +154,13 @@ class PathRules(unittest.TestCase):
         errors = errors_for(head(), path="releases/AdvancedFlightComputer/9.9.9.json")
         self.assertTrue(any("file name says" in message for message in errors))
 
+    def test_a_short_version_names_the_file_it_is_stored_in(self):
+        errors = errors_for(
+            head(version="0.7"), base=head(version="0.7"),
+            path="releases/AdvancedFlightComputer/0.7.json",
+        )
+        self.assertTrue(any("releases/AdvancedFlightComputer/0.7.0.json" in message for message in errors))
+
     def test_an_upper_case_suffix_is_rejected(self):
         errors = errors_for(head(), path="releases/AdvancedFlightComputer/0.7.2.JSON")
         self.assertTrue(any("lowercase .json" in message for message in errors))

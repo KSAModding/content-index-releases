@@ -110,9 +110,28 @@ class Versions(unittest.TestCase):
         self.assertEqual(normalize_version("v1.2.3"), "1.2.3")
         self.assertEqual(normalize_version("1.2.3-rc.1+build.5"), "1.2.3-rc.1+build.5")
 
+    def test_the_table_of_rfc_0072(self):
+        for tag, stored in (
+            ("2.3.4", "2.3.4"),
+            ("v2.3.4", "2.3.4"),
+            ("0.5", "0.5.0"),
+            ("v1", "1.0.0"),
+            ("1.2-rc.1", "1.2.0-rc.1"),
+            ("1.2+build.7", "1.2.0+build.7"),
+            ("2026.9", "2026.9.0"),
+        ):
+            with self.subTest(tag=tag):
+                self.assertEqual(normalize_version(tag), stored)
+
+        for tag in ("0.5.0.1", "01.2.3", "latest"):
+            with self.subTest(tag=tag), self.assertRaisesRegex(
+                StampError, "one to three numeric components without leading zeros"
+            ):
+                normalize_version(tag)
+
     def test_a_version_that_does_not_parse_is_rejected(self):
-        for tag in ("rc", "1.2", "2026.8.3.5117", "", None, "v1.02.3"):
-            with self.assertRaises(StampError):
+        for tag in ("rc", "2026.8.3.5117", "", None, "v1.02.3", "1.", ".5", "V1.2", "1.2-01"):
+            with self.subTest(tag=tag), self.assertRaises(StampError):
                 normalize_version(tag)
 
     def test_a_nightly_does_not_look_like_a_release(self):
@@ -248,6 +267,22 @@ class Stamp(unittest.TestCase):
             [entry["id"] for entry in document["dependencies"]],
             ["KittenExtensions", "MeasureTools"],
         )
+
+    def test_a_short_tag_stamps_its_filled_version(self):
+        document = self.stamp(release={**RELEASE, "tag": "v1.2-rc.1"})
+        self.assertEqual(document["version"], "1.2.0-rc.1")
+        self.assertEqual(document["release_status"], "testing")
+
+    def test_short_authored_bounds_are_filled_by_the_same_rule(self):
+        listing = {
+            **LISTING,
+            "loader": {"id": "StarMap", "min": "0.4", "max": "v1"},
+            "dependencies": [{"id": "MeasureTools", "kind": "optional", "min": "1.2"}],
+        }
+        document = self.stamp(listing=listing)
+        self.assertEqual((document["loader"]["min"], document["loader"]["max"]), ("0.4.0", "1.0.0"))
+        entry = next(item for item in document["dependencies"] if item["id"] == "MeasureTools")
+        self.assertEqual(entry["min"], "1.2.0")
 
     def test_an_archive_in_a_file_stamps_like_its_bytes(self):
         # A download streams into a file and brings its digest and size along,

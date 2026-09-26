@@ -187,6 +187,16 @@ def check_path(path, head, errors):
         errors.append(
             f"{path} carries the version '{head.get('version')}', and the file name says '{stem}'"
         )
+        return
+    try:
+        stored = normalize_version(stem)
+    except StampError:
+        return  # A new file fails its stamp for it, with the reason.
+    if stored != stem:
+        errors.append(
+            f"{path} names the version '{stem}', which the index stores as '{stored}', "
+            f"so the file is releases/{folder}/{stored}.json with the version '{stored}'"
+        )
 
 
 def check_immutable(base, head, errors):

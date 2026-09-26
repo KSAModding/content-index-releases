@@ -64,21 +64,26 @@ def select(paths, versions=None, up_to=None, everything=False):
         return list(paths)
 
     if up_to is not None:
-        try:
-            ceiling = precedence(up_to)
-        except ValueError as error:
-            raise AmendError(str(error)) from error
+        ceiling = precedence(_version(up_to))
         chosen = [path for path in paths if precedence(path.stem) <= ceiling]
         if not chosen:
             raise AmendError(f"no stamped release is at or below {up_to}")
         return chosen
 
-    wanted = list(versions or [])
+    wanted = [_version(version) for version in versions or []]
     by_version = {path.stem: path for path in paths}
     missing = [version for version in wanted if version not in by_version]
     if missing:
         raise AmendError(f"not stamped: {', '.join(missing)}")
     return [by_version[version] for version in wanted]
+
+
+def _version(value):
+    """A version as the index stores it, so `0.7` selects `0.7.0`."""
+    try:
+        return normalize_version(value)
+    except StampError as error:
+        raise AmendError(str(error)) from error
 
 
 def _reorder(entry, order):
