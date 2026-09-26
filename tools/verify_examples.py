@@ -119,10 +119,12 @@ def archive_facts(document, with_mirrors=True):
         # Measured under a root the listing chose.
         facts.pop("install_size", None)
 
-    if not with_mirrors and "download" in facts:
-        # Without the flag these went into the stamp, so it would compare them to itself.
+    if "download" in facts:
+        # Without the flag the mirrors went into the stamp, so it would compare them to
+        # itself, and whether the archive is still on its host is no fact a stamp derives.
+        skipped = ("unavailable_since",) if with_mirrors else ("mirrors", "unavailable_since")
         facts["download"] = {
-            key: value for key, value in facts["download"].items() if key != "mirrors"
+            key: value for key, value in facts["download"].items() if key not in skipped
         }
     return facts
 

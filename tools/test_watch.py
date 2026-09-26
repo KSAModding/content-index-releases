@@ -22,7 +22,7 @@ from unittest.mock import patch
 
 import watch
 from check_release import DEFAULT_AUTHORED
-from hosts import HostRelease
+from hosts import HostError, HostRelease
 from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize
 from watch import (
     IMAGES_VERIFIED,
@@ -92,9 +92,14 @@ class RecorderIssues:
         self.reasons = []
         self.listings = listings or {}
         self.degraded = degraded
+        self.notes = []
 
     def report(self, listing_id, errors, cache):
         self.reported.append((listing_id, list(errors)))
+
+    def note(self, listing_id, text, cache):
+        self.notes.append((listing_id, text))
+        return True
 
     def resolve(self, listing_id, cache, reason=None):
         self.resolved.append(listing_id)
@@ -1885,6 +1890,507 @@ class IssueRobustness(unittest.TestCase):
         api = StubApi({"/issues": [{"number": 7, "state": "open", "body": body}]})
         Issues(api, "watcher", log=lambda _: None).resolve_if("A", "0000", Cache(None))
         self.assertEqual(api.sent, [])
+
+
+GONE_URL = "http://a/M.zip"
+MIRROR_URL = "http://mirror/M.zip"
+
+
+def gone_file(folder, **download):
+    """A stamped release file of M 1.0.0 whose archive is the bytes `bytes`."""
+    return stamped_file(
+        folder,
+        download={"url": GONE_URL, "sha256": digest_of(b"bytes"), "size": 5,
+                  "content_type": "application/zip", **download},
+    )
+
+
+class ListingHost(FakeAuthority):
+    """An authority host whose release list a test sets, and None for an unchanged answer."""
+
+    key = "github:example/m"
+    truncated = False
+
+    def __init__(self, listed=(), payload=b"bytes"):
+        super().__init__(payload)
+        self.listed = list(listed)
+        self.fetched = []
+
+    def releases(self, etag=None):
+        return self.listed, None
+
+    def download(self, entry):
+        self.fetched.append(entry.url)
+        return super().download(entry)
+
+
+class Statuses:
+    """What each URL answers to a status request, and which URLs were asked."""
+
+    def __init__(self, answers):
+        self.answers = answers
+        self.asked = []
+
+    def __call__(self, url, api=False):
+        self.asked.append(url)
+        answer = self.answers[url]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+START = datetime(2026, 9, 20, tzinfo=timezone.utc)
+
+
+def at(hours):
+    return patch.object(watch, "now", return_value=START + timedelta(hours=hours))
+
+
+class GoneCase(WatcherCase):
+    """One stamped release of M in a folder, and a cache kept across watchers."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.folder = Path(self.directory.name)
+        self.store = None
+
+    def watcher_with(self, answers, argv=()):
+        watcher = self.watcher(self.folder, ["--no-commit", *argv])
+        if self.store is not None:
+            watcher.cache = self.store
+        self.store = watcher.cache
+        watcher.http.status = Statuses(answers)
+        return watcher
+
+    def gone(self, hours, host, answers=None, argv=()):
+        """One gone pass at START plus `hours`, with `answers` to the status requests."""
+        watcher = self.watcher_with(answers or {}, argv)
+        errors = []
+        with at(hours):
+            watcher.gone_pass("M", host, host.releases()[0], errors)
+        return watcher, errors
+
+    def document(self):
+        return json.loads((self.folder / "releases" / "M" / "1.0.0.json").read_text())
+
+
+class GoneFromTheHost(GoneCase):
+    """A stamped release the host no longer serves is marked, and unmarked when it is back (RFC 0078)."""
+
+    def test_a_release_the_host_stops_listing_is_marked_after_a_day_of_gone_answers(self):
+        gone_file(self.folder)
+        host = ListingHost()
+        watcher, _ = self.gone(0, host)
+        self.assertEqual(watcher.http.status.asked, [])
+        watcher, _ = self.gone(23, host)
+        self.assertEqual(watcher.http.status.asked, [])
+        self.assertNotIn("unavailable_since", self.document()["download"])
+
+        watcher, errors = self.gone(24, host, {GONE_URL: 404})
+
+        self.assertEqual(watcher.http.status.asked, [GONE_URL])
+        download = self.document()["download"]
+        self.assertEqual(download["unavailable_since"], iso(START + timedelta(hours=24)))
+        self.assertEqual(list(download)[-1], "unavailable_since")
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+        self.assertEqual(len(watcher.notes["M"]), 1)
+        self.assertIn("`1.0.0`", watcher.notes["M"][0])
+        self.assertEqual(errors, [])
+
+        before = self.document()
+        watcher, _ = self.gone(72, host)
+        self.assertEqual(self.document(), before)
+        self.assertEqual(watcher.http.status.asked, [])
+
+    def test_every_gone_code_marks_and_every_stamped_url_is_asked(self):
+        for code in (404, 410, 451):
+            with self.subTest(code=code):
+                gone_file(self.folder, mirrors=[MIRROR_URL])
+                self.store = None
+                host = ListingHost()
+                self.gone(0, host)
+                watcher, _ = self.gone(24, host, {GONE_URL: code, MIRROR_URL: 404})
+                self.assertEqual(watcher.http.status.asked, [GONE_URL, MIRROR_URL])
+                self.assertIn("unavailable_since", self.document()["download"])
+
+    def test_any_other_answer_marks_nothing_and_asks_again_a_day_later(self):
+        for answer in (200, 403, 500, HostError("down")):
+            with self.subTest(answer=answer):
+                gone_file(self.folder)
+                self.store = None
+                host = ListingHost()
+                self.gone(0, host)
+                watcher, _ = self.gone(24, host, {GONE_URL: answer})
+                self.assertEqual(watcher.http.status.asked, [GONE_URL])
+                self.assertNotIn("unavailable_since", self.document()["download"])
+
+                watcher, _ = self.gone(47, host)
+                self.assertEqual(watcher.http.status.asked, [])
+                watcher, _ = self.gone(48, host, {GONE_URL: 404})
+                self.assertIn("unavailable_since", self.document()["download"])
+
+    def test_a_mirror_that_still_serves_keeps_the_release_unmarked_and_is_told_once(self):
+        gone_file(self.folder, mirrors=[MIRROR_URL])
+        host = ListingHost()
+        answers = {GONE_URL: 404, MIRROR_URL: 200}
+        self.gone(0, host)
+        watcher, _ = self.gone(24, host, answers)
+        self.assertNotIn("unavailable_since", self.document()["download"])
+        [note] = watcher.notes["M"]
+        self.assertIn("mirror", note)
+
+        watcher, _ = self.gone(48, host, answers)
+        self.assertEqual(watcher.http.status.asked, [GONE_URL, MIRROR_URL])
+        self.assertEqual(watcher.notes, {})
+
+    def test_a_release_listed_again_ends_the_wait(self):
+        gone_file(self.folder)
+        self.gone(0, ListingHost())
+        self.gone(12, ListingHost([release("1.0.0", GONE_URL, size=5)]))
+        watcher, _ = self.gone(25, ListingHost())
+        self.assertEqual(watcher.http.status.asked, [])
+
+    def test_a_stamped_url_that_is_not_the_picked_archive_counts_as_listed(self):
+        gone_file(self.folder)
+        listed = HostRelease(
+            host="github", tag="v1.0.0", version="1.0.0", release_date=None,
+            url=None, archives=("http://a/Other.zip", GONE_URL),
+        )
+        self.gone(0, ListingHost([listed]))
+        watcher, _ = self.gone(24, ListingHost([listed]), {GONE_URL: 404})
+        self.assertEqual(watcher.http.status.asked, [])
+
+    def test_a_truncated_answer_is_no_observation(self):
+        gone_file(self.folder)
+        host = ListingHost()
+        host.truncated = True
+        self.gone(0, host)
+        watcher, _ = self.gone(24, host, {GONE_URL: 404})
+        self.assertEqual(watcher.http.status.asked, [])
+        self.assertNotIn("M/1.0.0", self.store.data["gone"])
+
+    def test_an_unchanged_answer_repeats_the_last_one(self):
+        gone_file(self.folder)
+        unchanged = ListingHost()
+        unchanged.listed = None
+        watcher, _ = self.gone(0, unchanged)
+        self.assertNotIn("M/1.0.0", self.store.data["gone"])
+
+        self.gone(1, ListingHost())
+        watcher, _ = self.gone(25, unchanged, {GONE_URL: 404})
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+
+    def test_a_host_that_cannot_be_evaluated_neither_starts_nor_ends_a_wait(self):
+        class Down(ListingHost):
+            def releases(self, etag=None):
+                raise HostError("down")
+
+        class NoRepository(ListingHost):
+            def releases(self, etag=None):
+                raise StampError("the authority host has no repository")
+
+        gone_file(self.folder)
+        (self.folder / ".authored" / "listings").mkdir(parents=True, exist_ok=True)
+        self.gone(0, ListingHost())
+        for host in (Down(), NoRepository()):
+            with patch.object(watch.hosts, "build", return_value=(host, [])):
+                watcher = self.watcher_with({GONE_URL: 404})
+                watcher.images = FakeImages()
+                watcher.issues = RecorderIssues()
+                with at(30):
+                    watcher.one_listing("M", {"id": "M"})
+                self.assertEqual(watcher.http.status.asked, [])
+                self.assertEqual(self.store.data["gone"]["M/1.0.0"], {"since": iso(START)})
+
+    def test_a_lost_cache_restarts_the_wait(self):
+        gone_file(self.folder)
+        self.gone(0, ListingHost())
+        self.store = None
+        self.gone(12, ListingHost())
+        watcher, _ = self.gone(24, ListingHost(), {GONE_URL: 404})
+        self.assertEqual(watcher.http.status.asked, [])
+
+    def test_the_budget_asks_every_url_of_a_release_or_none(self):
+        gone_file(self.folder, mirrors=[MIRROR_URL])
+        self.gone(0, ListingHost())
+        answers = {GONE_URL: 404, MIRROR_URL: 404}
+        watcher, _ = self.gone(24, ListingHost(), answers, ["--gone-budget", "1"])
+        self.assertEqual(watcher.http.status.asked, [])
+        watcher, _ = self.gone(25, ListingHost(), answers)
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+
+    def test_the_stamped_bytes_listed_again_remove_the_mark(self):
+        gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        host = ListingHost([release("1.0.0", GONE_URL, size=5)])
+        watcher, errors = self.gone(0, host)
+        self.assertEqual(host.fetched, [GONE_URL])
+        self.assertNotIn("unavailable_since", self.document()["download"])
+        self.assertEqual(watcher.unmarked, ["M 1.0.0"])
+        self.assertIn("again", watcher.notes["M"][0])
+        self.assertEqual(errors, [])
+
+    def test_other_bytes_listed_again_are_a_swap_and_keep_the_mark(self):
+        gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        host = ListingHost([release("1.0.0", GONE_URL, size=5)], payload=b"other")
+        for _ in range(2):
+            _, errors = self.gone(0, host)
+            self.assertEqual(len(errors), 1)
+            self.assertIn(digest_of(b"other"), errors[0])
+        self.assertEqual(host.fetched, [GONE_URL])
+        self.assertEqual(self.document()["download"]["unavailable_since"], "2026-09-01T00:00:00Z")
+
+        unchanged = ListingHost()
+        unchanged.listed = None
+        _, errors = self.gone(1, unchanged)
+        self.assertEqual(len(errors), 1)
+
+    def test_bytes_that_could_not_be_checked_refetch_the_list_until_they_are(self):
+        class EtagHost(ListingHost):
+            """Answers unchanged to its own ETag, and fails the first download."""
+
+            def __init__(self):
+                super().__init__([release("1.0.0", GONE_URL, size=5)])
+                self.polls = []
+
+            def releases(self, etag=None):
+                self.polls.append(etag)
+                return (None, "E1") if etag == "E1" else (self.listed, "E1")
+
+            def download(self, entry):
+                if not self.fetched:
+                    self.fetched.append(entry.url)
+                    raise HostError("timed out")
+                return super().download(entry)
+
+        gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        host = EtagHost()
+        for hours in (0, 1):
+            with patch.object(watch.hosts, "build", return_value=(host, [])):
+                watcher = self.watcher_with({})
+                watcher.images = FakeImages()
+                watcher.issues = RecorderIssues()
+                with at(hours):
+                    watcher.one_listing("M", {"id": "M"})
+        self.assertEqual(host.polls, [None, None])
+        self.assertEqual(host.fetched, [GONE_URL, GONE_URL])
+        self.assertNotIn("unavailable_since", self.document()["download"])
+
+    def test_the_stamped_bytes_at_a_new_url_add_a_mirror_and_remove_the_mark(self):
+        path = gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        watcher = self.watcher_with({})
+        watcher.check_for_a_swap(
+            "M", FakeAuthority(), release("1.0.0", "http://a/new/M.zip", size=5), path, []
+        )
+        download = self.document()["download"]
+        self.assertEqual(download["mirrors"], ["http://a/new/M.zip"])
+        self.assertNotIn("unavailable_since", download)
+        self.assertEqual(watcher.unmarked, ["M 1.0.0"])
+
+    def test_a_mark_is_told_and_does_not_keep_the_issue_open(self):
+        gone_file(self.folder)
+        self.gone(0, ListingHost())
+        (self.folder / ".authored" / "listings" / "M.toml").write_text('id = "M"\n')
+        with patch.object(watch.hosts, "build", return_value=(ListingHost(), [])):
+            watcher = self.watcher_with({GONE_URL: 404}, ["--no-sweep"])
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+            with at(24):
+                watcher.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(watcher.issues.resolved, ["M"])
+        [(listing, text)] = watcher.issues.notes
+        self.assertEqual(listing, "M")
+        self.assertIn("`1.0.0` is gone from its host", text)
+
+    def test_a_note_reaches_the_author_when_a_later_step_raises(self):
+        (self.folder / ".authored" / "listings").mkdir(parents=True, exist_ok=True)
+        (self.folder / ".authored" / "listings" / "M.toml").write_text('id = "M"\n')
+        watcher = self.watcher_with({}, ["--no-sweep"])
+        watcher.images = FakeImages()
+        watcher.issues = RecorderIssues()
+
+        def one_listing(listing_id, authored):
+            watcher.tell_later(listing_id, "marked")
+            raise RuntimeError("later step")
+
+        watcher.one_listing = one_listing
+        watcher.tick()
+        self.assertEqual(len(watcher.issues.reported), 1)
+        [(listing, text)] = watcher.issues.notes
+        self.assertEqual(listing, "M")
+        self.assertIn("- marked", text)
+
+    def test_a_note_that_could_not_be_sent_waits_for_the_next_tick(self):
+        watcher = self.watcher_with({})
+        watcher.issues = RecorderIssues()
+        watcher.issues.note = lambda listing_id, text, cache: False
+        watcher.tell_later("M", "first")
+        watcher.tell("M")
+
+        watcher.issues = RecorderIssues()
+        watcher.tell_later("M", "second")
+        watcher.tell("M")
+        [(_, text)] = watcher.issues.notes
+        self.assertIn("- first\n- second", text)
+
+
+class GoneWithoutReleases(GoneCase):
+    """A listing without [releases] has its stamped URLs asked once a day (RFC 0078)."""
+
+    def ask(self, hours, answers, payload=b"bytes", argv=()):
+        watcher = self.watcher_with(answers, argv)
+        fetched = []
+
+        def download(http, entry):
+            fetched.append(entry.url)
+            return payload, "application/zip"
+
+        errors = []
+        with at(hours), patch.object(watch.hosts, "download", download):
+            watcher.gone_by_request("M", errors)
+        return watcher, errors, fetched
+
+    def test_every_answer_gone_over_a_day_marks(self):
+        gone_file(self.folder)
+        watcher, _, _ = self.ask(0, {GONE_URL: 404})
+        self.assertEqual(watcher.http.status.asked, [GONE_URL])
+        watcher, _, _ = self.ask(23, {GONE_URL: 404})
+        self.assertEqual(watcher.http.status.asked, [])
+        watcher, _, _ = self.ask(24, {GONE_URL: 410})
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+
+    def test_an_answer_that_could_not_be_evaluated_is_no_observation(self):
+        gone_file(self.folder)
+        self.ask(0, {GONE_URL: 404})
+        watcher, _, _ = self.ask(24, {GONE_URL: HostError("down")})
+        self.assertEqual(watcher.marked, [])
+        watcher, _, _ = self.ask(48, {GONE_URL: 404})
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+
+    def test_any_other_answer_ends_the_wait(self):
+        gone_file(self.folder)
+        self.ask(0, {GONE_URL: 404})
+        self.ask(24, {GONE_URL: 403})
+        watcher, _, _ = self.ask(48, {GONE_URL: 404})
+        self.assertEqual(watcher.marked, [])
+        watcher, _, _ = self.ask(72, {GONE_URL: 404})
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+
+    def test_a_success_with_the_stamped_bytes_removes_the_mark(self):
+        gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        watcher, errors, fetched = self.ask(0, {GONE_URL: 200})
+        self.assertEqual(fetched, [GONE_URL])
+        self.assertEqual(watcher.unmarked, ["M 1.0.0"])
+        self.assertNotIn("unavailable_since", self.document()["download"])
+        self.assertEqual(errors, [])
+
+    def test_bytes_the_budget_did_not_check_are_asked_on_the_next_tick(self):
+        gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        watcher, _, fetched = self.ask(0, {GONE_URL: 200}, argv=["--gone-budget", "1"])
+        self.assertEqual((watcher.unmarked, fetched), ([], []))
+        watcher, _, fetched = self.ask(1, {GONE_URL: 200})
+        self.assertEqual(fetched, [GONE_URL])
+        self.assertEqual(watcher.unmarked, ["M 1.0.0"])
+
+    def test_other_bytes_keep_the_mark_and_stay_reported_between_the_daily_checks(self):
+        gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        _, errors, fetched = self.ask(0, {GONE_URL: 200}, payload=b"other")
+        self.assertEqual(fetched, [GONE_URL])
+        self.assertEqual(len(errors), 1)
+        watcher, errors, fetched = self.ask(1, {})
+        self.assertEqual((watcher.http.status.asked, fetched), ([], []))
+        self.assertEqual(len(errors), 1)
+        self.assertIn("unavailable_since", self.document()["download"])
+
+    def test_a_tick_asks_a_listing_without_releases(self):
+        gone_file(self.folder)
+        watcher = self.watcher_with({GONE_URL: 404}, ["--no-sweep"])
+        (self.folder / ".authored" / "listings" / "M.toml").write_text('id = "M"\n')
+        watcher.images = FakeImages()
+        watcher.issues = RecorderIssues()
+        watcher.tick()
+        self.assertEqual(watcher.http.status.asked, [GONE_URL])
+
+
+def issue_routes(open_issues=(), every_issue=()):
+    """An API whose issue list answers by state, as GitHub does."""
+    return StubApi(
+        {
+            "/issues": lambda query: list(
+                open_issues if query.get("state") == "open" else every_issue
+            )
+        }
+    )
+
+
+class Notes(unittest.TestCase):
+    MARKED = "<!-- watcher:listing=M -->\nold"
+
+    def note(self, api, store=None):
+        return Issues(api, "watcher", log=lambda _: None).note("M", "gone", store or cache())
+
+    def test_a_note_goes_to_the_open_issue_and_leaves_it_open(self):
+        issue = {"number": 7, "state": "open", "body": self.MARKED}
+        api = issue_routes([issue], [issue])
+        self.assertTrue(self.note(api))
+        self.assertEqual(api.sent, [("POST", "/issues/7/comments", {"body": "gone"})])
+
+    def test_without_an_open_issue_the_last_closed_one_gets_the_note(self):
+        closed = [
+            {"number": 3, "state": "closed", "body": self.MARKED},
+            {"number": 9, "state": "closed", "body": self.MARKED},
+            {"number": 12, "state": "closed", "body": "<!-- watcher:listing=Other -->"},
+        ]
+        api = issue_routes([], closed)
+        store = cache()
+        self.assertTrue(self.note(api, store))
+        self.assertEqual(api.sent, [("POST", "/issues/9/comments", {"body": "gone"})])
+        self.assertEqual(store.section("listings", "M")["last_issue"], 9)
+
+    def test_a_listing_that_never_had_an_issue_gets_one_closed_at_once(self):
+        api = issue_routes()
+        self.assertTrue(self.note(api))
+        [(_, _, created), closing] = api.sent
+        self.assertIn("<!-- watcher:listing=M -->", created["body"])
+        self.assertEqual(closing, ("PATCH", "/issues/42", {"state": "closed"}))
+
+    def test_an_issue_list_that_could_not_be_read_opens_nothing(self):
+        def failing(query):
+            raise http_error(500)
+
+        api = StubApi({"/issues": failing})
+        self.assertFalse(self.note(api))
+        self.assertEqual(api.sent, [])
+
+    def test_a_note_issue_that_could_not_be_closed_still_counts_as_sent(self):
+        class CloseRefusingApi(StubApi):
+            def send(self, method, path, payload):
+                if method == "PATCH":
+                    raise HostError("down")
+                return super().send(method, path, payload)
+
+        store = cache()
+        self.assertTrue(self.note(CloseRefusingApi(issue_routes().routes), store))
+        self.assertEqual(store.section("listings", "M")["last_issue"], 42)
+
+    def test_a_newer_issue_a_human_closed_gets_the_note(self):
+        old = {"number": 5, "state": "closed", "body": self.MARKED}
+        newer = {"number": 9, "state": "closed", "body": self.MARKED}
+        store = cache()
+        store.section("listings", "M").update(last_issue=5, issue=9)
+        api = StubApi({"/issues/5": old, "/issues/9": newer, "/issues": []})
+        self.assertTrue(self.note(api, store))
+        self.assertEqual(api.sent, [("POST", "/issues/9/comments", {"body": "gone"})])
+
+    def test_a_closed_issue_remembers_itself_for_the_next_note(self):
+        issue = {"number": 7, "state": "open", "body": self.MARKED}
+        store = cache()
+        Issues(issue_routes([issue]), "watcher", log=lambda _: None).resolve("M", store)
+        closed = dict(issue, state="closed")
+        api = StubApi({"/issues/7": closed, "/issues": []})
+        self.assertTrue(self.note(api, store))
+        self.assertEqual(api.sent, [("POST", "/issues/7/comments", {"body": "gone"})])
 
 
 class RerunRefusingApi(StubApi):

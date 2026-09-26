@@ -124,6 +124,11 @@ def check_shape(path, head, errors):
                 "download.mirrors is the watcher's to append, once a further host from "
                 "[releases] serves the same bytes, and a submitted release names one host"
             )
+        if "unavailable_since" in download:
+            errors.append(
+                "download.unavailable_since is the watcher's to write, once a published "
+                "release is gone from its host, and a submitted release is on its host"
+            )
         if not _address(download.get("url")):
             errors.append(f"download.url {download.get('url')!r} is not an http or https address")
         if download.get("content_type") not in ZIP_CONTENT_TYPES:

@@ -64,6 +64,9 @@ CHUNK_BYTES = MIB
 
 LINK_NEXT = re.compile(r'<([^>]+)>;\s*rel="next"')
 
+# The answers that say an archive is gone, a fact about the release and not a bad moment of the host.
+GONE = (404, 410, 451)
+
 
 class HostError(Exception):
     """The host could not be evaluated this tick. Transient by assumption."""
@@ -96,6 +99,9 @@ class HostRelease:
     candidates: tuple = ()
     # The download count of the picked archive, or None.
     downloads: int | None = None
+    # Every archive URL the host lists for the release, so a stamped URL that is
+    # not the picked archive still counts as listed.
+    archives: tuple = ()
 
     def facts(self):
         """The release facts the stamper takes."""
@@ -161,6 +167,16 @@ class Http:
                 dict(answer.headers),
             ),
         )
+
+    def status(self, url, api=False):
+        """The status a GET of `url` answers after its redirects, without reading the body.
+
+        Raises HostError when the host could not be evaluated, as `get` does.
+        """
+        try:
+            return self._send(url, self._headers(None, None, api), lambda answer: answer.status)
+        except urllib.error.HTTPError as error:
+            return error.code
 
     def _headers(self, accept, etag, api):
         headers = {"User-Agent": USER_AGENT}
@@ -435,6 +451,11 @@ class GitHubHost(Host):
             asset_name=(asset or {}).get("name"),
             candidates=() if asset else tuple(candidates),
             downloads=_count((asset or {}).get("download_count")),
+            archives=tuple(
+                item["browser_download_url"]
+                for item in payload.get("assets") or []
+                if item.get("state") == "uploaded" and item.get("browser_download_url")
+            ),
         )
 
     def _asset(self, payload):
@@ -522,18 +543,20 @@ class SpaceDockHost(Host):
         releases = []
         for version in versions:
             tag = (version.get("friendly_version") or "").strip()
+            url = _on_host(SPACEDOCK, version.get("download_path"), "the download path")
             releases.append(
                 HostRelease(
                     host=self.kind,
                     tag=tag,
                     version=_version_of(tag),
                     release_date=_utc(version.get("created")),
-                    url=_on_host(SPACEDOCK, version.get("download_path"), "the download path"),
+                    url=url,
                     content_type="application/zip",
                     prerelease=False,
                     changelog=changelog,
                     changelog_text=_notes(version, "changelog"),
                     downloads=_count(version.get("downloads")),
+                    archives=(url,) if url else (),
                 )
             )
         return releases, None
@@ -572,7 +595,7 @@ def download(http, release):
     except urllib.error.HTTPError as error:
         # A gone archive is a fact about the release, reported to the author.
         # Everything else is the host having a bad moment this tick.
-        if error.code in (404, 410, 451):
+        if error.code in GONE:
             raise StampError(
                 f"the archive at {release.url} is gone (HTTP {error.code})"
             ) from error
@@ -601,10 +624,10 @@ def stamped_dependencies(http, document):
     raise problem
 
 
-def _declared_dependencies(http, document, url):
+def stamped_release(document, url):
+    """The release a stamped release file describes, served from `url`, one of its stamped URLs."""
     download_section = document.get("download") or {}
-    digest = (download_section.get("sha256") or "").upper()
-    release = HostRelease(
+    return HostRelease(
         host="stamped",
         tag=document.get("version"),
         version=document.get("version"),
@@ -613,8 +636,12 @@ def _declared_dependencies(http, document, url):
         content_type=download_section.get("content_type"),
         size=download_section.get("size"),
     )
+
+
+def _declared_dependencies(http, document, url):
+    digest = ((document.get("download") or {}).get("sha256") or "").upper()
     try:
-        archive, _ = download(http, release)
+        archive, _ = download(http, stamped_release(document, url))
     except ValueError as error:
         raise StampError(f"the archive at {url} cannot be requested: {error}") from error
     mod_toml = None

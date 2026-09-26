@@ -105,6 +105,14 @@ class Dropped(unittest.TestCase):
         self.assertNotIn("mirrors", archive_facts(stamped, with_mirrors=False)["download"])
         self.assertIn("mirrors", archive_facts(stamped, with_mirrors=True)["download"])
 
+    def test_a_gone_mark_the_watcher_wrote_after_publish(self):
+        marked = release()
+        marked["download"] = dict(marked["download"], unavailable_since="2026-09-23T10:24:00Z")
+        for with_mirrors in (True, False):
+            self.assertEqual(
+                archive_facts(marked, with_mirrors), archive_facts(release(), with_mirrors)
+            )
+
 
 class Comparison(unittest.TestCase):
     """What the check does with two documents, which is the point of the split."""

@@ -1,7 +1,8 @@
 # Ask every listing's authority host for its releases and stamp every release
 # that appeared after the newest one already stamped (RFC 0033). A back
 # catalogue is left alone, unless the listing names `since` under [releases]
-# (RFC 0079) or the backfill input asks for it.
+# (RFC 0079) or the backfill input asks for it. A stamped release whose archive
+# is gone from its host is marked as gone, and unmarked when it is back (RFC 0078).
 #
 # The tick holds no state. What is stamped in the repository is the state, so a
 # dropped run costs latency and not data, and a re-run stamps nothing twice.
