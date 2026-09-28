@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "MacOSMoltenPatcher",
+  "type": "mod",
+  "version": "0.0.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-09-28T04:25:05Z",
+  "game_min": "2026.9.22.5482",
+  "game_min_revision": 5482,
+  "download": {
+    "url": "https://github.com/renancamm/ksa-macos-molten-patcher/releases/download/v0.0.1/MacOSMoltenPatcher.zip",
+    "sha256": "07FA776421E3CBBE8FA384BC97451AB3C74296640045BD93B6CB6A89869A1525",
+    "size": 4580655,
+    "content_type": "application/zip"
+  },
+  "install_size": 12332456,
+  "install": {
+    "root": "MacOSMoltenPatcher",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/renancamm/ksa-macos-molten-patcher/releases/tag/v0.0.1",
+  "changelog_text": "sha256: 07fa776421e3cbbe8fa384bc97451ab3c74296640045bd93b6cb6a89869a1525\n\n**Full Changelog**: https://github.com/renancamm/ksa-macos-molten-patcher/commits/v0.0.1",
+  "listing": {
+    "name": "ksa-macos-molten-patcher",
+    "authors": [
+      "Beik"
+    ],
+    "abstract": "Kitten Space Agency mod that makes the Windows game run on macOS in a Sikarugir (Wine) wrapper",
+    "description": "## ⚠️ Warning\n\n- Only for macOS users running KSA inside a **Sikarugir** wrapper, using the `WS12WineSikarugir10.0_6` engine.\n- This is a highly experimental project. Proceed with caution.\n- macOS is still not officially supported. Leave the devs alone.\n\n---\n\nA Kitten Space Agency mod that lets the Windows version of the game run on macOS in a Sikarugir (Wine) wrapper. A StarMap hook runs it before the game starts. It applies the patches in its `patches/` folder to the wrapper and the game files.\n\nEach patch is a plain text file that says what it changes and why:\n[ksa-macos-molten-patcher/patches](https://github.com/renancamm/ksa-macos-molten-patcher/tree/main/patches)\n\n> 💬 *Have you figured out a new way to improve the macOS experience in KSA? Propose a new patch!*\n\n---\n\n## How to revert changes\n\nThe patches edit files in your wrapper and game folder. **Removing the mod does not undo them.**\n\nBefore changing a file, the mod saves the original next to it as `<file>.orig`, so every changed file has one. To revert:\n\n1. Remove the mod.\n2. Copy each `.orig` file back over its original.\n\n---\n\n## Licenses\n\nMod code: MIT. Bundled third-party files come with their licenses in the `licenses/` folder.\n",
+    "license": "MIT",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/macos-molten-patcher.1310/",
+      "repository": "https://github.com/renancamm/ksa-macos-molten-patcher",
+      "bugtracker": "https://github.com/renancamm/ksa-macos-molten-patcher/issues"
+    }
+  }
+}
