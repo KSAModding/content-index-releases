@@ -1,0 +1,63 @@
+{
+  "spec_version": 1,
+  "id": "KittenEngineerRedux",
+  "type": "mod",
+  "version": "0.5.3",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-03T02:44:12Z",
+  "game_min": "2026.10.7.5541",
+  "game_min_revision": 5541,
+  "game_max": "2026.10.7.5541",
+  "game_max_revision": 5541,
+  "download": {
+    "url": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/download/v0.5.3/KittenEngineerRedux-0.5.3.zip",
+    "sha256": "E0A9177BA26710765F3525F520F1C740F7238F8C05E56FCD65A5936D26F5214D",
+    "size": 23063,
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux/download/v0.5.3"
+    ]
+  },
+  "install_size": 50204,
+  "install": {
+    "root": "KittenEngineerRedux",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "max": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "required",
+      "min": "0.2.2",
+      "max": "0.2.2",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/tag/v0.5.3",
+  "changelog_text": "Updated for the latest version of KSA, fixed ModMenu integration and the fallback menu.",
+  "listing": {
+    "name": "Kitten Engineer Redux",
+    "authors": [
+      "BarneyTheGod"
+    ],
+    "abstract": "Utility mod for KSA that mirrors KSP's Kerbal Engineer Redux.",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kitten-engineer-redux-ker.443/",
+      "homepage": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux",
+      "repository": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux",
+      "spacedock": "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux",
+      "bugtracker": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/issues"
+    }
+  }
+}
