@@ -26,7 +26,7 @@
   },
   "dependencies": [],
   "changelog": "https://spacedock.info/mod/4074/Compendium",
-  "changelog_text": "- added the ability to target Stars and Barycenters.  this uses a some different targeting code than the game which reverts back to the standard game's code when other objects are targeted.",
+  "changelog_text": "- added the ability to target Stars and Barycenters.  this uses different targeting code than the game which reverts back to the standard game's code when other objects are targeted.",
   "listing": {
     "name": "Compendium",
     "authors": [
