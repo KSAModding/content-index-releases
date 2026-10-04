@@ -1,0 +1,64 @@
+{
+  "spec_version": 1,
+  "id": "KittenEngineerRedux",
+  "type": "mod",
+  "version": "0.5.5",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-04T05:59:16Z",
+  "game_min": "2026.10.7.5541",
+  "game_min_revision": 5541,
+  "game_max": "2026.10.7.5541",
+  "game_max_revision": 5541,
+  "download": {
+    "url": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/download/v0.5.5/KittenEngineerRedux-0.5.5.zip",
+    "sha256": "DD1BE8258A3E3E970B32BFF5ADD28E05A62858E458F43874946E43814F02D0C8",
+    "size": 40048,
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux/download/v0.5.5"
+    ]
+  },
+  "install_size": 89628,
+  "install": {
+    "root": "KittenEngineerRedux",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "max": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "required",
+      "min": "0.2.2",
+      "max": "0.2.2",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/tag/v0.5.5",
+  "changelog_text": "Revamped HUD layout, added customizable widgets, added color customizability, fixed some VAB readout issues.",
+  "listing": {
+    "name": "Kitten Engineer Redux",
+    "authors": [
+      "BarneyTheGod"
+    ],
+    "abstract": "Utility mod for KSA that mirrors KSP's Kerbal Engineer Redux.",
+    "description": "Kitten Engineer Redux is a utility readout mod for Kitten Space Agency. It aims to mirror the KSP mod \"Kerbal Engineer Redux\" by providing the player with useful vehicle data inside of the VAB and during flight.\n\nDependencies:\n - [ModMenu](https://github.com/MrJeranimo/ModMenu/)",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kitten-engineer-redux-ker.443/",
+      "homepage": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux",
+      "repository": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux",
+      "spacedock": "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux",
+      "bugtracker": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/issues"
+    }
+  }
+}
