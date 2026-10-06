@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "FastAndPurrious",
+  "type": "mod",
+  "version": "0.1.6",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-06T15:43:59Z",
+  "game_min": "2026.10.7.5541",
+  "game_min_revision": 5541,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSACars/releases/download/v0.1.6/FastAndPurrious-0.1.6.zip",
+    "sha256": "C7675E68664A22F78243081047C83D47DA32EE88981FD1DDB57E64A643C1392C",
+    "size": 7859100,
+    "content_type": "application/zip"
+  },
+  "install_size": 12192184,
+  "install": {
+    "root": "FastAndPurrious",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSACars/releases/tag/v0.1.6",
+  "changelog_text": "## [0.1.6](https://github.com/LaurensDeV/KSACars/compare/v0.1.5...v0.1.6) (2026-10-06)\n\n### Fixes\n\n* stand a car on a launch pad instead of sinking its wheels into it ([c6c0314](https://github.com/LaurensDeV/KSACars/commit/c6c03146b2041d859591b684d348af6a3ed0c8d0))\n\n\n---\n\nDrop the `FastAndPurrious` folder into your KSA user directory's `mods/`, register it in\n`manifest.toml`, and launch through StarMap. See the README for the full guide.\n\nWorks on Windows and Linux — the mod is a portable .NET assembly.\n\nRelease build: no debug symbols, log starts at INFO. Tick **Verbose log** in the\npanel if you are reporting a bug.",
+  "listing": {
+    "name": "Fast & Purrious",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "Drivable cars for Kitten Space Agency, with their own springs, tyres and engine.",
+    "description": "Cars for Kitten Space Agency. KSA has no wheels, so these bring their own: springs, tyres, an engine and a gearbox, all simulated by the mod and driven with the keys you already fly with.\n\n## The cars\n\n**Beach Buggy**: a fibreglass dune buggy on long-travel coil-overs, with a Beetle engine behind the seats and two kittens up front.\n\n**???**: there is a second car in the garage. Who's that car? You'll have to find out.\n\n## What you get\n\n- Real suspension and tyre grip: the car leans, squats and slides, and the gearbox shifts on its own.\n- An engine you can hear, cut from recordings of the real thing.\n- The driver kitten holds the steering wheel and turns it.\n- Kittens can get out on EVA and climb back in through the doors.\n- Headlights with dipped and main beam, and tail lights that brighten when you brake.\n- An Unflip button for when you end up on your roof.\n- Cars bounce instead of breaking up in a hard landing or a crash.\n- Move any craft with the mouse: click to pick it up, click again to set it down.\n\n## Driving\n\nFind the cars under Vehicles in the editor, or launch one from the vehicle list, and fill the seats in the launch window.\n\n| Control | Default key | |\n| --- | --- | --- |\n| pitch | W / S | throttle, and brake then reverse |\n| yaw | A / D | steer |\n\nThe Fast & Purrious panel is on screen while you are in a car.\n",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "audio",
+      "vehicles"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/fastandpurrious.1355/",
+      "homepage": "https://github.com/LaurensDeV/KSACars",
+      "repository": "https://github.com/LaurensDeV/KSACars",
+      "bugtracker": "https://github.com/LaurensDeV/KSACars/issues",
+      "discussions": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/fastandpurrious.1355/"
+    }
+  }
+}
