@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "FastAndPurrious",
+  "type": "mod",
+  "version": "0.1.7",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-07T09:11:35Z",
+  "game_min": "2026.10.7.5541",
+  "game_min_revision": 5541,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSACars/releases/download/v0.1.7/FastAndPurrious-0.1.7.zip",
+    "sha256": "FC2F90CBD77448ECAA067348B6BB0DBE3D38D30AA48F6186D0E894FA1FF447BB",
+    "size": 7859102,
+    "content_type": "application/zip"
+  },
+  "install_size": 12192186,
+  "install": {
+    "root": "FastAndPurrious",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSACars/releases/tag/v0.1.7",
+  "changelog_text": "## [0.1.7](https://github.com/LaurensDeV/KSACars/compare/v0.1.6...v0.1.7) (2026-10-07)\n\n### Build and packaging\n\n* **ksa:** retarget 2026.10.10.5554 ([a75eab5](https://github.com/LaurensDeV/KSACars/commit/a75eab5035e7aeda0cdeb4e196ef52dec26003f1))\n\n\n---\n\nDrop the `FastAndPurrious` folder into your KSA user directory's `mods/`, register it in\n`manifest.toml`, and launch through StarMap. See the README for the full guide.\n\nWorks on Windows and Linux — the mod is a portable .NET assembly.\n\nRelease build: no debug symbols, log starts at INFO. Tick **Verbose log** in the\npanel if you are reporting a bug.",
+  "listing": {
+    "name": "Fast & Purrious",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "Drivable cars for Kitten Space Agency, with their own springs, tyres and engine.",
+    "description": "Cars for Kitten Space Agency. KSA has no wheels, so these bring their own: springs, tyres, an engine and a gearbox, all simulated by the mod and driven with the keys you already fly with.\n\n## The cars\n\n**Beach Buggy**: a fibreglass dune buggy on long-travel coil-overs, with a Beetle engine behind the seats and two kittens up front.\n\n**Cadillac Eldorado**: a red 1976 convertible with the top down, four seats, a whitewall on every corner and a V8 that sounds like one. It floats on its springs and leans into a turn. It also flies, on rockets hidden under its floor.\n\n## What you get\n\n- Real suspension and tyre grip: the car leans, squats and slides, and the gearbox shifts on its own.\n- An engine you can hear, cut from recordings of the real thing.\n- The driver kitten holds the steering wheel and turns it.\n- Kittens can get out on EVA and climb back in through the doors.\n- Headlights with dipped and main beam, and tail lights that brighten when you brake.\n- An Unflip button for when you end up on your roof.\n- Cars bounce instead of breaking up in a hard landing or a crash.\n- Move any craft with the mouse: click to pick it up, click again to set it down.\n\nThe Eldorado adds:\n\n- Four lift rockets under the floor: half throttle hovers, more climbs.\n- Two boost rockets on the tail.\n- Downward thrusters that press it onto the ground for grip, which is what makes it drivable on Luna.\n- A hover hold: with the lift rockets and the downward thrusters on together it keeps its height.\n- A scoop on the nose in three sizes, 3.4 m, 6 m and 10 m, for shoving rocks about, with a slider for how heavy the rocks are.\n\n## Driving\n\nFind **Beach Buggy** or **Cadillac Eldorado** under Vehicles in the editor, or launch one from the vehicle list, and fill the seats in the launch window.\n\n| Control | Default key | |\n| --- | --- | --- |\n| pitch | W / S | throttle, and brake then reverse |\n| yaw | A / D | steer |\n\n## Flying the Eldorado\n\n| Control | Default key | |\n| --- | --- | --- |\n| engine start / shutdown | Z / X | light and cut the lift rockets |\n| throttle up / down | Up / Down | half hovers, more climbs |\n| pitch | W / S | in the air, lean forward or back |\n| yaw | A / D | in the air, bank left or right |\n| roll | Q / E | in the air, turn left or right |\n| sprint | Left Shift | hold to fire the boost rockets |\n| toggle RCS | R | switch the downward thrusters |\n\nThe Fast & Purrious panel is on screen while you are in a car, with the headlights, the scoop size, the rock weight and Unflip.\n",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "audio",
+      "vehicles"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/fastandpurrious.1355/",
+      "homepage": "https://github.com/LaurensDeV/KSACars",
+      "repository": "https://github.com/LaurensDeV/KSACars",
+      "bugtracker": "https://github.com/LaurensDeV/KSACars/issues",
+      "discussions": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/fastandpurrious.1355/"
+    }
+  }
+}
