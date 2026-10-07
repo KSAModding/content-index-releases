@@ -81,7 +81,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 |---|---|
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
 | `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
-| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
+| `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
 | `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
@@ -131,7 +131,25 @@ The watcher follows edits of the notes (RFC 0079).
 For every release in the release list the tick already read, it adds, replaces or removes the field so that it matches the notes on the host, which costs no request.
 A host answer that does not carry the notes of a release changes nothing.
 
-An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick resolves and adds the bound once the month completes.
+An authored `game_max` naming a month that was still running at stamp time is stamped with no upper bound, and a later tick adds the resolved bound to that release once the month completes.
+It resolves the month the listing named when that release was stamped, whatever the listing names now, and it resolves each release only once, so a bound that an amendment removed stays removed.
+
+A merged listing edit to `[compatibility]`, `[loader]` or `[[dependencies]]` reaches the newest release as an amendment of the verified owner (RFC 0081), in both directions, and older releases keep their stamp.
+The newest release is the newest by SemVer precedence that is neither yanked nor `dev`.
+Only what changed in the listing since the most recent release by SemVer precedence was stamped, yanked and `dev` releases included, counts, or since the listing commit the newest release last received when that is later, so an amendment made after it has the last word.
+A stamp of the watcher names the listing commit it read in its commit message, and the edit is measured from that commit, so a listing merged while a tick ran is not taken as part of the stamp.
+A release merged by pull request is measured from its merge.
+An edit merged before the watcher applied listing edits changes nothing.
+A change is written the way a stamp writes it, so a dependency the archive's `mod.toml` declares stays, and a changed loader id reaches only the next release.
+The edit reaches the release with the next tick after the merge, also when the release host cannot be reached.
+Apart from a month that is not over yet, it waits only while a pull request here adds a release file of the listing.
+The watcher then runs the checks of that pull request again when they ran before the edit, so the release file has to carry the edit before it can merge.
+A `game_max` month the edit names waits alone until the month is over, and the other changes of the edit land at once.
+The commit names the waiting month on a `Waiting:` line, so a later tick still applies it.
+A disputed or delisted listing gets no edit.
+Each change goes through the check of an owner's amendment before it is written, and a change the check refuses goes into the issue of that listing.
+The commit names the release, the listing commit it read and each change.
+Both checkouts need their full history, because the watcher reads from git when each release file was stamped and how the listing stood then.
 
 A tick also fetches the images of each listing again, once every 24 hours and at once after a record changed (RFC 0058).
 It uses `tools/images.py` from the content-index checkout, so the watcher and the checks apply the same fetch rules from one file.

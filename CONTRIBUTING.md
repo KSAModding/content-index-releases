@@ -80,6 +80,7 @@ When it validates and your ownership of the listing verifies, it merges itself.
 
 The authored document in [content-index](https://github.com/KSAModding/content-index) is a separate file, and an amendment does not touch it.
 A bound that applies to future releases belongs there too, or the next release is stamped without it.
+An edit there also reaches the newest release that is neither yanked nor `dev` with the next watcher tick (RFC 0081), so that release needs no amendment pull request for the same change.
 
 ## A release
 

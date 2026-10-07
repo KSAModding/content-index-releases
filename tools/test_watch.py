@@ -14,6 +14,7 @@ import json
 import os
 import struct
 import tempfile
+import tomllib
 import unittest
 import urllib.error
 import zipfile
@@ -24,6 +25,7 @@ from unittest.mock import patch
 
 import decide
 import watch
+from check_amendment import check_document
 from check_release import DEFAULT_AUTHORED
 from hosts import HostError, HostRelease
 from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize
@@ -551,12 +553,95 @@ class TheTickSurvivesOneListing(WatcherCase):
             self.assertFalse((folder / "cache.json").exists())
 
 
+class FakeHistory:
+    """The git answers the month and listing edit passes read, set by hand."""
+
+    def __init__(self, before, stamped="2026-09-01T00:00:00Z", changed="2026-09-02T00:00:00Z"):
+        self.before = before
+        # One time for every release file, or a time per file name.
+        self.stamped = stamped
+        self.changed = changed
+        self.asked = []
+        # The listing commit a release file last received, as (sha, committed, text),
+        # and the fields that commit left waiting.
+        self.last_received = None
+        self.waiting = ()
+        # The listing commit a stamp named, as (sha, committed, text) per file name.
+        self.stamped_with = {}
+        self.introduced_at = None
+        self.resolved_files = set()
+
+    def problem(self):
+        return None
+
+    def stamped_from(self, path, repository):
+        entry = self.stamped_with.get(Path(path).name)
+        return entry and entry[0]
+
+    def resolved(self, path):
+        return Path(path).name in self.resolved_files
+
+    def introduced(self):
+        return self.introduced_at
+
+    def commit(self, sha):
+        for entry in (self.last_received, *self.stamped_with.values()):
+            if entry and entry[0] == sha:
+                return entry
+        return sha, None, None
+
+    def last_stamp(self, path):
+        if isinstance(self.stamped, dict):
+            return self.stamped.get(Path(path).name)
+        return self.stamped
+
+    def listing_change(self, path):
+        return "9fe1c0f", self.changed
+
+    def listing_at(self, path, moment):
+        self.asked.append(moment)
+        return self.before
+
+    def received(self, path, repository):
+        return self.last_received and (self.last_received[0], self.waiting)
+
+    def committed(self, path, sha):
+        return self.commit(sha)[1]
+
+    def listing_in(self, path, sha):
+        return self.commit(sha)[2]
+
+
+MONTH_LISTING = """id = "M"
+
+[compatibility]
+game_min = "2020.1.1.100"
+game_max = "2020.1"
+"""
+
+
 class TheMonthPass(WatcherCase):
+    def watcher(self, folder, argv=(), versions=None, before=MONTH_LISTING):
+        watcher = super().watcher(folder, argv, versions)
+        watcher.history = FakeHistory(before)
+        return watcher
+
+    @staticmethod
+    def listing(folder):
+        return folder / ".authored" / "listings" / "M.toml"
+
     def release_file(self, folder, listing_id, version, document):
         path = folder / "releases" / listing_id
         path.mkdir(parents=True, exist_ok=True)
         (path / f"{version}.json").write_text(json.dumps(document, indent=2) + "\n")
         return path / f"{version}.json"
+
+    def open_release(self, folder, version="1.0.0"):
+        return self.release_file(folder, "M", version, {
+            "id": "M", "version": version,
+            "game_min": "2020.1.1.100", "game_min_revision": 100,
+            "download": {"url": "u"},
+        })
 
     def test_a_completed_month_is_resolved_onto_open_stamps(self):
         with tempfile.TemporaryDirectory() as name:
@@ -565,15 +650,9 @@ class TheMonthPass(WatcherCase):
                 folder, ["--no-commit"],
                 versions=["2020.1.1.100", "2020.1.2.150", "2020.2.1.200"],
             )
-            path = self.release_file(folder, "M", "1.0.0", {
-                "id": "M", "version": "1.0.0",
-                "game_min": "2020.1.1.100", "game_min_revision": 100,
-                "download": {"url": "u"},
-            })
+            path = self.open_release(folder)
             errors = []
-            watcher.month_pass(
-                "M", {"id": "M", "compatibility": {"game_min": "2020.1.1.100", "game_max": "2020.1"}}, errors
-            )
+            watcher.month_pass("M", self.listing(folder), errors)
             document = json.loads(path.read_text())
             self.assertEqual(errors, [])
             self.assertEqual(document["game_max"], "2020.1.2.150")
@@ -584,6 +663,76 @@ class TheMonthPass(WatcherCase):
                 ["id", "version", "game_min", "game_min_revision",
                  "game_max", "game_max_revision", "download"],
             )
+
+    def test_the_month_of_the_stamp_is_resolved_whatever_the_listing_names_now(self):
+        # The listing named 2020.1 at the stamp and 2020.2 or nothing now. The
+        # release keeps its stamp, so it gets the bound of 2020.1.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(
+                folder, ["--no-commit"],
+                versions=["2020.1.1.100", "2020.1.2.150", "2020.2.1.200"],
+            )
+            self.listing(folder).write_text(MONTH_LISTING.replace('"2020.1"\n', '"2020.2"\n'))
+            path = self.open_release(folder)
+            watcher.month_pass("M", self.listing(folder), [])
+            self.assertEqual(json.loads(path.read_text())["game_max"], "2020.1.2.150")
+
+    def test_the_month_a_stamp_was_made_with_is_read_from_git_once(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            future = f"{datetime.now(timezone.utc).year + 1}.1"
+            watcher = self.watcher(
+                folder, ["--no-commit"], versions=["2020.1.1.100"],
+                before=MONTH_LISTING.replace('"2020.1"\n', f'"{future}"\n'),
+            )
+            self.open_release(folder)
+            for _ in range(2):
+                watcher.month_pass("M", self.listing(folder), [])
+            self.assertEqual(len(watcher.history.asked), 1)
+            self.assertEqual(watcher.cache.data["months"], {"M/1.0.0": {"game_max": future}})
+
+    def test_a_stamp_the_watcher_named_its_listing_commit_in_is_read_from_that_commit(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(
+                folder, ["--no-commit"], versions=["2020.1.1.100", "2020.1.2.150"], before=None
+            )
+            watcher.history.stamped_with = {
+                "1.0.0.json": ("1234567", "2020-01-01T00:00:00Z", MONTH_LISTING)
+            }
+            path = self.open_release(folder)
+            watcher.month_pass("M", self.listing(folder), [])
+            self.assertEqual(json.loads(path.read_text())["game_max"], "2020.1.2.150")
+            self.assertEqual(watcher.history.asked, [])
+
+    def test_a_month_the_listing_did_not_name_at_the_stamp_is_not_resolved(self):
+        # A month named after the stamp is a listing edit, and only the listing edit pass carries one.
+        for before in (MONTH_LISTING.replace('game_max = "2020.1"\n', ""), None):
+            with self.subTest(before=before), tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                watcher = self.watcher(
+                    folder, ["--no-commit"], versions=["2020.1.1.100", "2020.1.2.150"], before=before
+                )
+                path = self.open_release(folder)
+                text = path.read_text()
+                errors = []
+                watcher.month_pass("M", self.listing(folder), errors)
+                self.assertEqual(path.read_text(), text)
+                self.assertEqual(errors, [])
+
+    def test_a_release_is_resolved_only_once(self):
+        # A bound an amendment or a listing edit removed after the month pass added it stays removed.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(
+                folder, ["--no-commit"], versions=["2020.1.1.100", "2020.1.2.150"]
+            )
+            watcher.history.resolved_files = {"1.0.0.json"}
+            path = self.open_release(folder)
+            text = path.read_text()
+            watcher.month_pass("M", self.listing(folder), [])
+            self.assertEqual(path.read_text(), text)
 
     def test_the_pass_is_add_only(self):
         with tempfile.TemporaryDirectory() as name:
@@ -597,25 +746,21 @@ class TheMonthPass(WatcherCase):
                 "game_max": "2020.1.1.100", "game_max_revision": 100,
             })
             before = path.read_text()
-            watcher.month_pass(
-                "M", {"id": "M", "compatibility": {"game_min": "2020.1.1.100", "game_max": "2020.1"}}, []
-            )
+            watcher.month_pass("M", self.listing(folder), [])
             self.assertEqual(path.read_text(), before)
 
     def test_a_running_month_stays_open(self):
         with tempfile.TemporaryDirectory() as name:
             folder = Path(name)
-            watcher = self.watcher(folder, ["--no-commit"], versions=["2020.1.1.100"])
-            path = self.release_file(folder, "M", "1.0.0", {
-                "id": "M", "version": "1.0.0",
-                "game_min": "2020.1.1.100", "game_min_revision": 100,
-            })
-            before = path.read_text()
             future = f"{datetime.now(timezone.utc).year + 1}.1"
-            errors = []
-            watcher.month_pass(
-                "M", {"id": "M", "compatibility": {"game_min": "2020.1.1.100", "game_max": future}}, errors
+            watcher = self.watcher(
+                folder, ["--no-commit"], versions=["2020.1.1.100"],
+                before=MONTH_LISTING.replace('"2020.1"\n', f'"{future}"\n'),
             )
+            path = self.open_release(folder)
+            before = path.read_text()
+            errors = []
+            watcher.month_pass("M", self.listing(folder), errors)
             self.assertEqual(path.read_text(), before)
             self.assertEqual(errors, [])
 
@@ -631,9 +776,7 @@ class TheMonthPass(WatcherCase):
             })
             before = path.read_text()
             errors = []
-            watcher.month_pass(
-                "M", {"id": "M", "compatibility": {"game_min": "2020.1.1.100", "game_max": "2020.1"}}, errors
-            )
+            watcher.month_pass("M", self.listing(folder), errors)
             self.assertEqual(path.read_text(), before)
             self.assertEqual(len(errors), 1)
 
@@ -1628,6 +1771,623 @@ class Unreachable(WatcherCase):
             self.assertNotIn("unreachable_signature", state)
 
 
+EDIT_VERSIONS = ["2026.8.3.5117", "2026.9.10.5438"]
+
+LISTED = """id = "M"
+type = "mod"
+spec_version = 1
+
+[compatibility]
+game_min = "2026.8.3.5117"
+
+[[dependencies]]
+id = "Lib"
+kind = "optional"
+"""
+
+MOD_MENU = '\n[[dependencies]]\nid = "ModMenu"\nkind = "recommends"\n'
+
+RAISED = LISTED.replace('"2026.8.3.5117"', '"2026.9.10.5438"')
+
+
+def stamped_release(version, **extra):
+    """A release file in the shape the stamper writes it."""
+    return {
+        "spec_version": 1,
+        "id": "M",
+        "type": "mod",
+        "version": version,
+        "version_scheme": "semver",
+        "release_status": "stable",
+        "release_date": "2026-09-01T00:00:00Z",
+        "game_min": "2026.8.3.5117",
+        "game_min_revision": 5117,
+        "download": {
+            "url": f"https://example.invalid/M-{version}.zip",
+            "sha256": "AB" * 32,
+            "size": 5,
+            "content_type": "application/zip",
+        },
+        "install_size": 5,
+        "install": {"root": "M", "derived": True},
+        "dependencies": [{"id": "Lib", "kind": "optional", "source": "authored"}],
+        "listing": {"name": "M"},
+        **extra,
+    }
+
+
+class ListingEdits(WatcherCase):
+    """A merged listing edit reaches the newest release, and only that one (RFC 0081)."""
+
+    def setup(self, folder, after, before=LISTED, releases=None, pulls=(), **history):
+        watcher = self.watcher(folder, versions=EDIT_VERSIONS)
+        listing = folder / ".authored" / "listings" / "M.toml"
+        listing.write_text(after, encoding="utf-8")
+        for document in releases or [stamped_release("1.0.0"), stamped_release("1.1.0")]:
+            path = folder / "releases" / "M" / f"{document['version']}.json"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(serialize(document), encoding="utf-8")
+        watcher.history = FakeHistory(before, **history)
+        watcher.releases_api = StubApi({"/pulls/": [], "/pulls": list(pulls)})
+        watcher.archive_dependencies = lambda listing_id, document: []
+        commits = []
+        watcher.commit = lambda path, message: commits.append((path.name, message))
+        return watcher, listing, commits
+
+    def run_pass(self, watcher, listing):
+        errors = []
+        watcher.listing_edit_pass("M", tomllib.loads(listing.read_text()), listing, errors)
+        return errors
+
+    def texts(self, folder):
+        return {
+            path.name: path.read_text(encoding="utf-8")
+            for path in sorted((folder / "releases" / "M").glob("*.json"))
+        }
+
+    def test_an_added_dependency_reaches_the_newest_release_only(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            before = self.texts(folder)
+
+            self.assertEqual(self.run_pass(watcher, listing), [])
+
+            after = self.texts(folder)
+            self.assertEqual(after["1.0.0.json"], before["1.0.0.json"])
+            expected = stamped_release("1.1.0")
+            expected["dependencies"].append(
+                {"id": "ModMenu", "kind": "recommends", "source": "authored"}
+            )
+            self.assertEqual(after["1.1.0.json"], serialize(expected))
+            self.assertEqual(
+                commits,
+                [(
+                    "1.1.0.json",
+                    "Apply the listing of M to 1.1.0\n\n"
+                    "Listing: KSAModding/content-index@9fe1c0f\n"
+                    "- adds the recommends dependency ModMenu",
+                )],
+            )
+            self.assertEqual(watcher.history.asked, ["2026-09-01T00:00:00Z"])
+            self.assertEqual(watcher.edited, ["M 1.1.0"])
+
+    def test_a_raised_game_min_reaches_the_newest_release(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, LISTED.replace('"2026.8.3.5117"', '"2026.9"')
+            )
+
+            self.run_pass(watcher, listing)
+
+            expected = stamped_release("1.1.0", game_min="2026.9.10.5438", game_min_revision=5438)
+            self.assertEqual(self.texts(folder)["1.1.0.json"], serialize(expected))
+            self.assertIn("- raises game_min to 2026.9.10.5438", commits[0][1])
+
+    def test_a_lowered_game_min_and_a_removed_dependency_reach_it_too(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            releases = [stamped_release("1.1.0", game_min="2026.9.10.5438", game_min_revision=5438)]
+            watcher, listing, commits = self.setup(
+                folder, LISTED.split("\n[[dependencies]]")[0], before=RAISED, releases=releases
+            )
+
+            self.assertEqual(self.run_pass(watcher, listing), [])
+
+            self.assertEqual(
+                self.texts(folder)["1.1.0.json"], serialize(stamped_release("1.1.0", dependencies=[]))
+            )
+            self.assertEqual(
+                commits[0][1].splitlines()[3:],
+                ["- lowers game_min to 2026.8.3.5117", "- removes the optional dependency Lib"],
+            )
+
+    def test_a_dependency_the_archive_declares_stays(self):
+        # The listing made Lib required over the archive's optional one, and now drops it.
+        required = [{"id": "Lib", "kind": "required", "source": "authored"}]
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder,
+                LISTED.split("\n[[dependencies]]")[0],
+                before=LISTED.replace('kind = "optional"', 'kind = "required"'),
+                releases=[stamped_release("1.1.0", dependencies=required)],
+            )
+            watcher.archive_dependencies = lambda listing_id, document: [
+                {"id": "Lib", "kind": "optional", "source": "derived"}
+            ]
+
+            self.run_pass(watcher, listing)
+
+            written = json.loads(self.texts(folder)["1.1.0.json"])
+            self.assertEqual(
+                written["dependencies"], [{"id": "Lib", "kind": "optional", "source": "derived"}]
+            )
+
+    def test_a_second_tick_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            self.run_pass(watcher, listing)
+            once = self.texts(folder)
+
+            self.run_pass(watcher, listing)
+
+            self.assertEqual(self.texts(folder), once)
+            self.assertEqual(len(commits), 1)
+
+    def test_an_amendment_after_the_edit_was_applied_has_the_last_word(self):
+        # ModMenu was applied from 9fe1c0f and then amended away, and a later
+        # listing commit that touches none of the applied fields brings nothing back.
+        edited = LISTED + MOD_MENU
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, edited.replace('id = "M"', 'id = "M"\nname = "M"'),
+                changed="2026-09-04T00:00:00Z",
+            )
+            watcher.history.last_received = ("9fe1c0f", "2026-09-02T00:00:00Z", edited)
+            before = self.texts(folder)
+
+            self.assertEqual(self.run_pass(watcher, listing), [])
+
+            self.assertEqual(self.texts(folder), before)
+            self.assertEqual(commits, [])
+
+    def test_a_listing_commit_after_the_received_one_is_measured_from_it(self):
+        edited = LISTED + MOD_MENU
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, edited.replace('"2026.8.3.5117"', '"2026.9.10.5438"'),
+                changed="2026-09-04T00:00:00Z",
+            )
+            watcher.history.last_received = ("9fe1c0f", "2026-09-02T00:00:00Z", edited)
+
+            self.run_pass(watcher, listing)
+
+            self.assertEqual(
+                commits[0][1].splitlines()[3:], ["- raises game_min to 2026.9.10.5438"]
+            )
+
+    def test_a_refused_change_stays_reported_after_the_rest_was_applied(self):
+        capped = LISTED.replace(
+            'game_min = "2026.8.3.5117"', 'game_min = "2026.8.3.5117"\ngame_max = "2026.8.3.5117"'
+        ) + MOD_MENU
+        releases = [stamped_release("1.1.0", game_min="2026.9.10.5438", game_min_revision=5438)]
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, capped, releases=releases)
+            watcher.history.last_received = ("9fe1c0f", "2026-09-02T00:00:00Z", capped)
+
+            errors = self.run_pass(watcher, listing)
+
+            self.assertEqual(commits, [])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("adds game_max 2026.8.3.5117", errors[0])
+
+    def test_a_yanked_newest_release_passes_its_own_edits_on_to_nobody(self):
+        # 1.1.0 was stamped with ModMenu and then yanked, so ModMenu is no edit
+        # for 1.0.0. The game_min raised after that stamp is.
+        stamped_with = LISTED + MOD_MENU
+        now_listed = stamped_with.replace('"2026.8.3.5117"', '"2026.9.10.5438"')
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            releases = [stamped_release("1.0.0"), stamped_release("1.1.0", yanked=True)]
+            watcher, listing, commits = self.setup(
+                folder, now_listed, before=stamped_with, releases=releases
+            )
+
+            self.run_pass(watcher, listing)
+
+            expected = stamped_release("1.0.0", game_min="2026.9.10.5438", game_min_revision=5438)
+            self.assertEqual(self.texts(folder)["1.0.0.json"], serialize(expected))
+            self.assertEqual(
+                commits[0][1].splitlines()[-1], "- raises game_min to 2026.9.10.5438"
+            )
+
+    def test_a_dev_release_is_not_the_target(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            releases = [stamped_release("1.0.0"), stamped_release("1.1.0-dev.1", release_status="dev")]
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU, releases=releases)
+            self.run_pass(watcher, listing)
+            self.assertEqual([file for file, _ in commits], ["1.0.0.json"])
+
+    def test_every_written_change_passes_the_amendment_check_of_the_owner(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            after = LISTED.replace('"2026.8.3.5117"', '"2026.9"') + MOD_MENU
+            after = after.replace('kind = "optional"', 'kind = "optional"\nmax = "2.0.0"')
+            watcher, listing, commits = self.setup(folder, after)
+            base = json.loads(self.texts(folder)["1.1.0.json"])
+
+            self.run_pass(watcher, listing)
+
+            head = json.loads(self.texts(folder)["1.1.0.json"])
+            self.assertEqual(len(commits[0][1].splitlines()), 6)
+            errors = []
+            check_document("releases/M/1.1.0.json", base, head, errors, owner_only=[])
+            self.assertEqual(errors, [])
+
+    def test_a_change_the_amendment_check_refuses_is_reported_and_not_written(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            capped = LISTED.replace(
+                'game_min = "2026.8.3.5117"',
+                'game_min = "2026.8.3.5117"\ngame_max = "2026.8.3.5117"',
+            )
+            releases = [stamped_release("1.1.0", game_min="2026.9.10.5438", game_min_revision=5438)]
+            watcher, listing, commits = self.setup(folder, capped, releases=releases)
+
+            errors = self.run_pass(watcher, listing)
+
+            self.assertEqual(commits, [])
+            self.assertEqual(len(errors), 1)
+            self.assertIn("the listing edit that adds game_max 2026.8.3.5117", errors[0])
+
+    def test_a_game_max_month_that_is_not_over_waits_alone(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            month = f"{now().year + 1}.1"
+            running = f'game_min = "2026.8.3.5117"\ngame_max = "{month}"'
+            after = LISTED.replace('game_min = "2026.8.3.5117"', running) + MOD_MENU
+            watcher, listing, commits = self.setup(folder, after)
+
+            self.assertEqual(self.run_pass(watcher, listing), [])
+
+            written = json.loads(self.texts(folder)["1.1.0.json"])
+            self.assertNotIn("game_max", written)
+            self.assertIn({"id": "ModMenu", "kind": "recommends", "source": "authored"},
+                          written["dependencies"])
+            self.assertEqual(
+                commits[0][1].splitlines()[2:],
+                [
+                    "Listing: KSAModding/content-index@9fe1c0f",
+                    f"Waiting: game_max {month}",
+                    "- adds the recommends dependency ModMenu",
+                ],
+            )
+
+    def test_a_waiting_month_lands_once_it_is_over(self):
+        # The commit that applied ModMenu left game_max 2026.9 waiting, and the
+        # listing has not changed since.
+        over = LISTED.replace(
+            'game_min = "2026.8.3.5117"', 'game_min = "2026.8.3.5117"\ngame_max = "2026.9"'
+        ) + MOD_MENU
+        menu = [
+            {"id": "Lib", "kind": "optional", "source": "authored"},
+            {"id": "ModMenu", "kind": "recommends", "source": "authored"},
+        ]
+        for waiting, expected in ((("game_max",), ["- adds game_max 2026.9.10.5438"]), ((), None)):
+            with self.subTest(waiting=waiting), tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                watcher, listing, commits = self.setup(
+                    folder, over, releases=[stamped_release("1.1.0", dependencies=menu)]
+                )
+                watcher.history.last_received = ("9fe1c0f", "2026-09-02T00:00:00Z", over)
+                watcher.history.waiting = waiting
+
+                self.run_pass(watcher, listing)
+
+                if expected is None:
+                    self.assertEqual(commits, [])
+                else:
+                    self.assertEqual(commits[0][1].splitlines()[3:], expected)
+
+    def test_a_listing_merged_while_the_tick_stamped_is_not_in_the_stamp(self):
+        # The stamp read 1234567 and was committed after 9fe1c0f was merged, so
+        # 9fe1c0f is an edit although it is older than the stamp commit.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, LISTED + MOD_MENU, stamped="2026-09-03T00:00:00Z"
+            )
+            watcher.history.stamped_with = {
+                "1.1.0.json": ("1234567", "2026-08-30T00:00:00Z", LISTED)
+            }
+
+            self.run_pass(watcher, listing)
+
+            self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+            self.assertEqual(watcher.history.asked, [])
+
+    def test_a_stamp_names_the_listing_commit_it_read(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED)
+            self.assertEqual(watcher.stamp_message("M", "1.2.0"), "Stamp M 1.2.0")
+            watcher.listing_paths["M"] = listing
+            self.assertEqual(
+                watcher.stamp_message("M", "1.2.0"),
+                "Stamp M 1.2.0\n\nListing: KSAModding/content-index@9fe1c0f",
+            )
+
+    def test_an_edit_merged_before_listing_edits_began_changes_nothing(self):
+        began = "2026-09-03T00:00:00Z"
+        for changed, applied, asked in (
+            ("2026-09-02T00:00:00Z", [], []),
+            # Measured from the listing as it stood when listing edits began, not from the stamp.
+            ("2026-09-04T00:00:00Z", ["1.1.0.json"], [began]),
+        ):
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU, changed=changed)
+                watcher.history.introduced_at = began
+                self.run_pass(watcher, listing)
+                self.assertEqual([file for file, _ in commits], applied)
+                self.assertEqual(watcher.history.asked, asked)
+
+    def test_an_edit_reaches_the_release_right_after_the_merge(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, LISTED + MOD_MENU, changed=iso(now() - timedelta(minutes=5))
+            )
+            self.run_pass(watcher, listing)
+            self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+
+    def test_an_edit_older_than_the_most_recent_stamp_is_already_in_it(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, LISTED + MOD_MENU, stamped="2026-09-03T00:00:00Z"
+            )
+            self.run_pass(watcher, listing)
+            self.assertEqual(commits, [])
+            self.assertEqual(watcher.history.asked, [])
+
+    def test_an_older_version_stamped_later_does_not_take_the_edit_with_it(self):
+        # 1.0.0 was stamped after the edit, as a backport or through since, and
+        # 1.1.0, the most recent release, was stamped before it.
+        stamps = {"1.0.0.json": "2026-09-05T00:00:00Z", "1.1.0.json": "2026-09-01T00:00:00Z"}
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU, stamped=stamps)
+            self.run_pass(watcher, listing)
+            self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+            self.assertEqual(watcher.history.asked, ["2026-09-01T00:00:00Z"])
+
+    def test_a_yanked_most_recent_release_is_measured_from_its_own_stamp(self):
+        stamps = {"1.0.0.json": "2026-09-01T00:00:00Z", "1.1.0.json": "2026-09-03T00:00:00Z"}
+        releases = [stamped_release("1.0.0"), stamped_release("1.1.0", yanked=True)]
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(
+                folder, LISTED + MOD_MENU, releases=releases, stamped=stamps
+            )
+            self.run_pass(watcher, listing)
+            self.assertEqual(commits, [])
+
+    def test_only_a_pull_request_that_adds_a_release_file_of_the_listing_holds_it_back(self):
+        files = (
+            [{"filename": "releases/Other/1.2.0.json", "status": "added"}],
+            [{"filename": "releases/M/1.1.0.json", "status": "modified"}],
+        )
+        for changed in files:
+            with self.subTest(changed=changed), tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+                watcher.releases_api = StubApi({"/pulls/": changed, "/pulls": [{"number": 5}]})
+                self.run_pass(watcher, listing)
+                self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+
+    def test_a_host_that_cannot_be_reached_does_not_hold_it_back(self):
+        class Down(ListingHost):
+            def releases(self, etag=None):
+                raise HostError("down")
+
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+            with patch.object(watch.hosts, "build", return_value=(Down(), [])):
+                watcher.one_listing("M", tomllib.loads(listing.read_text()), listing)
+            self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+
+    def test_a_release_this_tick_stamps_takes_the_edit_itself(self):
+        # The host lists 1.2.0 and the tick stamps it with the live listing, so
+        # the edit is older than the most recent stamp and 1.1.0 keeps its stamp.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+            watcher.history.stamped = {
+                "1.0.0.json": "2026-09-01T00:00:00Z",
+                "1.1.0.json": "2026-09-01T00:00:00Z",
+                "1.2.0.json": "2026-09-03T00:00:00Z",
+            }
+
+            def stamp_one(listing_id, authored, authority, mirror_hosts, entry):
+                path = folder / "releases" / "M" / f"{entry.version}.json"
+                path.write_text(serialize(stamped_release(entry.version)), encoding="utf-8")
+
+            watcher.stamp_one = stamp_one
+            host = ListingHost([release("1.2.0", "https://example.invalid/M-1.2.0.zip",
+                                        date="2026-09-03T00:00:00Z")])
+            with patch.object(watch.hosts, "build", return_value=(host, [])):
+                watcher.one_listing("M", tomllib.loads(listing.read_text()), listing)
+            self.assertEqual(commits, [])
+
+    def test_a_tick_that_leaves_a_release_of_the_host_unstamped_still_applies_it(self):
+        # An edit waits only for an open release pull request, not for a stamp budget.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+            watcher.stamp_budget = 0
+            host = ListingHost([release("1.2.0", "https://example.invalid/M-1.2.0.zip",
+                                        date="2026-09-03T00:00:00Z")])
+            with patch.object(watch.hosts, "build", return_value=(host, [])):
+                watcher.one_listing("M", tomllib.loads(listing.read_text()), listing)
+            self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+
+    def test_an_unknown_listing_at_the_stamp_changes_nothing(self):
+        # Read as empty, every entry of the live listing would look like a new edit.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU, before=None)
+            before = self.texts(folder)
+            self.run_pass(watcher, listing)
+            self.assertEqual(self.texts(folder), before)
+            self.assertEqual(commits, [])
+
+    def test_an_open_release_pull_request_holds_it_back(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.releases_api = StubApi({
+                "/pulls/": [{"filename": "releases/M/1.2.0.json", "status": "added"}],
+                "/pulls": [{"number": 5}],
+            })
+            self.run_pass(watcher, listing)
+            self.assertEqual(commits, [])
+
+    def test_an_open_release_pull_request_runs_its_checks_again_once(self):
+        # The checks stamp the release against the listing of the moment they ran.
+        def routes(started):
+            return {
+                "/pulls/": [{"filename": "releases/M/1.2.0.json", "status": "added"}],
+                "/pulls": [{"number": 5, "head": {"sha": "abc"}}],
+                "/actions/runs": {"workflow_runs": [
+                    {"id": 8, "event": "push", "path": ".github/workflows/checks.yml",
+                     "status": "completed", "run_started_at": started},
+                    {"id": 9, "event": "pull_request", "path": ".github/workflows/checks.yml",
+                     "status": "completed", "run_started_at": started},
+                ]},
+            }
+
+        for started, reruns in (("2026-09-01T12:00:00Z", ["/actions/runs/9/rerun"]),
+                                ("2026-09-02T12:00:00Z", [])):
+            with self.subTest(started=started), tempfile.TemporaryDirectory() as name:
+                folder = Path(name)
+                watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+                watcher.releases_api = StubApi(routes(started))
+                for _ in range(2):
+                    watcher._release_pulls = None
+                    self.run_pass(watcher, listing)
+                self.assertEqual(commits, [])
+                self.assertEqual([path for _, path, _ in watcher.releases_api.sent], reruns)
+
+    def test_a_check_run_that_is_still_going_is_looked_at_again(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.releases_api = StubApi({
+                "/pulls/": [{"filename": "releases/M/1.2.0.json", "status": "added"}],
+                "/pulls": [{"number": 5, "head": {"sha": "abc"}}],
+                "/actions/runs": {"workflow_runs": [
+                    {"id": 9, "event": "pull_request", "path": ".github/workflows/checks.yml",
+                     "status": "in_progress", "run_started_at": "2026-09-01T12:00:00Z"},
+                ]},
+            })
+            self.run_pass(watcher, listing)
+            self.assertEqual(watcher.releases_api.sent, [])
+            self.assertNotIn("listing", watcher.cache.data["reruns"].get("5", {}))
+
+    def test_a_pull_request_list_that_cannot_be_read_holds_it_back(self):
+        class Unreadable(StubApi):
+            def get_paged(self, path, key=None, max_pages=10, **query):
+                raise http_error(502)
+
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.releases_api = Unreadable()
+            self.run_pass(watcher, listing)
+            self.assertEqual(commits, [])
+
+    def test_a_disputed_listing_gets_no_edit(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            (folder / ".authored" / "index-status.toml").write_text(
+                '[[entries]]\nid = "M"\nstate = "disputed"\n'
+            )
+            self.assertEqual([path.stem for path in watcher.listings()], ["M"])
+            self.run_pass(watcher, listing)
+            self.assertEqual(commits, [])
+
+    def test_a_listing_without_a_releases_section_gets_its_edit_in_a_tick(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher, listing, commits = self.setup(folder, LISTED + MOD_MENU)
+            watcher.options.no_sweep = True
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+            watcher.tick()
+            self.assertEqual([file for file, _ in commits], ["1.1.0.json"])
+
+
+class ArchiveHttp:
+    """Serves one archive and counts the downloads."""
+
+    def __init__(self, payload):
+        self.payload = payload
+        self.downloads = 0
+
+    def archive(self, url, api=False, limit=None):
+        self.downloads += 1
+        return Archive.of_bytes(self.payload), {"Content-Type": "application/zip"}
+
+
+class TheArchiveDependencies(WatcherCase):
+    MOD_TOML = '[[StarMap.ModDependencies]]\nModId = "Lib"\nOptional = true\n'
+
+    def release(self, payload, **extra):
+        digest = hashlib.sha256(payload).hexdigest().upper()
+        return stamped_release(
+            "1.0.0",
+            download={"url": "https://example.invalid/M.zip", "sha256": digest, "size": len(payload),
+                      "content_type": "application/zip"},
+            **extra,
+        )
+
+    def test_the_mod_toml_is_read_once_and_cached(self):
+        payload = zip_of({"M/mod.toml": self.MOD_TOML})
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.watcher(Path(name))
+            watcher.http = ArchiveHttp(payload)
+            for _ in range(2):
+                self.assertEqual(
+                    watcher.archive_dependencies("M", self.release(payload)),
+                    [{"id": "Lib", "kind": "optional", "source": "derived"}],
+                )
+            self.assertEqual(watcher.http.downloads, 1)
+
+    def test_an_archive_that_no_longer_matches_is_refused(self):
+        payload = zip_of({"M/mod.toml": self.MOD_TOML})
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.watcher(Path(name))
+            watcher.http = ArchiveHttp(zip_of({"M/mod.toml": ""}))
+            with self.assertRaisesRegex(StampError, "no longer matches"):
+                watcher.archive_dependencies("M", self.release(payload))
+
+
 ICON_URL = "https://example.org/icon.png"
 EXPECTED = "aa" * 32
 
@@ -2102,7 +2862,7 @@ class GoneFromTheHost(GoneCase):
                 watcher.images = FakeImages()
                 watcher.issues = RecorderIssues()
                 with at(30):
-                    watcher.one_listing("M", {"id": "M"})
+                    watcher.one_listing("M", {"id": "M"}, self.folder / ".authored" / "listings" / "M.toml")
                 self.assertEqual(watcher.http.status.asked, [])
                 self.assertEqual(self.store.data["gone"]["M/1.0.0"], {"since": iso(START)})
 
@@ -2174,7 +2934,7 @@ class GoneFromTheHost(GoneCase):
                 watcher.images = FakeImages()
                 watcher.issues = RecorderIssues()
                 with at(hours):
-                    watcher.one_listing("M", {"id": "M"})
+                    watcher.one_listing("M", {"id": "M"}, self.folder / ".authored" / "listings" / "M.toml")
         self.assertEqual(host.polls, [None, None])
         self.assertEqual(host.fetched, [GONE_URL, GONE_URL])
         self.assertNotIn("unavailable_since", self.document()["download"])
@@ -2213,7 +2973,7 @@ class GoneFromTheHost(GoneCase):
         watcher.images = FakeImages()
         watcher.issues = RecorderIssues()
 
-        def one_listing(listing_id, authored):
+        def one_listing(listing_id, authored, path):
             watcher.tell_later(listing_id, "marked")
             raise RuntimeError("later step")
 
