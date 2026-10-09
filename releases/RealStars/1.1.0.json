@@ -12,7 +12,10 @@
     "url": "https://github.com/Brimfyr/RealStars/releases/download/v1.1.0/RealStars-v1.1.0-ksa2026.9.22.5482.zip",
     "sha256": "CC78546E1F1872E81F15A876B6B059CBF28DF9AE3B01B7232B6B72BAB4D22EC6",
     "size": 3451251,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4608/Real%20Stars/download/1.1.0"
+    ]
   },
   "install_size": 4668716,
   "install": {
