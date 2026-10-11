@@ -1,0 +1,42 @@
+{
+  "spec_version": 1,
+  "id": "LonelyPlanets",
+  "type": "mod",
+  "version": "1.2.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-11T04:47:08Z",
+  "game_min": "2026.10.10.5554",
+  "game_min_revision": 5554,
+  "download": {
+    "url": "https://github.com/Jared-Melchers/LonelyPlanets/releases/download/1.2.2/LonelyPlanets.zip",
+    "sha256": "3F227BD352A88A2E94B75C37D5F49A640468C2A7AA005338BE704C65E3D118E6",
+    "size": 22748043,
+    "content_type": "application/zip"
+  },
+  "install_size": 23740138,
+  "install": {
+    "root": "LonelyPlanets",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Jared-Melchers/LonelyPlanets/releases/tag/1.2.2",
+  "changelog_text": "Fixed the mod for the latest version of KSA.",
+  "listing": {
+    "name": "Lonely Planets",
+    "authors": [
+      "Jared-Melchers"
+    ],
+    "abstract": "A mod for Kitten Space Agency that allows users to select only one planet to load.",
+    "description": "# Lonely Planets\nIf you do not have sufficient VRAM to load the full Solar System, now you can select individual planets to load.  \nCurrently Jupiter Saturn and Mars are available, Venus is in the files, but do not work in the current version of KSA.\n\n# Current Issues\nAs mentioned above Venus does not currently load. In addition the vehicle creator does not work in Jupiter, Saturn or Mars Only, the game must be loaded in 'Testing' mode (rather than 'Sandbox').\n\n# License\n© 2026 Jared Melchers  \n  \nThis work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International. For the full text of the license see LICENSE.txt\n",
+    "license": "CC-BY-NC-SA-4.0",
+    "tags": [
+      "celestial"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/lonely-planets-1-2-2.483/",
+      "repository": "https://github.com/Jared-Melchers/LonelyPlanets",
+      "bugtracker": "https://github.com/Jared-Melchers/LonelyPlanets/issues"
+    }
+  }
+}
