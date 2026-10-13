@@ -24,10 +24,11 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import decide
+import hosts
 import watch
 from check_amendment import check_document
 from check_release import DEFAULT_AUTHORED
-from hosts import HostError, HostRelease
+from hosts import HostError, HostRelease, Response
 from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize
 from watch import (
     IMAGES_VERIFIED,
@@ -1725,6 +1726,164 @@ class OlderReleasesFromSince(WatcherCase):
                 sorted(f"`{version}`: the archive is not a readable zip" for version in rejects),
             )
             self.assertFalse(settled)
+
+
+class GatosHttp:
+    """Answers the release list of one repository that mixes mod and image releases."""
+
+    def __init__(self, payloads, archive=b""):
+        self.body = json.dumps(payloads).encode()
+        self.payload = archive
+        self.downloaded = []
+
+    def log(self, message):
+        pass
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        return Response(200, {}, self.body)
+
+    def archive(self, url, api=False, limit=None):
+        self.downloaded.append(url)
+        return Archive.of_bytes(self.payload), {"Content-Type": "application/zip"}
+
+
+def gatos(tag, date):
+    return {
+        "tag_name": tag,
+        "published_at": date,
+        "html_url": f"https://github.com/o/gatos/releases/tag/{tag}",
+        "assets": [{
+            "state": "uploaded",
+            "name": "gatOS.zip",
+            "content_type": "application/zip",
+            "browser_download_url": f"https://github.com/o/gatos/releases/download/{tag}/gatOS.zip",
+        }],
+    }
+
+
+GATOS = [
+    gatos("vm-images-2026-10", "2026-10-05T00:00:00Z"),
+    gatos("gatos-v1.2.0", "2026-09-01T00:00:00Z"),
+    gatos("vm-images-2026-08", "2026-08-15T00:00:00Z"),
+    gatos("gatos-v1.1.0", "2026-08-01T00:00:00Z"),
+    gatos("gatos-v1.0.0", "2026-07-01T00:00:00Z"),
+]
+
+
+class TagPrefixes(WatcherCase):
+    """Only the releases whose tag starts with `tag_prefix` are mod releases."""
+
+    @staticmethod
+    def authored(**section):
+        return {"id": "gatOS", "releases": {"github": "o/gatos", **section}}
+
+    def tick(self, authored, payloads=GATOS):
+        """The versions one stamp pass picks, its errors, and whether it settled."""
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.watcher(Path(name), ["--no-commit"])
+            picked = []
+            watcher.stamp_one = lambda *arguments: picked.append(arguments[-1].version)
+            authority, mirrors = hosts.build(authored["releases"], GatosHttp(payloads), "gatOS")
+            releases, _ = authority.releases()
+            errors = []
+            settled = watcher.stamp_pass("gatOS", authored, authority, mirrors, releases, errors)
+            return picked, errors, settled
+
+    def test_an_image_release_is_neither_stamped_nor_reported(self):
+        for prefix in ("gatos-v", "gatos-"):
+            picked, errors, settled = self.tick(self.authored(tag_prefix=prefix))
+            self.assertEqual(picked, ["1.2.0"], msg=prefix)
+            self.assertEqual(errors, [])
+            self.assertTrue(settled)
+
+    def test_without_a_prefix_the_newest_image_release_is_reported(self):
+        picked, errors, _ = self.tick(self.authored())
+        self.assertEqual(picked, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("vm-images-2026-10", errors[0])
+
+    def test_since_reaches_the_candidates_only(self):
+        for prefix in ("gatos-v", "gatos-"):
+            picked, errors, _ = self.tick(self.authored(tag_prefix=prefix, since="1.1"))
+            self.assertEqual(picked, ["1.1.0", "1.2.0"], msg=prefix)
+            self.assertEqual(errors, [])
+        picked, _, _ = self.tick(self.authored(tag_prefix="gatos-v", since="0"))
+        self.assertEqual(picked, ["1.0.0", "1.1.0", "1.2.0"])
+
+    def test_a_prefix_that_matches_nothing_stamps_and_reports_nothing(self):
+        picked, errors, settled = self.tick(self.authored(tag_prefix="mod-v", since="0"))
+        self.assertEqual((picked, errors, settled), ([], [], True))
+
+    def test_a_candidate_whose_rest_does_not_parse_is_reported(self):
+        payloads = [gatos("gatos-beta", "2026-10-09T00:00:00Z"), *GATOS]
+        picked, errors, _ = self.tick(self.authored(tag_prefix="gatos-"), payloads)
+        self.assertEqual(picked, [])
+        self.assertEqual(len(errors), 1)
+        self.assertIn("`gatos-beta`", errors[0])
+        self.assertIn("after the tag_prefix `gatos-`", errors[0])
+
+    def test_a_prefix_without_a_github_key_builds_no_host(self):
+        with self.assertRaises(StampError):
+            hosts.build({"spacedock": 1, "tag_prefix": "gatos-v"}, GatosHttp([]), "gatOS")
+
+    def test_a_github_mirror_is_matched_by_the_version_of_the_rest(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher = self.watcher(Path(name), ["--no-commit"])
+            section = {
+                "github": "o/gatos", "spacedock": 1, "authority": "spacedock",
+                "tag_prefix": "gatos-v",
+            }
+            mirror = hosts.named(section, GatosHttp(GATOS), "gatOS")["github"]
+            found = watcher.mirror_release(mirror, "1.2.0")
+            self.assertEqual(found.tag, "gatos-v1.2.0")
+            # A listing without the prefix on the same repository does not share the list.
+            plain = hosts.named({"github": "o/gatos"}, GatosHttp(GATOS), "gatOS")["github"]
+            self.assertIsNone(watcher.mirror_release(plain, "1.2.0"))
+
+    def test_the_gatos_repository_end_to_end(self):
+        # Two full ticks through the real GitHub host and the real stamper.
+        listing = (
+            'spec_version = 1\nid = "gatOS"\ntype = "mod"\nname = "gatOS"\nauthors = ["A"]\n'
+            'abstract = "A mod."\nlicense = "MIT"\n\n[compatibility]\ngame_min = "2026.8.3.5117"\n\n'
+            '[releases]\ngithub = "o/gatos"\ntag_prefix = "gatos-v"\nsince = "1.1"\n'
+        )
+        data = zip_of({"gatOS/gatOS.dll": "x" * 100, "gatOS/mod.toml": 'name = "gatOS"\n'})
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            watcher.images = FakeImages()
+            watcher.issues = RecorderIssues()
+            watcher.http = GatosHttp(GATOS, data)
+            path = folder / ".authored" / "listings" / "gatOS.toml"
+            path.write_text(listing, encoding="utf-8")
+            stamped = folder / "releases" / "gatOS"
+
+            watcher.one_listing("gatOS", tomllib.loads(listing), path)
+            first = {file.name: file.read_bytes() for file in sorted(stamped.iterdir())}
+            watcher.one_listing("gatOS", tomllib.loads(listing), path)
+            second = {file.name: file.read_bytes() for file in sorted(stamped.iterdir())}
+
+            self.assertEqual(watcher.issues.reported, [])
+            self.assertEqual(list(first), ["1.1.0.json", "1.2.0.json"])
+            self.assertEqual(second, first)
+            self.assertEqual(
+                watcher.http.downloaded,
+                [
+                    "https://github.com/o/gatos/releases/download/gatos-v1.1.0/gatOS.zip",
+                    "https://github.com/o/gatos/releases/download/gatos-v1.2.0/gatOS.zip",
+                ],
+            )
+            document = json.loads(first["1.2.0.json"])
+            self.assertEqual(document["version"], "1.2.0")
+            self.assertEqual(
+                document["changelog"], "https://github.com/o/gatos/releases/tag/gatos-v1.2.0"
+            )
+            self.assertEqual(
+                document["download"]["url"],
+                "https://github.com/o/gatos/releases/download/gatos-v1.2.0/gatOS.zip",
+            )
+            # The image releases are not stamped releases, so no gone wait starts for them.
+            self.assertEqual(watcher.cache.data["gone"], {})
 
 
 class TheLookback(WatcherCase):

@@ -495,5 +495,109 @@ class AssetSelection(unittest.TestCase):
         self.assertEqual(releases[0].archives, ("https://spacedock.info/d/1",))
 
 
+def gatos_release(tag, *names, draft=False):
+    return {
+        "tag_name": tag,
+        "draft": draft,
+        "published_at": "2026-10-01T00:00:00Z",
+        "html_url": f"https://github.com/o/gatos/releases/tag/{tag}",
+        "assets": [
+            {
+                "state": "uploaded",
+                "name": name,
+                "content_type": "application/zip",
+                "size": 1,
+                "browser_download_url": f"https://github.com/o/gatos/releases/download/{tag}/{name}",
+            }
+            for name in names
+        ],
+    }
+
+
+GATOS = [
+    gatos_release("gatos-v1.3.0", "gatOS.zip", draft=True),
+    gatos_release("vm-images-2026-10", "gatos-vm.zip"),
+    gatos_release("gatos-v1.2.0", "gatOS.zip"),
+    gatos_release("gatos-v1.1.0", "gatOS.zip"),
+]
+
+
+class TagPrefix(unittest.TestCase):
+    """A repository that publishes VM image releases next to its mod releases."""
+
+    @staticmethod
+    def host(prefix, payloads=GATOS):
+        body = json.dumps(payloads).encode()
+        http = FakeHttp({"https://api.github.com/repos/o/gatos/releases": Response(200, {}, body)})
+        return GitHubHost("o/gatos", http, listing_id="gatOS", tag_prefix=prefix)
+
+    def test_only_a_tag_with_the_prefix_is_a_candidate(self):
+        for prefix, rest in (("gatos-v", "1.2.0"), ("gatos-", "v1.2.0")):
+            host = self.host(prefix)
+            releases, _ = host.releases()
+            self.assertEqual([entry.tag for entry in releases], ["gatos-v1.2.0", "gatos-v1.1.0"])
+            self.assertEqual([entry.version for entry in releases], ["1.2.0", "1.1.0"])
+            self.assertEqual(releases[0].facts()["tag"], rest)
+            # The links keep the real tag.
+            self.assertEqual(
+                releases[0].changelog, "https://github.com/o/gatos/releases/tag/gatos-v1.2.0"
+            )
+            self.assertIn("/gatos-v1.2.0/", releases[0].url)
+            # The draft is not counted, the image release is.
+            self.assertEqual(host.skipped, 1)
+
+    def test_without_a_prefix_every_release_is_a_candidate(self):
+        host = self.host("")
+        releases, _ = host.releases()
+        self.assertEqual(len(releases), 3)
+        self.assertEqual([entry.version for entry in releases], [None, None, None])
+        self.assertEqual(releases[0].facts()["tag"], "vm-images-2026-10")
+        self.assertEqual(host.skipped, 0)
+
+    def test_a_prefix_that_matches_nothing_offers_nothing(self):
+        # The match is case-sensitive, as GitHub compares tags.
+        for prefix in ("GATOS-", "mod-v"):
+            host = self.host(prefix)
+            releases, _ = host.releases()
+            self.assertEqual(releases, [])
+            self.assertEqual(host.skipped, 3)
+
+    def test_a_candidate_whose_rest_does_not_parse_has_no_version(self):
+        releases, _ = self.host("gatos-", [gatos_release("gatos-beta", "gatOS.zip")]).releases()
+        self.assertEqual(len(releases), 1)
+        self.assertIsNone(releases[0].version)
+
+    def test_the_asset_name_is_matched_against_the_rest_of_the_tag(self):
+        payload = gatos_release("gatos-v1.2.0", "gatOS-1.2.0.zip", "Source.zip")
+        for prefix in ("gatos-v", "gatos-"):
+            chosen = self.host(prefix)._release(payload)
+            self.assertEqual(chosen.asset_name, "gatOS-1.2.0.zip", msg=prefix)
+
+    def test_the_prefix_is_part_of_the_key(self):
+        self.assertEqual(self.host("").key, "github:o/gatos")
+        self.assertEqual(self.host("gatos-v").key, "github:o/gatos#gatos-v")
+        self.assertNotEqual(self.host("gatos-").key, self.host("gatos-v").key)
+
+    def test_named_gives_the_prefix_to_github_as_authority_and_as_mirror(self):
+        found = named({"github": "o/gatos", "tag_prefix": "gatos-v"}, FakeHttp({}), "gatOS")
+        self.assertEqual(found["github"].tag_prefix, "gatos-v")
+        both = {
+            "github": "o/gatos", "spacedock": 1, "authority": "spacedock", "tag_prefix": "gatos-v",
+        }
+        found = named(both, FakeHttp({}), "gatOS")
+        self.assertEqual(found["github"].tag_prefix, "gatos-v")
+        self.assertEqual(named({"github": "o/gatos"}, FakeHttp({}))["github"].tag_prefix, "")
+
+    def test_an_invalid_prefix_is_a_stamp_error(self):
+        for value in ("", "gatos v", "gatos-ä", 5, True, ["gatos-"]):
+            with self.assertRaises(StampError, msg=repr(value)):
+                named({"github": "o/gatos", "tag_prefix": value}, FakeHttp({}))
+
+    def test_a_prefix_without_a_github_key_is_a_stamp_error(self):
+        with self.assertRaises(StampError) as caught:
+            named({"spacedock": 1, "tag_prefix": "gatos-v"}, FakeHttp({}))
+        self.assertIn("github", str(caught.exception))
+
+
 if __name__ == "__main__":
     unittest.main()

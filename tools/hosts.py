@@ -64,6 +64,9 @@ CHUNK_BYTES = MIB
 
 LINK_NEXT = re.compile(r'<([^>]+)>;\s*rel="next"')
 
+# A `tag_prefix` is printable ASCII without whitespace.
+TAG_PREFIX = re.compile(r"[!-~]+")
+
 # The answers that say an archive is gone, a fact about the release and not a bad moment of the host.
 GONE = (404, 410, 451)
 
@@ -102,11 +105,18 @@ class HostRelease:
     # Every archive URL the host lists for the release, so a stamped URL that is
     # not the picked archive still counts as listed.
     archives: tuple = ()
+    # The `tag_prefix` of the listing, which the tag starts with (RFC 0096).
+    tag_prefix: str = ""
+
+    @property
+    def rest(self):
+        """The tag without its `tag_prefix`, which is what the version is read from."""
+        return self.tag[len(self.tag_prefix):]
 
     def facts(self):
         """The release facts the stamper takes."""
         return {
-            "tag": self.tag,
+            "tag": self.rest,
             "release_date": self.release_date,
             "url": self.url,
             "content_type": self.content_type,
@@ -362,15 +372,22 @@ class Host:
 
 
 class GitHubHost(Host):
-    """A GitHub repository's releases. Polled conditionally, drafts ignored."""
+    """A GitHub repository's releases. Polled conditionally, drafts ignored.
+
+    With a `tag_prefix`, only a release whose tag starts with it is offered,
+    and its version is read from the rest of the tag (RFC 0096).
+    """
 
     kind = "github"
 
-    def __init__(self, repository, http, listing_id=None, max_pages=5):
+    def __init__(self, repository, http, listing_id=None, max_pages=5, tag_prefix=""):
         self.repository = str(repository).strip("/")
         self.http = http
         self.listing_id = listing_id or self.repository.split("/")[-1]
         self.max_pages = max_pages
+        self.tag_prefix = tag_prefix or ""
+        # The published releases of the last full answer whose tag does not start with the prefix.
+        self.skipped = 0
         # True when the last scan hit max_pages with more pages left, so the
         # caller can report the tail instead of silently never seeing it.
         self.truncated = False
@@ -379,10 +396,17 @@ class GitHubHost(Host):
 
     @property
     def key(self):
-        return f"github:{self.repository.lower()}"
+        # The prefix is part of the key, because it changes which releases the list holds.
+        key = f"github:{self.repository.lower()}"
+        return f"{key}#{self.tag_prefix}" if self.tag_prefix else key
+
+    def candidate(self, payload):
+        """Whether a release of the answer is a mod release of the listing."""
+        return str(payload.get("tag_name") or "").startswith(self.tag_prefix)
 
     def releases(self, etag=None):
         self.pages = 0
+        self.skipped = 0
         url = f"{GITHUB_API}/repos/{self.repository}/releases?per_page=100"
         try:
             first = self.http.get(
@@ -426,12 +450,9 @@ class GitHubHost(Host):
                 "the older ones are not scanned"
             )
 
-        releases = [
-            self._release(payload)
-            for page in payloads
-            for payload in page
-            if not payload.get("draft")
-        ]
+        published = [payload for page in payloads for payload in page if not payload.get("draft")]
+        releases = [self._release(payload) for payload in published if self.candidate(payload)]
+        self.skipped = len(published) - len(releases)
         return releases, first.headers.get("ETag") or etag
 
     def _release(self, payload):
@@ -440,7 +461,8 @@ class GitHubHost(Host):
         return HostRelease(
             host=self.kind,
             tag=tag,
-            version=_version_of(tag),
+            tag_prefix=self.tag_prefix,
+            version=_version_of(tag[len(self.tag_prefix):]),
             release_date=_utc(payload.get("published_at") or payload.get("created_at")),
             url=asset.get("browser_download_url") if asset else None,
             content_type=(asset or {}).get("content_type") or "application/zip",
@@ -485,7 +507,7 @@ class GitHubHost(Host):
             return (assets[0] if assets else None), names
 
         identifier = self.listing_id.lower()
-        tag = (payload.get("tag_name") or "").lstrip("vV").lower()
+        tag = (payload.get("tag_name") or "")[len(self.tag_prefix):].lstrip("vV").lower()
         for wanted in (f"{identifier}.zip", f"{identifier}-{tag}.zip", f"{identifier}_{tag}.zip"):
             for asset in assets:
                 if asset["name"].lower() == wanted:
@@ -654,12 +676,36 @@ def _declared_dependencies(http, document, url):
     return derived_dependencies(mod_toml)
 
 
+def tag_prefix(releases_section):
+    """The `tag_prefix` of a `[releases]` section, or "" when it has none (RFC 0096).
+
+    It filters the tags of a GitHub repository, so it is valid only next to a
+    `github` key. SpaceDock has no tags and ignores it.
+    """
+    section = releases_section or {}
+    value = section.get("tag_prefix")
+    if value is None:
+        return ""
+    if not isinstance(value, str) or not TAG_PREFIX.fullmatch(value):
+        raise StampError(
+            f"tag_prefix {value!r} under [releases] is not a non-empty ASCII string "
+            "without whitespace"
+        )
+    if not section.get("github"):
+        raise StampError(
+            "tag_prefix under [releases] selects the releases of a GitHub repository by "
+            "their tags, so it needs a github key next to it"
+        )
+    return value
+
+
 def named(releases_section, http, listing_id=None):
     """Every host a `[releases]` section names, keyed by kind."""
     section = releases_section or {}
+    prefix = tag_prefix(section)
     found = {}
     if section.get("github"):
-        found["github"] = GitHubHost(section["github"], http, listing_id)
+        found["github"] = GitHubHost(section["github"], http, listing_id, tag_prefix=prefix)
     if section.get("spacedock"):
         found["spacedock"] = SpaceDockHost(section["spacedock"], http)
     return found

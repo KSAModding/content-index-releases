@@ -75,6 +75,13 @@ A release that fails its checks is reported in the listing's issue and does not 
 It is downloaded again when its archive, the listing or the game release list changes, and otherwise once a day.
 Raising `since` above a rejected release, or removing `since`, takes that release out of the report.
 
+A listing whose repository also publishes releases that are not mod releases names `tag_prefix` under `[releases]`, for example `tag_prefix = "gatos-"` (RFC 0096).
+The GitHub host then offers only the releases whose tag starts with the prefix, compared case-sensitively, and the version is read from the rest of the tag, so `gatos-v1.2.0` is `1.2.0`.
+Every other release is not a candidate: it is never stamped, never reported, and its downloads do not count.
+`since`, the history rule, the mirror match, the release notes, the gone check and the download counts all read the filtered list.
+A candidate whose rest does not parse is reported as before.
+The key is valid only next to a `github` key, and SpaceDock ignores it.
+
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
 | Tool | What it does |
