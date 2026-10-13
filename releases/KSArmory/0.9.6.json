@@ -1,0 +1,57 @@
+{
+  "spec_version": 1,
+  "id": "KSArmory",
+  "type": "mod",
+  "version": "0.9.6",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-13T13:04:10Z",
+  "game_min": "2026.8.19.5261",
+  "game_min_revision": 5261,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSArmory/releases/download/v0.9.6/KSArmory-0.9.6.zip",
+    "sha256": "FEC14C09B3027E5E3B7786A23C046168F986A356CA1AD7DB37848E30116F1D31",
+    "size": 23851948,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4460/KSArmory/download/0.9.6"
+    ]
+  },
+  "install_size": 30775159,
+  "install": {
+    "root": "KSArmory",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSArmory/releases/tag/v0.9.6",
+  "changelog_text": "## [0.9.6](https://github.com/LaurensDeV/KSArmory/compare/v0.9.5...v0.9.6) (2026-10-13)\n\n### Features\n\n* **icbm:** keep the computer's targets and settings in the save ([ab8c9ce](https://github.com/LaurensDeV/KSArmory/commit/ab8c9cea1ca7107eeca5129ab2fc427d6b2745d8))\n* **icbm:** let the trim wait out the spent stack before closing on it ([5e8db1a](https://github.com/LaurensDeV/KSArmory/commit/5e8db1a0cfcf77d16724d086825d3c862f13d879))\n* **icbm:** show what the shot needs against what the stack has ([542168e](https://github.com/LaurensDeV/KSArmory/commit/542168e3c52464083897bba02ad6a1e7b306dc15))\n* **icbm:** wait out the spent stack, and trim through a held keyboard ([b78feb5](https://github.com/LaurensDeV/KSArmory/commit/b78feb562448dc089ebb30745b52538fcd1db902))\n* **mirv:** spend the split reserve on a walk's later hops ([b9cac9f](https://github.com/LaurensDeV/KSArmory/commit/b9cac9f5ceabef0e213a942f1425b163708a133e))\n* **ui:** say on the Ballistic tab where the warheads burst ([ca7c15c](https://github.com/LaurensDeV/KSArmory/commit/ca7c15ce1ab85851150f95b8723ba3d099198409))\n\n### Fixes\n\n* **effects:** pick warhead presets on Core's resized conflagration ([fd746eb](https://github.com/LaurensDeV/KSArmory/commit/fd746ebabda8993596dd7c25a06d231849932c14))\n* **icbm:** add the release kick where it happens, keep a recent aim, on ([9e28640](https://github.com/LaurensDeV/KSArmory/commit/9e286404bd13b966e56536c0063575de823b692c))\n* **icbm:** hand a stack outrunning its shot to the closed loop, on ([1586a87](https://github.com/LaurensDeV/KSArmory/commit/1586a87dd56398e60a98690a7177a03ca47782f8))\n* **icbm:** hold for a burn window without losing it or the jets ([b2cd576](https://github.com/LaurensDeV/KSArmory/commit/b2cd5761e7d930815c5e3ce7b964ee317923df17))\n* **icbm:** keep a hold's burn window, and light it only once turned ([d117411](https://github.com/LaurensDeV/KSArmory/commit/d1174117c1b321e5e31c8c36ac18f33d36499b14))\n* **icbm:** land a long coast from orbit on its aim, not its clock ([39d7a4e](https://github.com/LaurensDeV/KSArmory/commit/39d7a4e0f1042c639b29d3f5a7b7388986c9dd23))\n* **icbm:** latch a burn's arrival after its solids, from orbit too ([183c4ba](https://github.com/LaurensDeV/KSArmory/commit/183c4badcc5c1215ba2849858ea801a4b8f0a6c1))\n* **icbm:** let a coast warp while nothing is correcting ([ad02a27](https://github.com/LaurensDeV/KSArmory/commit/ad02a273c1ca0da8aa2b8563169f9dd15cb4a8de))\n* **icbm:** let an orbital hold warp to its burn window ([2066f3f](https://github.com/LaurensDeV/KSArmory/commit/2066f3fa1bda548b1b2a485605f84c9171929130))\n* **icbm:** light a held burn at real time, not inside a warp ([64d411f](https://github.com/LaurensDeV/KSArmory/commit/64d411fe6d853c0ef1051d4e438bc90497cbe5c5))\n* **icbm:** move a release staged too early to the end of the list ([02f37ba](https://github.com/LaurensDeV/KSArmory/commit/02f37ba62a3444990f079858f077d82d847e3362))\n* **icbm:** pulse a throttle below the floor rather than break the stack ([5ac7e5d](https://github.com/LaurensDeV/KSArmory/commit/5ac7e5dba5ad31ea786b4b2e47179578f59dac38))\n* **icbm:** push a liquid stack's stalled cutoff through at 25 km ([3d4f416](https://github.com/LaurensDeV/KSArmory/commit/3d4f416d251a5a48fc272ba56b995af5efe7fee2))\n* **icbm:** retrim a refused bus onto the cheapest arrival, not none ([4a07bce](https://github.com/LaurensDeV/KSArmory/commit/4a07bceb5a40122add40c82bced0ec05b99d7c39))\n* **icbm:** stop the stack wait holding long shots' post-boost correction ([516d301](https://github.com/LaurensDeV/KSArmory/commit/516d301f8e66859d6875af0e72d987e4df72c9db))\n* **icbm:** turn a holding stack onto its burn just in time ([0905442](https://github.com/LaurensDeV/KSArmory/commit/090544254ba05c65a74baebdfc8127ea9d6c2bdc))\n* **icbm:** turn into the airflow before dropping a spent stage in air ([87c6a29](https://github.com/LaurensDeV/KSArmory/commit/87c6a298b45de60655168337e7eace9cceac735f))\n* **mirv:** end the stack wait once the first warhead has left ([ac92bca](https://github.com/LaurensDeV/KSArmory/commit/ac92bca0ef3d4931b4ac7ad735235ccad1885e0a))\n* **mirv:** price a multi-target walk at what the bus actually spends ([016a5f3](https://github.com/LaurensDeV/KSArmory/commit/016a5f346433a7d8560b1bb06a4326c4516e6af7))\n* **mirv:** stop the coast's warp early enough for a walk to hop ([ea87a76](https://github.com/LaurensDeV/KSArmory/commit/ea87a76cd83a1807432931a8537fae295feb1f9a))\n* **rings:** stop stacked targeting rings compounding into a glow ([076a9ef](https://github.com/LaurensDeV/KSArmory/commit/076a9ef7ff73f18c467e0465a483d474502c42b2))\n* **settings:** follow the save the game loaded and wrote ([c4196c9](https://github.com/LaurensDeV/KSArmory/commit/c4196c99f03caf09e121e4552acc23f82bcbda86))\n* **ui:** say a holding bus's impact comes after its burn ([cf25c1e](https://github.com/LaurensDeV/KSArmory/commit/cf25c1e8acb3f116384ff6fb18c19557cb746423))\n\n### Build and packaging\n\n* **ksa:** retarget 2026.10.10.5554 ([ec1fe4e](https://github.com/LaurensDeV/KSArmory/commit/ec1fe4e6ce583d41bc47ad49618683d8ea7e4d61))\n* **ksa:** retarget 2026.10.13.5602 ([c4528ee](https://github.com/LaurensDeV/KSArmory/commit/c4528ee5713ac3c611fc6d68f7f078a585837499))\n* **saves:** remove the startup save repair after its one release ([5e1cab3](https://github.com/LaurensDeV/KSArmory/commit/5e1cab3a201584314aefbd685874c6f558cb7e08))\n\n\n---\n\nDrop the `KSArmory` folder into your KSA user directory's `mods/`, register it in\n`manifest.toml`, and launch through StarMap. See the README for the full guide.\n\nWorks on Windows and Linux — the mod is a portable .NET assembly.\n\nRelease build: no debug symbols, log starts at INFO. Tick **Verbose log** in the\npanel if you are reporting a bug.",
+  "listing": {
+    "name": "KSArmory",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "Weapon systems for Kitten Space Agency: point defence, guided and unguided munitions, targeting sights and a ballistic computer.",
+    "description": "Adds working weapon systems to Kitten Space Agency. Every launcher searches, tracks, decides and shoots on its own, and the rounds are simulated by the mod rather than by the vehicle physics, so guidance runs at sub-frame accuracy and cannot corrupt a save.\n\n### Launchers\n\nA **Pantsir-S1** on an 8x8 chassis: search radar, twelve proportional-navigation interceptors in two pods of six, twin cannon, and a turret that traverses and elevates. A **Mk 15 Phalanx CIWS** that stacks on any 3 m node and carries no missiles at all. Three rails that surface-attach to anything: **LAU-7** with an AIM-9J, **LAU-128** with an AIM-120C, and **LAU-118** with an AGM-88 HARM, which homes on radar emissions and cannot engage an aircraft. A **B61 rack** that neither aims nor fires - it lets a bomb go and the ground does the rest.\n\n### Sights\n\nAn **electro-optical director** on a mast and a **Rafael LITENING pod** whose whole nose rolls about its centreline while the sight nods within it. Both drive the main view, magnify by rewriting the field of view, and work on a craft carrying no weapons at all - a hull with one director on it is an observation post.\n\n### Fire control\n\nThreat classification is by closest point of approach rather than closing speed, so targets passing by are engageable and not only ones flying straight at you. IFF is per installation, so two sites can be on opposite sides. A radar can be told to go silent, which is a trade rather than a free defence: a silent set cannot be homed on and cannot see. Rounds can themselves be shot down.\n\n### Ballistic computer\n\nAim a multiple-warhead ballistic missile at a point on any body and it flies itself: ascent, guided cutoff on velocity-to-be-gained, post-boost trim, and a warhead bus that releases each round along the same line. It picks up from wherever the vehicle already is - on the pad, mid-ascent, or in orbit, where it also decides *when* to leave.\n\n### Effects\n\nDetonations, nuclear fireballs and mushroom clouds standing in the world, motor plumes and smoke trails, tracers, muzzle flashes and spatialised gunfire, all through the engine's own renderers.\n",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "user-interface",
+      "audio",
+      "weapons",
+      "physics"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kessler-systems-armory-ksarmory.1131/",
+      "homepage": "https://ksarmory.com",
+      "repository": "https://github.com/LaurensDeV/KSArmory",
+      "spacedock": "https://spacedock.info/mod/4460/KSArmory",
+      "bugtracker": "https://github.com/LaurensDeV/KSArmory/issues"
+    }
+  }
+}
