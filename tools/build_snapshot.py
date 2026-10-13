@@ -7,6 +7,7 @@ import argparse
 import datetime
 import json
 import os
+import subprocess
 import sys
 import tomllib
 from pathlib import Path
@@ -22,6 +23,15 @@ STATUS_FIELDS = ("state", "since", "reason")
 DOWNLOAD_COUNTS_VERSION = 1
 
 DOWNLOAD_HOSTS = ("github", "spacedock")
+
+REPOSITORY_VARIABLES = (
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_COMMON_DIR",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+)
 
 
 class SnapshotError(Exception):
@@ -425,7 +435,94 @@ def entry_dates(timestamps):
     return dates
 
 
-def listing_entry(document, status, releases, downloads=None):
+def git(authored, *arguments):
+    """The output of one git command in the authored checkout, or None when it fails.
+
+    Variables such as GIT_DIR, which a git hook sets, would point git at another
+    repository, so the ones that choose the repository are left out.
+    """
+    environment = {
+        key: value for key, value in os.environ.items() if key not in REPOSITORY_VARIABLES
+    }
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(authored), *arguments],
+            capture_output=True,
+            encoding="utf-8",
+            env=environment,
+            check=False,
+        )
+    except (OSError, ValueError):
+        return None
+    return result.stdout if result.returncode == 0 else None
+
+
+def history_key(path):
+    """The folder and lowercased id a path of the authored tree belongs to, or None.
+
+    The folder is part of the key, so an id that moves between a listing and a pack
+    does not take the time of the other one.
+    """
+    parts = path.split("/")
+    if len(parts) == 2 and parts[0] == "listings" and parts[1].endswith(".toml"):
+        return ("listings", parts[1][: -len(".toml")].lower())
+    if len(parts) == 3 and parts[0] == "packs" and parts[2].endswith(".toml"):
+        return ("packs", parts[1].lower())
+    return None
+
+
+def listed_times(authored, log):
+    """When each entry came into the index, keyed as history_key does, or None without the history.
+
+    RFC 0092 takes the committer time of the oldest commit in the first-parent history
+    of HEAD whose tree holds the listing's document or a version of the pack, which is
+    the first commit that adds such a file against its first parent. A shallow checkout
+    cuts the history, so its oldest commit would claim every file and is not used.
+    """
+    top = git(authored, "rev-parse", "--show-toplevel")
+    try:
+        own = top is not None and os.path.samefile(top.strip(), authored)
+    except OSError:
+        own = False
+    if not own:
+        log(
+            f"{authored} is not a git checkout of its own that git can read, "
+            "so no entry carries listed_at"
+        )
+        return None
+    if (git(authored, "rev-parse", "--is-shallow-repository") or "").strip() != "false":
+        log(
+            f"{authored} is a shallow checkout without its full history, "
+            "so no entry carries listed_at"
+        )
+        return None
+
+    output = git(
+        authored,
+        "-c", "core.quotePath=false",
+        "log", "HEAD",
+        "--first-parent", "--diff-merges=first-parent", "--root", "--reverse",
+        "--no-renames", "--diff-filter=A", "--name-only", "--format=commit %ct",
+        "--", "listings", "packs",
+    )
+    if output is None:
+        log(f"the history of {authored} could not be read, so no entry carries listed_at")
+        return None
+
+    times = {}
+    moment = None
+    for line in output.splitlines():
+        if line.startswith("commit "):
+            seconds = int(line[len("commit "):])
+            moment = datetime.datetime.fromtimestamp(seconds, datetime.timezone.utc)
+            continue
+        key = history_key(line.strip())
+        if key is not None and moment is not None:
+            times.setdefault(key, moment.strftime("%Y-%m-%dT%H:%M:%SZ"))
+    return times
+
+
+def listing_entry(document, status, releases, downloads=None, listed_at=None):
     """One entry of `listings`. Delisted becomes a tombstone: id and status only."""
     if status is not None and status["state"] == "delisted":
         return {"id": document["id"], "index_status": status}
@@ -438,6 +535,8 @@ def listing_entry(document, status, releases, downloads=None):
         )
         for release in releases
     )
+    if listed_at is not None:
+        dates["listed_at"] = listed_at
     entry = {"id": document["id"], **dates, "authored": document, "releases": releases}
     if status is not None:
         entry["index_status"] = status  # disputed ships whole, the client warns
@@ -446,7 +545,7 @@ def listing_entry(document, status, releases, downloads=None):
     return entry
 
 
-def pack_entry(pack, status, versioned):
+def pack_entry(pack, status, versioned, listed_at=None):
     """One entry of `packs`. A pack has no generated half, so there is no `releases`."""
     identifier = pack["id"]
     if status is not None and status["state"] == "delisted":
@@ -468,7 +567,10 @@ def pack_entry(pack, status, versioned):
             )
         )
 
-    entry = {"id": identifier, **entry_dates(timestamps), "versions": rendered}
+    dates = entry_dates(timestamps)
+    if listed_at is not None:
+        dates["listed_at"] = listed_at
+    entry = {"id": identifier, **dates, "versions": rendered}
     if status is not None:
         entry["index_status"] = status
     return entry
@@ -506,6 +608,15 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
 
     folders = release_folders(releases)
 
+    listed = listed_times(authored, log)
+    if listed is not None:
+        entries = [("listings", key, listings[key]["id"]) for key in listings]
+        entries += [("packs", key, packs[key]["id"]) for key in packs]
+        for folder, key, identifier in sorted(entries):
+            if (folder, key) not in listed and whole.get(key, {}).get("state") != "delisted":
+                log(f"'{identifier}' is not in the committed history, so it carries no listed_at")
+    listed = listed or {}
+
     rendered_listings = []
     for key in sorted(listings):
         document = listings[key]
@@ -513,9 +624,16 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
         delisted = status is not None and status["state"] == "delisted"
         folder = folders.get(key)
         files = [] if delisted or folder is None else read_releases(folder, document["id"])
-        rendered_listings.append(listing_entry(document, status, files, counts.get(key)))
+        rendered_listings.append(
+            listing_entry(
+                document, status, files, counts.get(key), listed.get(("listings", key))
+            )
+        )
 
-    rendered_packs = [pack_entry(packs[key], whole.get(key), versioned) for key in sorted(packs)]
+    rendered_packs = [
+        pack_entry(packs[key], whole.get(key), versioned, listed.get(("packs", key)))
+        for key in sorted(packs)
+    ]
 
     for key in sorted(set(folders) - set(listings)):
         # The snapshot carries the release files of listed entries only.
