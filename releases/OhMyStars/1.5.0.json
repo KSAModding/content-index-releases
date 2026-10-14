@@ -1,0 +1,54 @@
+{
+  "spec_version": 1,
+  "id": "OhMyStars",
+  "type": "mod",
+  "version": "1.5.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-14T07:38:51Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://spacedock.info/mod/4537/Oh%20My%20Stars/download/1.5.0",
+    "sha256": "E583DBB1B8930E6FEE166D195A229BDC1ECD7EB122A68E1D720A10708AEFACFA",
+    "size": 25778822,
+    "content_type": "application/zip"
+  },
+  "install_size": 70178540,
+  "install": {
+    "root": "OhMyStars",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.6",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "ModMenu",
+      "kind": "required",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+  "changelog_text": "Huge update!  Also compatibility restored with version v2026.10.13.5602\n\n* Changed code to accommodate the game itself making the stars background 3 dimensional (RIP 3 day old OMS feature)\n* Made a pointer mode where you can select a star for information with mouse / cursor clicking stars!\n* In the Editor window added a generator which can generate a stars binaries file using a selected stars AT-HYG catalog.  you can get the larger expanded AT-HYG catalog with millions of stars to process if you want!\n* In the Editor window added a star binaries export which exports out as binaries files the current stars with their current size and color values which could  be changed by the editor window settings\n* In the Editor window added a tab to create and use your own constellations / lines!  It utilizes the justs added cursor / mouse star selector to help create them.\n\nNote that the new method for the Oh My Stars mod referencing stars to use it's functions is by generating and usisng a sister binaries file that is mapped along to the regular game utilized binaries file.  That's why when generating and exporting binaries files it creates two binaries both beginning their names with the user entered name.  The regular game without Oh My Stars can load the stars Binary file on it's own without Oh My Stars as it normally would.",
+  "listing": {
+    "name": "OhMyStars",
+    "authors": [
+      "nanonestor"
+    ],
+    "abstract": "This mod adds constellation lines between stars in KSA!",
+    "description": "This mod adds constellation lines between stars in KSA!\n\nFeatures: \n- Constellation (Asterism) Lines between stars  \n- Constellation Boundary lines (IAU defined) - Star informational window  \n- Star names and informational window  \n- Vehicle orientation mode to point towards stars  \n\n![OMShunter](ksa-image:OMSHunter)\n\nA pointer can be enabled showing the direction to a currently selected star.  A navball marker can be enabled showing the orientation where the selected star is in relation to your vehicle's pointing!\n\n![OMS3medium](ksa-image:OhMyStars3)\n\nAn orientation mode can be activated making the flight computer aim your vehicles towards the currently selected star!  Toggle the mode off to go back to the vehicle's previous orientation mode!\n\n![OMS3medium](ksa-image:OhMyStars4)\n",
+    "license": "GPL-2.0-only AND CC-BY-SA-4.0",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/oh-my-stars.1255",
+      "repository": "https://github.com/nanonestor/OhMyStars",
+      "spacedock": "https://spacedock.info/mod/4537/Oh%20My%20Stars",
+      "bugtracker": "https://github.com/nanonestor/OhMyStars/issues"
+    }
+  }
+}
