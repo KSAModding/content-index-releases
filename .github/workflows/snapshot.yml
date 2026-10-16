@@ -45,6 +45,8 @@ jobs:
           repository: ${{ github.repository_owner }}/content-index
           ref: main
           path: .authored
+          # listed_at (RFC 0092) is read from the full first-parent history of main.
+          fetch-depth: 0
 
       - name: Fetch the published snapshot
         run: |

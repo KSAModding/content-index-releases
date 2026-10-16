@@ -5,9 +5,12 @@
 
 import argparse
 import contextlib
+import datetime
 import io
 import json
 import os
+import shutil
+import subprocess
 import tempfile
 import unittest
 import unittest.mock
@@ -1037,6 +1040,237 @@ class Dates(Fixture):
         }
         self.assertEqual(entry_dates([utc, offset]), expected)
         self.assertEqual(entry_dates([offset, utc]), expected)
+
+
+@unittest.skipIf(shutil.which("git") is None, "git is not installed")
+class ListedAt(Fixture):
+    """listed_at of RFC 0092, from the first-parent history of the authored repository."""
+
+    def setUp(self):
+        super().setUp()
+        # An empty global config keeps the developer's hooks, signing and line endings out.
+        self.config = self.index.root / "gitconfig"
+        self.config.write_text("", encoding="utf-8")
+        self.git("init", "-q", "-b", "main")
+
+    def git(self, *arguments, when=None, where=None):
+        environment = {
+            key: value for key, value in os.environ.items() if not key.startswith("GIT_")
+        }
+        environment["GIT_CONFIG_GLOBAL"] = str(self.config)
+        environment["GIT_CONFIG_NOSYSTEM"] = "1"
+        if when is not None:
+            environment["GIT_AUTHOR_DATE"] = environment["GIT_COMMITTER_DATE"] = when
+        result = subprocess.run(
+            [
+                "git", "-C", str(where or self.index.authored),
+                "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+                *arguments,
+            ],
+            capture_output=True,
+            encoding="utf-8",
+            env=environment,
+            check=False,
+        )
+        if result.returncode != 0:
+            self.fail(f"git {' '.join(arguments)} failed: {result.stderr}")
+        return result.stdout
+
+    @staticmethod
+    def stamp(at, offset="+0000"):
+        """`at` (UTC text) in the internal date format of git, shown in the zone `offset`."""
+        moment = datetime.datetime.fromisoformat(at.replace("Z", "+00:00"))
+        return f"{int(moment.timestamp())} {offset}"
+
+    def commit(self, at, offset="+0000"):
+        """Commit everything with `at` as the author and committer time."""
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", f"change at {at}", when=self.stamp(at, offset))
+
+    def remove(self, relative):
+        self.git("rm", "-q", relative)
+
+    def test_a_squash_merge_lists_at_its_commit(self):
+        self.index.listing("Other")
+        self.commit("2026-08-30T10:00:00Z")
+        self.git("checkout", "-q", "-b", "feature")
+        self.index.listing("AutoStage")
+        self.commit("2026-08-31T10:00:00Z")
+        self.git("checkout", "-q", "main")
+        self.git("merge", "-q", "--squash", "feature")
+        self.commit("2026-09-01T10:00:00Z")
+        self.git("branch", "-q", "-D", "feature")
+        self.index.release("AutoStage", "1.0.0", release_date="2026-08-01T10:00:00Z")
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(entry["listed_at"], "2026-09-01T10:00:00Z")
+        self.assertEqual(list(entry)[:4], ["id", "published_at", "updated_at", "listed_at"])
+
+    def test_a_merge_commit_lists_at_the_merge_and_not_at_the_branch_commit(self):
+        self.index.listing("Other")
+        self.commit("2026-09-01T10:00:00Z")
+        self.git("checkout", "-q", "-b", "feature")
+        self.index.listing("AutoStage")
+        self.commit("2026-09-02T10:00:00Z")
+        self.git("checkout", "-q", "main")
+        self.index.listing("Third")
+        self.commit("2026-09-03T10:00:00Z")
+        self.git(
+            "merge", "-q", "--no-ff", "-m", "Merge feature", "feature",
+            when=self.stamp("2026-09-04T10:00:00Z"),
+        )
+        document = self.index.build()
+        self.assertEqual(self.entry(document, "AutoStage")["listed_at"], "2026-09-04T10:00:00Z")
+        self.assertEqual(self.entry(document, "Other")["listed_at"], "2026-09-01T10:00:00Z")
+        self.assertEqual(self.entry(document, "Third")["listed_at"], "2026-09-03T10:00:00Z")
+
+    def test_a_merge_of_a_branch_main_did_not_move_past_lists_at_the_merge(self):
+        # The merge tree is the tree of the branch, so git must not follow the branch.
+        self.index.listing("Other")
+        self.commit("2026-09-01T10:00:00Z")
+        self.git("checkout", "-q", "-b", "feature")
+        self.index.listing("AutoStage")
+        self.commit("2026-09-02T10:00:00Z")
+        self.git("checkout", "-q", "main")
+        self.git(
+            "merge", "-q", "--no-ff", "-m", "Merge feature", "feature",
+            when=self.stamp("2026-09-04T10:00:00Z"),
+        )
+        self.assertEqual(
+            self.entry(self.index.build(), "AutoStage")["listed_at"], "2026-09-04T10:00:00Z"
+        )
+
+    def test_an_id_that_moves_from_a_pack_to_a_listing_takes_the_listing_time(self):
+        self.index.pack("Moved", "1.0.0")
+        self.commit("2026-09-01T10:00:00Z")
+        self.remove("packs/Moved/1.0.0.toml")
+        (self.index.authored / "packs").mkdir(exist_ok=True)  # git rm takes the empty folder
+        self.index.listing("Moved")
+        self.commit("2026-09-02T10:00:00Z")
+        self.assertEqual(
+            self.entry(self.index.build(), "Moved")["listed_at"], "2026-09-02T10:00:00Z"
+        )
+
+    def test_a_case_only_rename_keeps_the_first_time(self):
+        self.index.listing("autostage")
+        self.commit("2026-09-01T10:00:00Z")
+        self.git("rm", "-q", "--cached", "listings/autostage.toml")
+        (self.index.authored / "listings" / "autostage.toml").unlink()
+        self.index.listing("AutoStage")
+        self.commit("2026-09-05T10:00:00Z")
+        self.assertEqual(
+            self.git("ls-tree", "--name-only", "HEAD", "listings/").split(),
+            ["listings/AutoStage.toml"],
+        )
+        entry = self.entry(self.index.build(), "AutoStage")
+        self.assertEqual(entry["listed_at"], "2026-09-01T10:00:00Z")
+
+    def test_a_pack_lists_at_its_first_version_even_when_that_version_is_gone(self):
+        self.index.pack("Pack", "1.0.0")
+        self.commit("2026-09-01T10:00:00Z")
+        self.index.pack("Pack", "1.1.0")
+        self.commit("2026-09-02T10:00:00Z")
+        self.remove("packs/Pack/1.0.0.toml")
+        self.commit("2026-09-03T10:00:00Z")
+        entry = self.entry(self.index.build(), "Pack")
+        self.assertEqual(entry["listed_at"], "2026-09-01T10:00:00Z")
+        self.assertEqual(list(entry)[:4], ["id", "published_at", "updated_at", "listed_at"])
+
+    def test_a_delist_then_relist_keeps_the_first_time(self):
+        self.index.listing("AutoStage")
+        self.commit("2026-09-01T10:00:00Z")
+        self.remove("listings/AutoStage.toml")
+        self.commit("2026-09-02T10:00:00Z")
+        self.index.listing("AutoStage")
+        self.commit("2026-09-03T10:00:00Z")
+        self.assertEqual(
+            self.entry(self.index.build(), "AutoStage")["listed_at"], "2026-09-01T10:00:00Z"
+        )
+
+    def test_a_tombstone_has_no_listed_at(self):
+        self.index.listing("Gone")
+        self.index.pack("GonePack", "1.0.0")
+        self.commit("2026-09-01T10:00:00Z")
+        self.index.status(
+            {"id": "Gone", "state": "delisted"}, {"id": "GonePack", "state": "delisted"}
+        )
+        self.commit("2026-09-02T10:00:00Z")
+        document = self.index.build()
+        self.assertEqual(sorted(self.entry(document, "Gone")), ["id", "index_status"])
+        self.assertEqual(sorted(self.entry(document, "GonePack")), ["id", "index_status"])
+        self.assertEqual(self.index.notes, [])
+
+    def test_a_disputed_listing_keeps_its_listed_at(self):
+        self.index.listing("Contested")
+        self.index.status({"id": "Contested", "state": "disputed"})
+        self.commit("2026-09-01T10:00:00Z")
+        self.assertIn("listed_at", self.entry(self.index.build(), "Contested"))
+
+    def test_the_committer_time_is_written_in_utc(self):
+        self.index.listing("AutoStage")
+        self.commit("2026-09-01T10:00:00Z", offset="+0200")
+        self.assertEqual(
+            self.entry(self.index.build(), "AutoStage")["listed_at"], "2026-09-01T10:00:00Z"
+        )
+
+    def test_a_shallow_checkout_leaves_the_field_out_and_says_so(self):
+        self.index.listing("AutoStage")
+        self.commit("2026-09-01T10:00:00Z")
+        self.index.listing("DeltaVMap")
+        self.commit("2026-09-02T10:00:00Z")
+        shallow = self.index.root / "shallow"
+        self.git(
+            "clone", "-q", "--depth", "1", self.index.authored.as_uri(), str(shallow),
+            where=self.index.root,
+        )
+        (shallow / "packs").mkdir()  # git does not carry an empty folder
+        document = build(
+            shallow, self.index.releases, self.index.game_versions, log=self.index.notes.append
+        )
+        self.assertNotIn("listed_at", self.entry(document, "AutoStage"))
+        self.assertNotIn("listed_at", self.entry(document, "DeltaVMap"))
+        self.assertTrue(any("shallow" in note for note in self.index.notes))
+
+    def test_an_uncommitted_listing_has_no_listed_at_and_says_so(self):
+        self.index.listing("AutoStage")
+        self.commit("2026-09-01T10:00:00Z")
+        self.index.listing("DeltaVMap")
+        document = self.index.build()
+        self.assertIn("listed_at", self.entry(document, "AutoStage"))
+        self.assertNotIn("listed_at", self.entry(document, "DeltaVMap"))
+        self.assertTrue(any("DeltaVMap" in note for note in self.index.notes))
+
+    def test_a_git_dir_set_by_a_hook_does_not_move_the_history(self):
+        self.index.listing("AutoStage")
+        self.commit("2026-09-01T10:00:00Z")
+        other = self.index.root / "other"
+        other.mkdir()
+        self.git("init", "-q", "-b", "main", where=other)
+        with unittest.mock.patch.dict(os.environ, {"GIT_DIR": str(other / ".git")}):
+            document = self.index.build()
+        self.assertEqual(self.entry(document, "AutoStage")["listed_at"], "2026-09-01T10:00:00Z")
+
+    def test_the_same_history_gives_the_same_bytes(self):
+        self.index.listing("AutoStage")
+        self.index.pack("Pack", "1.0.0")
+        self.commit("2026-09-01T10:00:00Z")
+        self.assertEqual(serialize(self.index.build()), serialize(self.index.build()))
+
+
+class ListedAtWithoutHistory(Fixture):
+    def test_a_folder_that_is_not_a_git_checkout_leaves_the_field_out_and_says_so(self):
+        self.index.listing("AutoStage")
+        self.index.pack("Pack", "1.0.0")
+        document = self.index.build()
+        self.assertNotIn("listed_at", self.entry(document, "AutoStage"))
+        self.assertNotIn("listed_at", self.entry(document, "Pack"))
+        self.assertTrue(any("listed_at" in note for note in self.index.notes))
+
+    def test_a_missing_git_leaves_the_field_out_and_the_build_succeeds(self):
+        self.index.listing("AutoStage")
+        with unittest.mock.patch("subprocess.run", side_effect=FileNotFoundError("git")):
+            document = self.index.build()
+        self.assertNotIn("listed_at", self.entry(document, "AutoStage"))
+        self.assertTrue(any("listed_at" in note for note in self.index.notes))
 
 
 class Malformed(Fixture):

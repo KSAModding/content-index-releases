@@ -188,6 +188,11 @@ Each listing and pack that is not delisted carries the dates of RFC 0058 next to
 `updated_at` is the latest release date of a version that is neither yanked nor retracted.
 An entry without such a version does not carry the field.
 
+`listed_at` of RFC 0092 is when the entry came into the index: the committer time in UTC of the oldest commit in the first-parent history of the authored `main` whose tree holds the listing's document or a version of the pack.
+Ids compare case-insensitively, so a case-only rename and a delisting followed by a new listing keep the first time.
+The workflow checks the authored half out with its full history for this.
+When that history is missing, as in a shallow checkout or a folder that is not a git checkout, no entry carries the field, the build says so in its log, and it still succeeds.
+
 A build runs on every change to either half: this repository triggers it on a push, and the authored half asks for it through a `repository_dispatch`, so a steward writing `index-status.toml` reaches clients in one build rather than at the next scheduled one.
 
 To build one by hand, against a checkout of the authored half:
