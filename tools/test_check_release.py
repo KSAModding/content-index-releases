@@ -370,6 +370,20 @@ class TheHost(Fixture):
         self.assertEqual(outcome.outcome, check_release.COULD_NOT_EVALUATE)
 
 
+class TagPrefix(Fixture):
+    def test_a_release_stamped_from_a_prefixed_tag_passes(self):
+        # The watcher hands the stamper the rest of the tag, and the check reads the version, so both stamp the same file.
+        for prefix in ("gatos-v", "gatos-"):
+            tagged = hosts.HostRelease(
+                host="github", tag="gatos-v1.0.0", tag_prefix=prefix, version="1.0.0",
+                release_date=RELEASE["release_date"], url=URL, changelog=RELEASE["changelog"],
+            )
+            head = self.stamped(release=tagged.facts())
+            self.assertEqual(head["version"], "1.0.0")
+            outcome = self.check(head)
+            self.assertEqual(outcome.outcome, check_release.PASS, outcome.messages)
+
+
 class Helpers(unittest.TestCase):
     def test_the_authored_root_is_the_argument_then_the_environment_then_the_sibling(self):
         self.assertEqual(check_release.authored_root("x"), Path("x"))

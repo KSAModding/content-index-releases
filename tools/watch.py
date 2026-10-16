@@ -14,6 +14,8 @@ release only, because RFC 0031 freezes the authored facts "current at release
 time". A listing that names `since` under `[releases]` opts in (RFC 0079), and
 every release at or above that version is stamped too, with today's facts, which
 the owner corrects with an amendment. `--backfill` stamps the whole history.
+A `tag_prefix` under `[releases]` takes the releases whose tag does not start
+with it out of the host's answer, so no pass sees them (RFC 0096).
 
 A stamped release that the host no longer lists for a day, and whose every URL
 then answers that the archive is gone, gets `download.unavailable_since`, and
@@ -1139,6 +1141,10 @@ class Watcher:
             self.log("  unchanged since the last tick")
         else:
             self.log(f"  {len(releases)} release(s) on {authority.key}")
+            skipped = getattr(authority, "skipped", 0)
+            if skipped:
+                # Not a mod release of this listing, so it is neither stamped nor reported.
+                self.log(f"    {skipped} release(s) whose tag does not start with the tag_prefix")
             if getattr(authority, "truncated", False):
                 errors.append(
                     "the host lists more releases than one scan covers, so the "
@@ -1408,9 +1414,11 @@ class Watcher:
                 continue
 
             if release.version is None:
+                prefix = getattr(release, "tag_prefix", "")
+                after = f" after the tag_prefix `{prefix}`" if prefix else ""
                 errors.append(
-                    f"the tag `{release.tag}` does not parse as a version, so the release "
-                    f"cannot be stamped; {VERSION_FORMS}"
+                    f"the tag `{release.tag}` does not parse as a version{after}, so the "
+                    f"release cannot be stamped; {VERSION_FORMS}"
                 )
                 continue
 

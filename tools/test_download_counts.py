@@ -569,6 +569,62 @@ class KnownLimits(Fixture):
         self.assertEqual(entry["hosts"], {"github": 3})
 
 
+PREFIXED = GITHUB_ONLY + 'tag_prefix = "gatos-v"\n'
+
+
+class TagPrefixCounts(Fixture):
+    """Only the releases the prefix selects are counted, as only they are stamped."""
+
+    def answer(self, etag='W/"a"'):
+        return github(
+            github_release("vm-images-2026-10", 50),
+            github_release("gatos-v1.2.0", 5),
+            github_release("gatos-v1.1.0", 7),
+            etag=etag,
+        )
+
+    def test_a_release_without_the_prefix_does_not_count(self):
+        self.listing(releases=PREFIXED)
+        entry = self.only(self.refresh(FakeHttp({GITHUB: self.answer()})))
+        self.assertEqual(entry["hosts"], {"github": 12})
+        self.assertEqual([release["version"] for release in entry["releases"]], ["1.2.0", "1.1.0"])
+
+    def test_a_prefix_that_matches_nothing_has_no_counts(self):
+        self.listing(releases=GITHUB_ONLY + 'tag_prefix = "mod-v"\n')
+        self.assertEqual(self.refresh(FakeHttp({GITHUB: self.answer()}))["listings"], [])
+
+    def test_a_changed_prefix_is_not_answered_from_the_cache(self):
+        self.listing(releases=GITHUB_ONLY)
+        self.refresh(FakeHttp({GITHUB: self.answer()}))
+        self.listing(releases=PREFIXED)
+
+        def unchanged(etag):
+            return Response(304, {}, b"") if etag == 'W/"a"' else self.answer()
+
+        http = FakeHttp({GITHUB: unchanged})
+        entry = self.only(self.refresh(http))
+        self.assertEqual(http.asked, [(f"{GITHUB}?per_page=100", None)])
+        self.assertEqual(entry["hosts"], {"github": 12})
+        self.assertEqual(list(self.cache), ["mod/github:o/r#gatos-v"])
+
+    def test_a_prefix_without_a_github_key_keeps_the_last_known_counts(self):
+        self.listing(releases=SPACEDOCK_ONLY + 'tag_prefix = "gatos-v"\n')
+        stored = document(counted("Mod", {"spacedock": 3}, ("1.0.0", {"spacedock": 3})))
+        entry = self.only(self.refresh(FakeHttp({}), stored))
+        self.assertEqual(entry["hosts"], {"spacedock": 3})
+        self.assertTrue(any("tag_prefix" in note for note in self.notes))
+
+    def test_a_version_a_new_prefix_takes_out_keeps_its_count(self):
+        # A known limit: the stored document cannot tell a filtered release from a deleted one.
+        self.listing(releases=GITHUB_ONLY)
+        http = FakeHttp({GITHUB: github(github_release("2026.10", 50), github_release("gatos-v1.2.0", 5))})
+        stored = self.refresh(http)
+        self.listing(releases=PREFIXED)
+        entry = self.only(self.refresh(http, stored))
+        self.assertEqual(entry["hosts"], {"github": 55})
+        self.assertEqual([release["version"] for release in entry["releases"]], ["2026.10.0", "1.2.0"])
+
+
 class Cache(Fixture):
     SLOT = "mod/github:o/r"
 
