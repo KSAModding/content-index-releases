@@ -21,6 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import authored
 import hosts
 from check_amendment import Outcome, check_changelog_form, check_path
 from stamp_release import (
@@ -55,19 +56,15 @@ def authored_root(authored=None):
     return Path(authored or os.environ.get("CONTENT_INDEX") or DEFAULT_AUTHORED)
 
 
-def listing_path(root, listing_id):
-    return Path(root) / "listings" / f"{listing_id}.toml"
-
-
 def authored_document(root, listing_id):
     """The listing from the content-index checkout, as (document, problem)."""
-    path = listing_path(root, listing_id)
-    if not path.is_file():
+    path = authored.find(root, listing_id)
+    if path is None:
         return None, f"the listing '{listing_id}' is not in content-index"
     try:
         return tomllib.loads(path.read_text(encoding="utf-8")), ""
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
-        return None, f"listings/{listing_id}.toml does not parse: {error}"
+        return None, f"{path.parent.name}/{path.name} does not parse: {error}"
 
 
 def facts(head):
@@ -235,7 +232,7 @@ def check(path, head, root, game_versions, http, now=None):
 
     # `check_path` passed, so the path is releases/<id>/<version>.json.
     folder = path.split("/")[1]
-    if not listing_path(root, folder).is_file():
+    if authored.find(root, folder) is None:
         return Outcome(
             REJECT,
             [

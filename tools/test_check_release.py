@@ -394,6 +394,18 @@ class Helpers(unittest.TestCase):
         with patch.dict(os.environ, without, clear=True):
             self.assertEqual(check_release.authored_root(), check_release.DEFAULT_AUTHORED)
 
+    def test_a_vehicle_listing_is_found_under_vehicles(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            (root / "vehicles").mkdir()
+            (root / "vehicles" / "ExampleRover.toml").write_text('id = "ExampleRover"\n')
+            document, problem = check_release.authored_document(root, "ExampleRover")
+            self.assertEqual((document, problem), ({"id": "ExampleRover"}, ""))
+            (root / "vehicles" / "ExampleRover.toml").write_text("id = ")
+            document, problem = check_release.authored_document(root, "ExampleRover")
+            self.assertIsNone(document)
+            self.assertIn("vehicles/ExampleRover.toml does not parse", problem)
+
     def test_the_facts_read_the_pre_release_flag_back_out_of_the_status(self):
         flag = lambda version, status: check_release.facts(
             {"version": version, "release_status": status}

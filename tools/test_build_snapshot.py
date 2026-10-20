@@ -23,6 +23,7 @@ from build_snapshot import (
     carry_forward,
     entry_dates,
     precedence,
+    read_listings,
     read_previous,
     serialize,
     sources_from,
@@ -336,6 +337,21 @@ class Listings(Fixture):
         document = self.index.build()
         self.assertEqual(document["listings"], [])
         self.assertTrue(any("belongs to no listing" in note for note in self.index.notes))
+
+    def test_one_folder_of_listings_is_read_at_a_time(self):
+        self.index.listing("AutoStage")
+        self.index.write(
+            self.index.authored / "vehicles" / "ExampleRover.toml",
+            LISTING.format(identifier="ExampleRover", content_type="vehicle", extra=""),
+        )
+        self.assertEqual(list(read_listings(self.index.authored, "vehicles")), ["examplerover"])
+        self.assertEqual(list(read_listings(self.index.authored)), ["autostage"])
+        self.assertEqual(read_listings(self.index.authored, "saves"), {})
+
+    def test_a_vehicle_under_listings_is_an_error_that_names_the_folder(self):
+        self.index.listing("ExampleRover", content_type="vehicle")
+        with self.assertRaisesRegex(SnapshotError, "belongs under vehicles/"):
+            self.index.build()
 
     def test_a_listing_whose_id_disagrees_with_its_file_name_is_an_error(self):
         self.index.write(

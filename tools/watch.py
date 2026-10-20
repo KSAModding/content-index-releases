@@ -24,7 +24,9 @@ the field goes again once the host serves the stamped bytes (RFC 0078).
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
 
-Per-release derivation is tools/stamp_release.py, the hosts are tools/hosts.py.
+The listings are the documents under `listings/`, `vehicles/` and `saves/`
+(tools/authored.py). Per-release derivation is tools/stamp_release.py, the hosts
+are tools/hosts.py.
 The image fetch rules are tools/images.py of the authored checkout, the code the
 checks of RFC 0058 run, so the two cannot disagree. The owner an issue mentions
 is who tools/ownership.py of the authored checkout names, through tools/decide.py.
@@ -50,6 +52,7 @@ from pathlib import Path
 import decide
 import hosts
 import listing_edit
+from authored import id_holders, listing_files, type_problem
 from check_amendment import RELEASE_PATH, precedence
 from hosts import HostError
 from stamp_release import (
@@ -834,6 +837,7 @@ class Watcher:
         self._release_pulls = None
         self._edits_from = None
         self.listing_paths = {}
+        self.id_holders = {}
 
     def log(self, message):
         print(message, flush=True)
@@ -949,8 +953,10 @@ class Watcher:
             self.log("index-status.toml is unreadable, so no listing is scanned this tick")
             return []
         self.disputed = {key for key, state in states.items() if state == "disputed"}
+        # Before the filters, because a delisted document still holds its id.
+        self.id_holders = id_holders(self.authored_root)
         chosen = []
-        for path in sorted(folder.glob("*.toml")):
+        for path in listing_files(self.authored_root):
             if wanted and path.stem.lower() not in wanted:
                 continue
             if states.get(path.stem.lower()) == "delisted":
@@ -982,13 +988,14 @@ class Watcher:
             if entry.get("state") in ("delisted", "disputed")
         }
 
-    def listing_problem(self, path, listing_id):
+    def listing_problem(self, path, listing_id, content_type=None):
         """Why this listing cannot be processed at all, or None.
 
         The id becomes a path segment under releases/, so the id rules are the
         gate in front of every path this tick builds from it, and the file stem
         is what the delisting and `--listing` filters match, so it has to name
-        the same listing.
+        the same listing. Two documents with one id would stamp into the same
+        folder under releases/, and the watcher cannot tell which one owns it.
         """
         if not valid_id(listing_id):
             return (
@@ -999,6 +1006,19 @@ class Watcher:
             return (
                 f"the file is named '{path.stem}.toml' but the document says "
                 f"id = '{listing_id}'; the file name and the id must match"
+            )
+        problem = type_problem(path.parent.name, content_type)
+        if problem:
+            return problem
+        others = [
+            other for other in self.id_holders.get(listing_id.lower(), [])
+            if other != f"{path.parent.name}/{path.name}"
+        ]
+        if others:
+            return (
+                f"the id '{listing_id}' is also held by {', '.join(others)}; an id is unique "
+                "across listings/, vehicles/, saves/ and packs/, compared without case "
+                "(RFC 0031), so the watcher does not use it"
             )
         return None
 
@@ -1012,7 +1032,7 @@ class Watcher:
                         authored = tomllib.load(handle)
                     listing_id = (authored.get("id") or path.stem).strip()
                     self.documents[listing_id] = authored
-                    problem = self.listing_problem(path, listing_id)
+                    problem = self.listing_problem(path, listing_id, authored.get("type"))
                     if problem:
                         self.log(f"{listing_id}: {problem}")
                         self.failed.append(listing_id)

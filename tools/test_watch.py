@@ -424,6 +424,23 @@ class TheRepositoryIsTheState(WatcherCase):
                 (listings / f"{identifier}.toml").write_text(f'id = "{identifier}"\n')
             self.assertEqual([path.stem for path in watcher.listings()], ["Wanted"])
 
+    def test_vehicles_and_saves_are_listings_too(self):
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder)
+            for relative in ("listings/Mod", "vehicles/ExampleRover", "saves/MoonBase"):
+                path = folder / ".authored" / f"{relative}.toml"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(f'id = "{path.stem}"\n')
+            self.assertEqual(
+                [path.stem for path in watcher.listings()], ["Mod", "ExampleRover", "MoonBase"]
+            )
+            watcher = self.watcher(folder, ["--listing", "ExampleRover"])
+            self.assertEqual(
+                [f"{path.parent.name}/{path.name}" for path in watcher.listings()],
+                ["vehicles/ExampleRover.toml"],
+            )
+
     def test_a_path_that_escapes_releases_is_refused(self):
         # Path.parents is lexical, so the guard has to resolve: a `..` inside
         # the path keeps `releases` in the parents while the file lands outside.
@@ -543,6 +560,47 @@ class TheTickSurvivesOneListing(WatcherCase):
 
             self.assertEqual(len(watcher.issues.reported), 1)
             self.assertIn("must match", watcher.issues.reported[0][1][0])
+
+    def tick_over(self, folder, documents):
+        watcher = self.watcher(folder, ["--no-sweep", "--no-commit"])
+        watcher.issues = RecorderIssues()
+        scanned = []
+        watcher.one_listing = lambda listing_id, *rest: scanned.append(listing_id)
+        for relative, text in documents.items():
+            path = folder / ".authored" / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+        watcher.tick()
+        return watcher, scanned
+
+    def test_a_type_its_folder_does_not_hold_is_reported(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher, scanned = self.tick_over(
+                Path(name),
+                {
+                    "vehicles/Rover.toml": 'id = "Rover"\ntype = "mod"\n',
+                    "listings/Base.toml": 'id = "Base"\ntype = "save"\n',
+                    "saves/Moon.toml": 'id = "Moon"\ntype = "save"\n',
+                },
+            )
+            reported = dict(watcher.issues.reported)
+            self.assertIn("does not belong under vehicles/", reported["Rover"][0])
+            self.assertIn("belongs under saves/", reported["Base"][0])
+            self.assertEqual(scanned, ["Moon"])
+
+    def test_one_id_in_two_folders_is_reported_on_both_and_stamped_on_neither(self):
+        with tempfile.TemporaryDirectory() as name:
+            watcher, scanned = self.tick_over(
+                Path(name),
+                {
+                    "listings/Rover.toml": 'id = "Rover"\ntype = "mod"\n',
+                    "vehicles/rover.toml": 'id = "rover"\ntype = "vehicle"\n',
+                },
+            )
+            reported = dict(watcher.issues.reported)
+            self.assertIn("also held by vehicles/rover.toml", reported["Rover"][0])
+            self.assertIn("also held by listings/Rover.toml", reported["rover"][0])
+            self.assertEqual(scanned, [])
 
     def test_a_dry_run_leaves_no_cache_behind(self):
         # An ETag a dry run stored would make the next real tick take the 304

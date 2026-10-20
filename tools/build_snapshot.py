@@ -12,6 +12,7 @@ import sys
 import tomllib
 from pathlib import Path
 
+from authored import type_problem
 from stamp_release import SEMVER, StampError, normalize_version, valid_id
 
 SNAPSHOT_VERSION = 1
@@ -156,17 +157,20 @@ def declared_id(document, path):
     return identifier
 
 
-def read_listings(authored):
-    """The authored listings, keyed by lowercased id, since ids compare that way."""
-    folder = authored / "listings"
+def read_listings(authored, folder="listings"):
+    """The authored listings of one folder, keyed by lowercased id, since ids compare that way."""
+    directory = authored / folder
     listings = {}
-    for path in sorted(folder.glob("*.toml")) if folder.is_dir() else []:
+    for path in sorted(directory.glob("*.toml")) if directory.is_dir() else []:
         document = load_toml(path)
         identifier = declared_id(document, path)
         if identifier != path.stem:
             raise SnapshotError(
                 f"{path}: declares id '{identifier}', the file name says '{path.stem}'"
             )
+        problem = type_problem(folder, document.get("type"))
+        if problem:
+            raise SnapshotError(f"{path}: {problem}")
         if identifier.lower() in listings:
             raise SnapshotError(f"{path}: the id '{identifier}' is listed twice")
         listings[identifier.lower()] = document
