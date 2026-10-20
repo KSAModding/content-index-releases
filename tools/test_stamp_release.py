@@ -18,6 +18,7 @@ import unittest
 import zipfile
 from datetime import datetime, timezone
 
+from check_release import authored_root
 from stamp_release import (
     CHANGELOG_TEXT_LIMIT,
     Archive,
@@ -29,9 +30,11 @@ from stamp_release import (
     relative_path,
     release_status,
     resolve_bound,
+    save_name_problem,
     serialize,
     stamp,
     valid_id,
+    valid_save_name,
 )
 
 GAME_VERSIONS = [
@@ -495,6 +498,41 @@ class Ids(unittest.TestCase):
         listing = dict(LISTING, id="../AutoStage")
         with self.assertRaises(StampError):
             stamp(listing, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW)
+
+
+class SaveNames(unittest.TestCase):
+    """The name rule of RFC 0085, as `SaveName.IsSanitized` decides it."""
+
+    def test_names_the_game_keeps(self):
+        for name in ("Example Rover", "Rover_2-b", "CON_", "a" * 64, "Räver", "-"):
+            with self.subTest(name=name):
+                self.assertTrue(valid_save_name(name))
+                self.assertIsNone(save_name_problem(name))
+
+    def test_names_the_game_changes(self):
+        for name in (
+            "", "a" * 65, " Rover", "Rover ", "Two  spaces", "con", "Lpt9", "Rover.v2",
+            "Rover²", "\U0001d400", "Rover\n", None, 7,
+        ):
+            with self.subTest(name=name):
+                self.assertFalse(valid_save_name(name))
+                self.assertTrue(save_name_problem(name))
+
+    def test_the_limit_counts_utf_16_code_units(self):
+        self.assertIn("65 UTF-16 code units", save_name_problem("a" * 63 + "\U0001d400"))
+
+    def test_a_character_the_game_drops_is_named(self):
+        self.assertIn("U+00B2", save_name_problem("Rover²"))
+
+    def test_the_vector_file_of_the_authored_repository(self):
+        path = authored_root() / "schemas" / "save-names.json"
+        if not path.is_file():
+            self.skipTest(f"{path} is not there yet")
+        vectors = json.loads(path.read_text(encoding="utf-8"))["vectors"]
+        self.assertTrue(vectors)
+        for vector in vectors:
+            with self.subTest(name=vector["name"]):
+                self.assertEqual(valid_save_name(vector["value"]), vector["accepted"], vector.get("why"))
 
 
 class Rfc0035(unittest.TestCase):

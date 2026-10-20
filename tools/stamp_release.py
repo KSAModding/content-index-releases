@@ -22,6 +22,7 @@ import posixpath
 import re
 import sys
 import tomllib
+import unicodedata
 import zipfile
 import zlib
 from datetime import datetime, timezone
@@ -109,6 +110,59 @@ def valid_id(identifier):
     if not identifier or ID_PATTERN.match(identifier) is None:
         return False
     return identifier.split(".")[0].lower() not in RESERVED_IDS
+
+
+# The name rule of RFC 0085, which `SaveName.Sanitize` and `SaveName.IsSanitized`
+# apply to the name of a vehicle or a save. The categories are those of
+# `char.IsLetterOrDigit`. `str.isalnum` is wider, it accepts U+00B2 for example.
+SAVE_NAME_LIMIT = 64
+SAVE_NAME_CATEGORIES = frozenset({"Lu", "Ll", "Lt", "Lm", "Lo", "Nd"})
+SAVE_NAME_MARKS = frozenset(" -_")
+RESERVED_SAVE_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{digit}" for digit in "123456789"}
+    | {f"LPT{digit}" for digit in "123456789"}
+)
+
+
+def save_name_problem(name):
+    """Why the game would not keep `name` as the name of a vehicle or a save, or None."""
+    if not isinstance(name, str):
+        return "the name is not a string"
+    if not name:
+        return "the name is empty"
+    units = len(name.encode("utf-16-le", "surrogatepass")) // 2
+    if units > SAVE_NAME_LIMIT:
+        return (
+            f"the name has {units} UTF-16 code units, and the game keeps at most "
+            f"{SAVE_NAME_LIMIT}"
+        )
+    for character in name:
+        if ord(character) > 0xFFFF:
+            return (
+                f"the name holds U+{ord(character):04X}, which is outside the Basic "
+                "Multilingual Plane, and the game reads it as two surrogates, which it drops"
+            )
+        if (
+            character not in SAVE_NAME_MARKS
+            and unicodedata.category(character) not in SAVE_NAME_CATEGORIES
+        ):
+            return (
+                f"the name holds U+{ord(character):04X}, and the game keeps only letters, "
+                "digits, spaces, '-' and '_'"
+            )
+    if name[0] == " " or name[-1] == " ":
+        return "the name starts or ends with a space, which the game drops"
+    if "  " in name:
+        return "the name holds two spaces together, which the game makes one"
+    if name.upper() in RESERVED_SAVE_NAMES:
+        return f"the name '{name}' is a device name on Windows, which the game does not use"
+    return None
+
+
+def valid_save_name(name):
+    """Whether `name` passes the name rule of RFC 0085."""
+    return save_name_problem(name) is None
 
 
 class StampError(Exception):
