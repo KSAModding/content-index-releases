@@ -602,6 +602,25 @@ class RunVehicleRelease(Repository):
         self.assertIn("`OtherRover`", check.messages[0])
 
 
+class RunVehicleAmendment(Repository):
+    def test_removing_an_authored_dependency_downloads_nothing(self):
+        class Refuses(FakeHttp):
+            def get(self, url, accept=None, etag=None, api=False, limit=None):
+                raise AssertionError(f"a request for {url}")
+
+        document = stamp(
+            tomllib.loads(VEHICLE_TOML), dict(FACTS, tag="1.0.0"), rover_archive(), GAME_VERSIONS["versions"], now=NOW
+        )
+        dependency = {"id": "Wheels", "kind": "required", "source": "authored"}
+        self.write(ROVER, {**document, "dependencies": [dependency]})
+        self.git("add", "-A")
+        self.git("commit", "-m", "Stamp ExampleRover 1.0.0")
+        self.write(ROVER, {**document, "dependencies": []})
+        check = validate.run_amendment([ROVER], base_ref="main", http=Refuses({}))
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+        self.assertTrue(check.owner_only)
+
+
 class LocalChanges(Repository):
     def test_a_release_file_main_lacks_is_added(self):
         changes = validate.local_changes([NEW, PATH, "tools/amend.py"], "main")
