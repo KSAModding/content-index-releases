@@ -12,6 +12,7 @@ import importlib.util
 import io
 import json
 import os
+import shutil
 import struct
 import tempfile
 import tomllib
@@ -25,11 +26,12 @@ from unittest.mock import patch
 
 import decide
 import hosts
+import listing_edit
 import watch
 from check_amendment import check_document
 from check_release import DEFAULT_AUTHORED
 from hosts import HostError, HostRelease, Response
-from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize
+from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize, stamp
 from watch import (
     IMAGES_VERIFIED,
     REJECTION_HOURS,
@@ -3654,6 +3656,246 @@ class SweepRefusals(unittest.TestCase):
         options = parse_arguments([])
         Sweep(StubApi(routes), store, options, log=lambda _: None).run()
         self.assertIn("zzz", store.data["sweep"])
+
+
+SHARES = "https://github.com/o/shares/releases"
+
+ROVER_META = """\
+name = "{name}"
+created = 2026-09-22T14:22:28.6152545
+updated = 2026-09-22T14:30:01.1000000
+version = "{version}"
+systems = [ "Sol", ]
+"""
+
+ROVER_XML = '<?xml version="1.0" encoding="utf-8"?>\n<VehicleSaveData><Parts /></VehicleSaveData>\n'
+
+
+def rover_zip(name="Example Rover", version="v2026.9.22.5482", **more):
+    files = {f"{name}/meta.toml": ROVER_META.format(name=name, version=version), f"{name}/vehicle.xml": ROVER_XML}
+    files.update({f"{name}/{path}": text for path, text in more.items()})
+    return zip_of(files)
+
+
+def share(content_type, listing_id, version, date="2026-09-22T15:00:00Z"):
+    """A release of a share host, which keeps many vehicles and saves in one repository."""
+    tag = f"{content_type}/{listing_id}/{version}"
+    return {
+        "tag_name": tag,
+        "published_at": date,
+        "html_url": f"{SHARES}/tag/{tag}",
+        "assets": [{
+            "state": "uploaded",
+            "name": f"{listing_id}-{version}.zip",
+            "content_type": "application/zip",
+            "browser_download_url": f"{SHARES}/download/{tag}/{listing_id}-{version}.zip",
+        }],
+    }
+
+
+def vehicle_listing(listing_id, compatibility=""):
+    return (
+        f'spec_version = 1\nid = "{listing_id}"\ntype = "vehicle"\nname = "{listing_id}"\n'
+        'authors = ["A"]\nabstract = "A rover."\nlicense = "CC-BY-4.0"\n'
+        f"{compatibility}"
+        '\n[[dependencies]]\nid = "KittenExtensions"\nkind = "required"\n'
+        f'\n[releases]\ngithub = "o/shares"\ntag_prefix = "vehicle/{listing_id}/"\n'
+    )
+
+
+class SharesHttp:
+    """A share host repository that answers its release list with an ETag and 304 on a match."""
+
+    def __init__(self, payloads, archives):
+        self.payloads = payloads
+        self.archives = archives
+        self.downloaded = []
+        self.requests = 0
+
+    def log(self, message):
+        pass
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        body = json.dumps(self.payloads).encode()
+        current = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+        if etag == current:
+            return Response(304, {}, b"")
+        return Response(200, {"ETag": current}, body)
+
+    def archive(self, url, api=False, limit=None):
+        self.downloaded.append(url)
+        return Archive.of_bytes(self.archives[url]), {"Content-Type": "application/zip"}
+
+
+class VehiclesAndSaves(WatcherCase):
+    """RFC 0085: vehicles and saves are watched as mods are, and one folder has one listing."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.folder = Path(self.directory.name)
+        self.http = SharesHttp(
+            [
+                share("save", "MoonBase", "1.0.0"),
+                share("vehicle", "OtherRover", "1.0.0"),
+                share("vehicle", "ExampleRover", "1.0.0"),
+            ],
+            {
+                f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip": rover_zip(),
+                f"{SHARES}/download/vehicle/OtherRover/1.0.0/OtherRover-1.0.0.zip": rover_zip("example rover"),
+            },
+        )
+        self.commits = []
+        self.lines = []
+
+    def listing(self, listing_id, text=None):
+        path = self.folder / ".authored" / "vehicles" / f"{listing_id}.toml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text or vehicle_listing(listing_id), encoding="utf-8")
+        return path
+
+    def tick(self):
+        watcher = self.watcher(self.folder, ["--no-sweep"])
+        watcher.images = FakeImages()
+        watcher.issues = RecorderIssues()
+        watcher.http = self.http
+        watcher.history = FakeHistory(None)
+        watcher.log = self.lines.append
+        watcher.commit = lambda path, message: self.commits.append((path.name, message))
+        watcher.tick()
+        return watcher
+
+    def stamped(self, listing_id, version="1.0.0"):
+        return json.loads((self.folder / "releases" / listing_id / f"{version}.json").read_text())
+
+    def test_a_vehicle_on_a_share_host_is_stamped_from_its_game_folder(self):
+        self.listing("ExampleRover")
+        watcher = self.tick()
+
+        self.assertEqual(watcher.issues.reported, [])
+        document = self.stamped("ExampleRover")
+        self.assertEqual(
+            document["install"], {"root": "Example Rover", "derived": True, "folder": "Example Rover"}
+        )
+        self.assertEqual((document["game_min"], document["game_min_revision"]), ("2026.9.22.5482", 5482))
+        self.assertEqual(
+            document["dependencies"], [{"id": "KittenExtensions", "kind": "required", "source": "authored"}]
+        )
+        self.assertEqual(
+            self.http.downloaded, [f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"]
+        )
+
+    def test_a_folder_another_vehicle_holds_is_refused_and_tried_again_when_it_is_free(self):
+        self.listing("ExampleRover")
+        self.listing("OtherRover")
+        watcher = self.tick()
+
+        self.assertEqual(self.stamped("ExampleRover")["install"]["folder"], "Example Rover")
+        self.assertFalse((self.folder / "releases" / "OtherRover").exists())
+        [(listing_id, errors)] = watcher.issues.reported
+        self.assertEqual(listing_id, "OtherRover")
+        self.assertIn("`ExampleRover` already holds", errors[0])
+        self.assertIn("`example rover`", errors[0])
+
+        # Nothing changed, so the host answers 304 and nothing is downloaded again.
+        self.http.downloaded.clear()
+        watcher = self.tick()
+        self.assertEqual(self.http.downloaded, [])
+
+        # The holder is gone, so the refused release is tried again at once.
+        shutil.rmtree(self.folder / "releases" / "ExampleRover")
+        (self.folder / ".authored" / "vehicles" / "ExampleRover.toml").unlink()
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped("OtherRover")["install"]["folder"], "example rover")
+        self.assertNotIn("taken", watcher.cache.data["listings"]["OtherRover"])
+
+    def test_a_version_with_a_suffix_needs_an_authored_game_min(self):
+        url = f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+        self.http.archives[url] = rover_zip(version="v2026.9.22.5482-dev")
+        self.listing("ExampleRover")
+        watcher = self.tick()
+        [(_, errors)] = watcher.issues.reported
+        self.assertIn("without a suffix", errors[0])
+
+        self.listing("ExampleRover", vehicle_listing("ExampleRover", '\n[compatibility]\ngame_min = "2026.8.3.5117"\n'))
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped("ExampleRover")["game_min_revision"], 5117)
+
+    def test_other_files_of_a_vehicle_go_into_the_commit_body(self):
+        url = f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+        self.http.archives[url] = rover_zip(**{"thumbnail.png": "x"})
+        self.listing("ExampleRover")
+        watcher = self.tick()
+
+        self.assertEqual(watcher.issues.reported, [])
+        [(name, message)] = self.commits
+        self.assertEqual(name, "1.0.0.json")
+        lines = message.split("\n")
+        self.assertEqual(lines[:3], ["Stamp ExampleRover 1.0.0", "", "Listing: KSAModding/content-index@9fe1c0f"])
+        self.assertEqual(lines[3], "")
+        self.assertTrue(lines[4].startswith("Note: the vehicle folder holds files"))
+        self.assertIn('"thumbnail.png"', lines[4])
+        self.assertEqual(len(lines), 5)
+        self.assertEqual(
+            listing_edit.History._listing_line(message, "KSAModding/content-index"), ("9fe1c0f", ())
+        )
+        self.assertTrue(any(line.startswith("    note: the vehicle folder") for line in self.lines))
+
+    def test_a_stamp_without_notes_keeps_its_message(self):
+        watcher = self.watcher(self.folder)
+        watcher.history = FakeHistory(None)
+        watcher.listing_paths["M"] = self.folder / "M.toml"
+        self.assertEqual(
+            watcher.stamp_message("M", "1.0.0"), "Stamp M 1.0.0\n\nListing: KSAModding/content-index@9fe1c0f"
+        )
+
+    def test_a_listing_edit_reaches_the_newest_vehicle_release(self):
+        before = vehicle_listing("ExampleRover", '\n[compatibility]\ngame_min = "2026.8.3.5117"\n')
+        self.listing("ExampleRover", before)
+        self.tick()
+        stamped = self.stamped("ExampleRover")
+
+        watcher = self.watcher(self.folder, versions=EDIT_VERSIONS)
+        watcher.history = FakeHistory(before)
+        watcher.releases_api = StubApi({"/pulls/": [], "/pulls": []})
+        watcher.archive_dependencies = lambda listing_id, document: []
+        watcher.commit = lambda path, message: self.commits.append((path.name, message))
+        raised = self.listing(
+            "ExampleRover", vehicle_listing("ExampleRover", '\n[compatibility]\ngame_min = "2026.9.10.5438"\n')
+        )
+        errors = []
+        watcher.listing_edit_pass("ExampleRover", tomllib.loads(raised.read_text()), raised, errors)
+        self.assertEqual(errors, [])
+        self.assertEqual(self.stamped("ExampleRover")["game_min_revision"], 5438)
+
+        # Without an authored game_min the stamped bound stays.
+        watcher.history = FakeHistory(raised.read_text(), changed="2026-09-03T00:00:00Z")
+        removed = self.listing("ExampleRover")
+        watcher.listing_edit_pass("ExampleRover", tomllib.loads(removed.read_text()), removed, errors)
+        self.assertEqual(errors, [])
+        self.assertEqual(self.stamped("ExampleRover"), {**stamped, "game_min": "2026.9.10.5438", "game_min_revision": 5438})
+
+
+class VehicleGoneFromTheHost(GoneCase):
+    def test_a_vehicle_release_the_host_stops_listing_is_marked_as_a_mod_release_is(self):
+        document = stamp(
+            tomllib.loads(vehicle_listing("M")),
+            {"tag": "1.0.0", "release_date": "2020-01-01T00:00:00Z", "url": GONE_URL},
+            Archive.of_bytes(rover_zip()),
+            GAME_VERSIONS["versions"],
+        )
+        path = self.folder / "releases" / "M" / "1.0.0.json"
+        path.parent.mkdir(parents=True)
+        path.write_text(serialize(document))
+        host = ListingHost()
+        self.gone(0, host)
+        watcher, errors = self.gone(24, host, {GONE_URL: 404})
+        self.assertEqual(errors, [])
+        self.assertEqual(watcher.marked, ["M 1.0.0"])
+        self.assertEqual(self.document()["download"]["unavailable_since"], iso(START + timedelta(hours=24)))
+        self.assertEqual(self.document()["install"]["folder"], "Example Rover")
 
 
 if __name__ == "__main__":

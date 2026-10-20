@@ -85,6 +85,13 @@ Every other release is not a candidate: it is never stamped, never reported, and
 A candidate whose rest does not parse is reported as before.
 The key is valid only next to a `github` key, and SpaceDock ignores it.
 
+The listings are the documents under `listings/`, `vehicles/` and `saves/` of the authored half (RFC 0085), and `tools/authored.py` names the folders and the types each holds.
+A document whose type its folder does not hold is reported in its issue, and so is an id that another document under these folders or under `packs/` also holds, compared without case.
+A `vehicle` or a `save` is stamped from the game folder in its archive: `meta.toml` has to parse, `name` has to follow the name rule of `SaveName.Sanitize`, the folder has to be named `name`, and `vehicle.xml` or `universe.xml` has to be well-formed XML of at most 256 MiB without a DOCTYPE.
+`game_min` comes from `version` in `meta.toml` when the listing authors none.
+A release whose `install.folder` another listing of the same type already holds, compared without case, is refused, and it is tried again once the release files of that listing change.
+A vehicle folder with files besides `meta.toml` and `vehicle.xml` is stamped with a note, which goes into the body of the stamp commit and not into the issue.
+
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
 | Tool | What it does |

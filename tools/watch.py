@@ -56,11 +56,14 @@ from authored import id_holders, listing_files, type_problem
 from check_amendment import RELEASE_PATH, precedence
 from hosts import HostError
 from stamp_release import (
+    GAME_FILES,
     GAME_MONTH,
     VERSION_FORMS,
     StampError,
     as_archive,
     changelog_text,
+    check_folder,
+    folder_holders,
     month_is_over,
     normalize_version,
     resolve_bound,
@@ -838,6 +841,9 @@ class Watcher:
         self._edits_from = None
         self.listing_paths = {}
         self.id_holders = {}
+        # The install folders of each type under releases/, read once per tick
+        # and kept current as the tick stamps, or the message of a failed read.
+        self._folders = {}
 
     def log(self, message):
         print(message, flush=True)
@@ -1023,6 +1029,7 @@ class Watcher:
         return None
 
     def tick(self):
+        self._folders = {}
         try:
             paths = self.listings()
             for path in paths:
@@ -1138,7 +1145,7 @@ class Watcher:
         # Keyed per listing, not per host: two listings naming the same
         # repository must not blind each other through a shared ETag.
         host_state = self.cache.section("hosts", f"{listing_id}/{authority.key}")
-        digest = self.authored_digest(authored)
+        digest = self.poll_digest(listing_id, authored)
         try:
             releases, etag = authority.releases(self.poll_etag(host_state, digest))
         except HostError as error:
@@ -1189,7 +1196,8 @@ class Watcher:
             # a fixed tag is picked up at once.
             if etag:
                 host_state["etag"] = etag
-            host_state["authored"] = digest
+            # Again, because a folder this tick refused is part of it now.
+            host_state["authored"] = self.poll_digest(listing_id, authored)
             host_state["checked"] = iso(now())
         else:
             host_state.pop("etag", None)
@@ -1555,9 +1563,53 @@ class Watcher:
             )
             return None
 
-    def stamp_inputs(self, authored):
+    def stamp_inputs(self, listing_id, authored):
         """What a stamp reads besides the archive, so a rejection is retried once it changes."""
-        return self.authored_digest([authored, self.game_versions])
+        inputs = [authored, self.game_versions]
+        folders = self.folder_inputs(listing_id, authored)
+        if folders is not None:
+            inputs.append(folders)
+        return self.authored_digest(inputs)
+
+    def poll_digest(self, listing_id, authored):
+        """What a stored ETag stands for besides the host's answer, see `poll_etag`."""
+        folders = self.folder_inputs(listing_id, authored)
+        if folders is None:
+            return self.authored_digest(authored)
+        return self.authored_digest([authored, folders])
+
+    def folder_inputs(self, listing_id, authored):
+        """The listings that hold the folders a release of this listing was refused for, or None.
+
+        Only those folders count, so a new vehicle of somebody else does not
+        drop the ETag of every vehicle listing.
+        """
+        taken = (self.cache.data["listings"].get(listing_id) or {}).get("taken")
+        content_type = authored.get("type")
+        if content_type not in GAME_FILES or not taken:
+            return None
+        try:
+            holders = self.install_folders(content_type)
+        except StampError as error:
+            return str(error)
+        return {
+            folder: sorted(
+                other for other in holders.get(folder, []) if other.lower() != listing_id.lower()
+            )
+            for folder in taken
+        }
+
+    def install_folders(self, content_type):
+        """The install folders of `content_type` under releases/, to the listings that hold them."""
+        if content_type not in self._folders:
+            try:
+                self._folders[content_type] = folder_holders(self.releases_root, content_type)
+            except StampError as error:
+                self._folders[content_type] = str(error)
+        holders = self._folders[content_type]
+        if isinstance(holders, str):
+            raise StampError(holders)
+        return holders
 
     def known_rejection(self, listing_id, authored, release, any_age=False):
         """The error an older release got from the same inputs within REJECTION_HOURS, or None.
@@ -1575,7 +1627,7 @@ class Watcher:
             or (not any_age and now() - checked >= timedelta(hours=REJECTION_HOURS))
             or seen.get("url") != release.url
             or seen.get("size") != release.size
-            or seen.get("inputs") != self.stamp_inputs(authored)
+            or seen.get("inputs") != self.stamp_inputs(listing_id, authored)
         ):
             return None
         return seen.get("error")
@@ -1584,7 +1636,7 @@ class Watcher:
         self.cache.data["rejected"][f"{listing_id}/{release.version}"] = {
             "url": release.url,
             "size": release.size,
-            "inputs": self.stamp_inputs(authored),
+            "inputs": self.stamp_inputs(listing_id, authored),
             "checked": iso(now()),
             "error": message,
         }
@@ -1596,34 +1648,63 @@ class Watcher:
         is on disk and the mirror is checked against the stamped digest.
         """
         archive, content_type = authority.download(release)
+        notes = []
         with as_archive(archive) as archive:
             facts = release.facts()
             facts["content_type"] = content_type
-            document = stamp(authored, facts, archive, self.game_versions, now=now())
+            document = stamp(authored, facts, archive, self.game_versions, now=now(), notes=notes)
+
+        folder = (document.get("install") or {}).get("folder")
+        holders = None
+        if folder is not None:
+            holders = self.install_folders(document["type"])
+            state = self.cache.section("listings", listing_id)
+            try:
+                check_folder(document, holders)
+            except StampError:
+                # Kept, so the release is tried again once the holder changes.
+                state["taken"] = sorted(set(state.get("taken") or []) | {folder.lower()})
+                raise
 
         download = document["download"]
         mirrors = self.mirrors_for(mirror_hosts, release, download["sha256"])
         if mirrors:
             download["mirrors"] = mirrors
         path = self.folder(listing_id) / f"{document['version']}.json"
-        self.write(path, serialize(document), self.stamp_message(listing_id, document["version"]))
+        self.write(
+            path, serialize(document), self.stamp_message(listing_id, document["version"], notes)
+        )
         self.log(f"    stamped {document['version']} ({download['size']} bytes)")
+        for note in notes:
+            self.log(f"    note: {note}")
         self.stamped.append(f"{listing_id} {document['version']}")
+        if holders is not None:
+            holding = holders.setdefault(folder.lower(), [])
+            if listing_id not in holding:
+                holding.append(listing_id)
+            taken = [other for other in state.get("taken") or [] if other != folder.lower()]
+            if taken:
+                state["taken"] = taken
+            else:
+                state.pop("taken", None)
 
-    def stamp_message(self, listing_id, version):
+    def stamp_message(self, listing_id, version, notes=()):
         """The commit message of a stamp, which names the listing commit the stamp read when git can say.
 
         A listing edit is measured from that commit, because a listing merged
         while the tick ran is older than the stamp commit but not in the stamp.
+        The notes of the stamper follow it, one `Note:` line each.
         """
         message = f"Stamp {listing_id} {version}"
         path = self.listing_paths.get(listing_id)
-        if path is None or self.history_problem():
-            return message
-        change = self.history.listing_change(path)
-        if change is None:
-            return message
-        return f"{message}\n\nListing: {self.options.authored_repo}@{change[0]}"
+        change = None
+        if path is not None and not self.history_problem():
+            change = self.history.listing_change(path)
+        if change is not None:
+            message += f"\n\nListing: {self.options.authored_repo}@{change[0]}"
+        if notes:
+            message += "\n\n" + "\n".join(f"Note: {note}" for note in notes)
+        return message
 
     def check_for_a_swap(self, listing_id, authority, release, path, errors):
         """A stamped version is never overwritten, and a swap gets reported.
