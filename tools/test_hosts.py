@@ -12,6 +12,7 @@ import hashlib
 import http.client
 import json
 import tempfile
+import types
 import unittest
 import urllib.error
 import urllib.parse
@@ -108,6 +109,13 @@ class Downloads(unittest.TestCase):
         ):
             download(http, release(url))
         self.assertEqual(http.flags, [False, False, False, True, True])
+
+    def test_a_release_with_only_the_fields_content_index_passes_is_read(self):
+        # content-index calls download with a plain object, not a HostRelease.
+        bare = types.SimpleNamespace(url=None, candidates=("a.zip",), size=None)
+        with self.assertRaises(StampError) as caught:
+            download(FakeHttp({}), bare)
+        self.assertIn("none of them is named after the listing", str(caught.exception))
 
     def test_a_gone_archive_is_a_stamp_error(self):
         # 404, 410 and 451 are facts about the release, reported to the author.

@@ -759,6 +759,8 @@ class ShareHost(Host):
         return tuple(kept)
 
     def download(self, release):
+        if release.problem:
+            raise StampError(release.problem)
         return download(self.http, release, self.max_bytes)
 
 
@@ -824,8 +826,6 @@ def download(http, release, limit=None):
     Shared with the release pull request check, which downloads from the URL a
     submission names rather than from a host it polled.
     """
-    if release.problem:
-        raise StampError(release.problem)
     limit = min(limit or MAX_ARCHIVE_BYTES, MAX_ARCHIVE_BYTES)
     if not release.url:
         if release.candidates:
