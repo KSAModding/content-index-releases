@@ -1192,7 +1192,7 @@ class Watcher:
             )
             self.changelog_pass(listing_id, releases, errors)
 
-        self.mirror_pass(listing_id, mirrors, errors)
+        settled = self.mirror_pass(listing_id, mirrors, errors, authority, releases) and settled
         settled = self.gone_pass(listing_id, authority, releases, errors) and settled
         # After the stamp pass, so a release this tick stamps takes the edit itself.
         self.listing_edit_pass(listing_id, authored, path, errors)
@@ -1718,7 +1718,7 @@ class Watcher:
                 raise
 
         download = document["download"]
-        mirrors = self.mirrors_for(mirror_hosts, release, download["sha256"])
+        mirrors = self.mirrors_for(mirror_hosts, release, download["sha256"], authority)
         if mirrors:
             download["mirrors"] = mirrors
         path = self.folder(listing_id) / f"{document['version']}.json"
@@ -2202,8 +2202,8 @@ class Watcher:
         )
         self.mirrored.append(f"{document['id']} {document['version']}")
 
-    def mirrors_for(self, mirror_hosts, release, digest):
-        """The non-authority hosts serving byte-identical bytes for this release.
+    def mirrors_for(self, mirror_hosts, release, digest, authority=None):
+        """The non-authority hosts serving byte-identical bytes for this release, and the copies the authority lists.
 
         `digest` is the stamped SHA-256. Shares the mirror budget with
         `mirror_pass`: verifying costs a full download, and a fresh-stamp burst
@@ -2211,9 +2211,12 @@ class Watcher:
         is appended by a later tick's pass.
         """
         found = []
-        for host in mirror_hosts:
-            candidate = self.mirror_release(host, release.version)
-            if candidate is None or self.known_to_differ(host, candidate):
+        for host, candidate in self.mirror_candidates(mirror_hosts, release.version, authority, release):
+            if (
+                candidate is None
+                or candidate.url in (release.url, *found)
+                or self.known_to_differ(host, candidate)
+            ):
                 continue
             if self.mirror_budget <= 0:
                 break
@@ -2222,6 +2225,13 @@ class Watcher:
             if url:
                 found.append(url)
         return found
+
+    def mirror_candidates(self, mirror_hosts, version, authority=None, release=None):
+        """Each mirror host with its release of `version`, then each copy that `release` of the authority lists (RFC 0094)."""
+        for host in mirror_hosts:
+            yield host, self.mirror_release(host, version)
+        if authority is not None and release is not None:
+            yield from hosts.listed_mirrors(authority, release)
 
     def mirror_release(self, host, version):
         """The mirror host's release for `version`, from one list per tick."""
@@ -2270,23 +2280,39 @@ class Watcher:
         seen = self.cache.data["differs"].get(f"{host.key} {release.version}")
         return bool(seen) and seen.get("url") == release.url and seen.get("size") == release.size
 
-    def mirror_pass(self, listing_id, mirror_hosts, errors):
+    def mirror_pass(self, listing_id, mirror_hosts, errors, authority=None, releases=None):
         """Append a mirror that appeared after a release was stamped.
 
         Watcher-only and append-only. Verifying one costs a full download, so a
         tick works through the least recently checked candidates within a budget,
         and the rest wait for the next tick.
+
+        `releases` is the answer of the authority this tick, or None when it is
+        unchanged, and the copies its releases list are candidates too. Returns
+        False when the budget ran out before such a copy was checked, because an
+        unchanged answer on the next tick would not name it again.
         """
-        if not mirror_hosts or self.mirror_budget <= 0:
-            return
+        listed = {}
+        for release in releases or ():
+            if release.version is not None and release.mirrors:
+                listed.setdefault(release.version, release)
+        if not listed and (not mirror_hosts or self.mirror_budget <= 0):
+            return True
 
         candidates = []
+        waiting = set()
         for version, path in self.stamped_versions(listing_id).items():
             document = self.read_release(path, errors)
             if document is None:
                 continue
-            known = set((document.get("download") or {}).get("mirrors") or [])
-            if len(known) >= len(mirror_hosts):
+            download = document.get("download") or {}
+            known = set(download.get("mirrors") or [])
+            if any(
+                not self.known_mirror(download, host, candidate)
+                for host, candidate in self.mirror_candidates((), version, authority, listed.get(version))
+            ):
+                waiting.add(version)
+            elif len(known) >= len(mirror_hosts):
                 continue
             key = f"{listing_id}/{version}"
             checked = parse_iso(self.cache.section("mirrors", key).get("checked"))
@@ -2294,7 +2320,7 @@ class Watcher:
 
         for _, version, path in sorted(candidates, key=lambda entry: entry[0]):
             if self.mirror_budget <= 0:
-                return
+                return not waiting
             document = self.read_release(path, errors)
             if document is None:
                 continue
@@ -2303,14 +2329,16 @@ class Watcher:
                 continue
             known = list(download.get("mirrors") or [])
             found = []
-            for host in mirror_hosts:
-                candidate = self.mirror_release(host, version)
-                if candidate is None or candidate.url in known or self.known_to_differ(host, candidate):
+            for host, candidate in self.mirror_candidates(
+                mirror_hosts, version, authority, listed.get(version)
+            ):
+                if candidate is None or candidate.url in found or self.known_mirror(download, host, candidate):
                     continue
                 self.mirror_budget -= 1
                 url = self.verify_mirror(host, candidate, (download.get("sha256") or "").upper())
                 if url:
                     found.append(url)
+            waiting.discard(version)
             self.cache.section("mirrors", f"{listing_id}/{version}")["checked"] = iso(now())
             if not found:
                 continue
@@ -2322,6 +2350,14 @@ class Watcher:
             )
             self.log(f"    appended {len(found)} mirror(s) to {version}")
             self.mirrored.append(f"{listing_id} {version}")
+        return not waiting
+
+    def known_mirror(self, download, host, candidate):
+        """Whether the stamped `download` already names the candidate's URL, or its bytes are known to differ."""
+        return (
+            candidate.url in (download.get("url"), *(download.get("mirrors") or []))
+            or self.known_to_differ(host, candidate)
+        )
 
     def gone_pass(self, listing_id, authority, releases, errors):
         """Mark a stamped release the authority host no longer lists, and remove the mark once it lists it again (RFC 0078).

@@ -135,6 +135,9 @@ It is stamped from one of them only, the tag it was already stamped from or else
 
 The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
 A mirror that serves different bytes is remembered in the derived cache by URL and size, and is not downloaded again until one of them changes.
+The mirrors of a share host's release list are candidates too (RFC 0094): each copy is downloaded once with the host's `max_bytes`, and appended at the stamp or on a later tick when its bytes are the same.
+A copy that is not an `https` URL on `archive.org` or one of its subdomains is left out and logged.
+When the mirror budget runs out before such a copy is checked, the tick keeps no ETag, so the next tick reads the list again.
 
 ### A release gone from its host
 

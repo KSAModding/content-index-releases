@@ -3929,6 +3929,7 @@ max_bytes = {{ vehicle = {vehicle}, save = 104857600 }}
 """
 
 ROVER_ASSET = f"{ASSETS}/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+ARCHIVED = "https://archive.org/download/ksamods-vehicle-ExampleRover-1.0.0/ExampleRover-1.0.0.zip"
 
 
 def share_listing(listing_id, key="ksamods", value=None):
@@ -3987,8 +3988,8 @@ class ShareHostListings(WatcherCase):
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
 
-    def tick(self):
-        watcher = self.watcher(self.folder, ["--no-sweep"])
+    def tick(self, argv=()):
+        watcher = self.watcher(self.folder, ["--no-sweep", *argv])
         watcher.images = FakeImages()
         watcher.issues = RecorderIssues()
         watcher.http = self.http
@@ -3997,6 +3998,11 @@ class ShareHostListings(WatcherCase):
         watcher.commit = lambda path, message: None
         watcher.tick()
         return watcher
+
+    def listed(self, payload):
+        """The rover's release on the share host with one copy at the Internet Archive serving `payload`."""
+        self.http.document["releases"] = [share_entry("1.0.0", mirrors=[ARCHIVED])]
+        self.http.archives[ARCHIVED] = payload
 
     def stamped(self, listing_id="ExampleRover", version="1.0.0"):
         path = self.folder / "releases" / listing_id / f"{version}.json"
@@ -4086,6 +4092,58 @@ class ShareHostListings(WatcherCase):
         # A listing that names no share host keeps the digest it had, so no stored ETag is dropped.
         authored = tomllib.loads(vehicle_listing("OtherRover"))
         self.assertEqual(watcher.poll_digest("OtherRover", authored), watcher.authored_digest(authored))
+
+    def test_a_listed_copy_with_the_same_bytes_is_a_mirror_of_the_stamp(self):
+        self.listed(self.http.archives[ROVER_ASSET])
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+        # In the stamp itself, not appended by a later pass.
+        self.assertEqual(watcher.mirrored, [])
+        self.assertEqual(self.http.downloaded, [ROVER_ASSET, ARCHIVED])
+        self.assertEqual(self.http.limits, [10485760, 10485760])
+
+    def test_a_listed_copy_with_other_bytes_is_dropped_and_downloaded_once(self):
+        self.listed(rover_zip(version="v2026.9.22.5483"))
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertNotIn("mirrors", self.stamped()["download"])
+        self.assertEqual(self.http.downloaded.count(ARCHIVED), 1)
+
+        # A changed list is read in full, and the copy is still not downloaded again.
+        self.http.document["releases"].append(share_entry("1.1.0"))
+        self.http.releases["vehicle/ExampleRover/1.1.0"] = rover("1.1.0")
+        self.http.archives[f"{ASSETS}/vehicle/ExampleRover/1.1.0/ExampleRover-1.1.0.zip"] = rover_zip()
+        self.tick()
+        self.assertIsNotNone(self.stamped(version="1.1.0"))
+        self.assertEqual(self.http.downloaded.count(ARCHIVED), 1)
+        self.assertNotIn("mirrors", self.stamped()["download"])
+
+    def test_a_copy_listed_after_the_stamp_is_appended_on_the_next_tick(self):
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        self.tick()
+        self.assertNotIn("mirrors", self.stamped()["download"])
+
+        self.listed(self.http.archives[ROVER_ASSET])
+        watcher = self.tick()
+        self.assertEqual(watcher.mirrored, ["ExampleRover 1.0.0"])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+
+    def test_a_copy_the_budget_did_not_reach_keeps_the_list_unsettled(self):
+        self.listed(self.http.archives[ROVER_ASSET])
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick(["--mirror-budget", "0"])
+        self.assertNotIn("mirrors", self.stamped()["download"])
+        [state] = watcher.cache.data["hosts"].values()
+        self.assertNotIn("etag", state)
+
+        # The next tick reads the list in full and appends the copy.
+        watcher = self.tick()
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+        [state] = watcher.cache.data["hosts"].values()
+        self.assertIn("etag", state)
 
 
 class VehicleGoneFromTheHost(GoneCase):
