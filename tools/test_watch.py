@@ -3895,6 +3895,26 @@ class VehiclesAndSaves(WatcherCase):
         self.assertEqual(errors, [])
         self.assertEqual(self.stamped("ExampleRover"), {**stamped, "game_min": "2026.9.10.5438", "game_min_revision": 5438})
 
+    def test_a_listing_edit_that_adds_game_min_reaches_the_newest_vehicle_release(self):
+        before = vehicle_listing("ExampleRover")
+        self.listing("ExampleRover", before)
+        self.tick()
+        self.assertEqual(self.stamped("ExampleRover")["game_min_revision"], 5482)
+
+        watcher = self.watcher(self.folder, versions=EDIT_VERSIONS)
+        watcher.history = FakeHistory(before)
+        watcher.releases_api = StubApi({"/pulls/": [], "/pulls": []})
+        watcher.archive_dependencies = lambda listing_id, document: []
+        watcher.commit = lambda path, message: self.commits.append((path.name, message))
+        added = self.listing(
+            "ExampleRover", vehicle_listing("ExampleRover", '\n[compatibility]\ngame_min = "2026.9.10.5438"\n')
+        )
+        errors = []
+        watcher.listing_edit_pass("ExampleRover", tomllib.loads(added.read_text()), added, errors)
+        self.assertEqual(errors, [])
+        document = self.stamped("ExampleRover")
+        self.assertEqual((document["game_min"], document["game_min_revision"]), ("2026.9.10.5438", 5438))
+
 
 class VehicleGoneFromTheHost(GoneCase):
     def test_a_vehicle_release_the_host_stops_listing_is_marked_as_a_mod_release_is(self):
