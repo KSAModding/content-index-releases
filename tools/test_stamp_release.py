@@ -508,7 +508,7 @@ class SaveNames(unittest.TestCase):
     """The name rule of RFC 0085, as `SaveName.IsSanitized` decides it."""
 
     def test_names_the_game_keeps(self):
-        for name in ("Example Rover", "Rover_2-b", "CON_", "a" * 64, "Räver", "-"):
+        for name in ("Example Rover", "Rover_2-b", "CON_", "a" * 64, "R\xe4ver", "-"):
             with self.subTest(name=name):
                 self.assertTrue(valid_save_name(name))
                 self.assertIsNone(save_name_problem(name))
@@ -516,7 +516,7 @@ class SaveNames(unittest.TestCase):
     def test_names_the_game_changes(self):
         for name in (
             "", "a" * 65, " Rover", "Rover ", "Two  spaces", "con", "Lpt9", "Rover.v2",
-            "Rover²", "\U0001d400", "Rover\n", None, 7,
+            "Rover\xb2", "\U0001d400", "Rover\n", None, 7,
         ):
             with self.subTest(name=name):
                 self.assertFalse(valid_save_name(name))
@@ -526,7 +526,7 @@ class SaveNames(unittest.TestCase):
         self.assertIn("65 UTF-16 code units", save_name_problem("a" * 63 + "\U0001d400"))
 
     def test_a_character_the_game_drops_is_named(self):
-        self.assertIn("U+00B2", save_name_problem("Rover²"))
+        self.assertIn("U+00B2", save_name_problem("Rover\xb2"))
 
     def test_the_vector_file_of_the_authored_repository(self):
         path = authored_root() / "schemas" / "save-names.json"
