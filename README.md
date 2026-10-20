@@ -49,6 +49,7 @@ That poll only ever sees the build that is current when it runs, so a build supe
 ## Download counts
 
 `download-counts.json` holds the download counts GitHub and SpaceDock report for each listing and release version, as [RFC 0052](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0052-static-download-counts.md) defines them.
+Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 
