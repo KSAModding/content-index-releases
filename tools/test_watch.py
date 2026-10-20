@@ -4131,6 +4131,24 @@ class ShareHostListings(WatcherCase):
         self.assertEqual(watcher.mirrored, ["ExampleRover 1.0.0"])
         self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
 
+    def test_a_listed_copy_does_not_stand_for_a_mirror_host_that_publishes_later(self):
+        self.listed(self.http.archives[ROVER_ASSET])
+        self.listing(
+            "ExampleRover",
+            share_listing("ExampleRover")
+            + 'github = "o/shares"\ntag_prefix = "vehicle/ExampleRover/"\nauthority = "ksamods"\n',
+        )
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+
+        published = f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+        self.http.shares.payloads.append(share("vehicle", "ExampleRover", "1.0.0"))
+        self.http.shares.archives[published] = self.http.archives[ROVER_ASSET]
+        watcher = self.tick()
+        self.assertEqual(watcher.mirrored, ["ExampleRover 1.0.0"])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED, published])
+
     def test_a_copy_the_budget_did_not_reach_keeps_the_list_unsettled(self):
         self.listed(self.http.archives[ROVER_ASSET])
         self.listing("ExampleRover", share_listing("ExampleRover"))

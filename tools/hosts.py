@@ -752,11 +752,7 @@ class ShareHost(Host):
         """The copies an entry lists that are where RFC 0094 puts them. Any other is logged and left out."""
         kept = []
         for url in value if isinstance(value, list) else []:
-            parts = urllib.parse.urlsplit(url) if isinstance(url, str) else None
-            host = (parts.hostname or "") if parts else ""
-            if parts and parts.scheme == "https" and any(
-                host == allowed or host.endswith("." + allowed) for allowed in LISTED_MIRROR_HOSTS
-            ):
+            if listed_mirror_url(url):
                 kept.append(url)
             else:
                 self.http.log(f"{self.key}: the mirror {url!r} of `{tag}` is not an https URL on the Internet Archive")
@@ -791,6 +787,15 @@ class ListedMirror(Host):
 
     def download(self, release):
         return self.host.download(release)
+
+
+def listed_mirror_url(url):
+    """Whether `url` is where a share host may list a copy: https on the Internet Archive."""
+    parts = urllib.parse.urlsplit(url) if isinstance(url, str) else None
+    host = (parts.hostname or "") if parts else ""
+    return bool(parts) and parts.scheme == "https" and any(
+        host == allowed or host.endswith("." + allowed) for allowed in LISTED_MIRROR_HOSTS
+    )
 
 
 def listed_mirrors(host, release):

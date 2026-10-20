@@ -2306,13 +2306,14 @@ class Watcher:
             if document is None:
                 continue
             download = document.get("download") or {}
-            known = set(download.get("mirrors") or [])
+            # A copy the authority lists is no mirror host's, so it does not count here.
+            hosted = {url for url in download.get("mirrors") or [] if not hosts.listed_mirror_url(url)}
             if any(
                 not self.known_mirror(download, host, candidate)
                 for host, candidate in self.mirror_candidates((), version, authority, listed.get(version))
             ):
                 waiting.add(version)
-            elif len(known) >= len(mirror_hosts):
+            elif len(hosted) >= len(mirror_hosts):
                 continue
             key = f"{listing_id}/{version}"
             checked = parse_iso(self.cache.section("mirrors", key).get("checked"))
