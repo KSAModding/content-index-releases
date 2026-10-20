@@ -5,8 +5,10 @@
 A listing of a mod or a mod-loader is `listings/<id>.toml`, a vehicle is `vehicles/<id>.toml` and a save is `saves/<id>.toml` (RFC 0085).
 A pack is the folder `packs/<id>/` (RFC 0080).
 All of them share one namespace of ids, compared without case (RFC 0031).
+The share hosts the stewards registered are the tables of `hosts.toml` (RFC 0094).
 """
 
+import re
 from pathlib import Path
 
 # The folders of authored listing documents and the types each holds, in the
@@ -18,6 +20,12 @@ FOLDERS = {
 }
 
 PACKS = "packs"
+
+HOSTS = "hosts.toml"
+
+# The form of a table name in HOSTS, which is the key a listing names the host
+# with. The schema of hosts.toml in the authored repository has the same pattern.
+HOST_KEY = re.compile(r"[a-z][a-z0-9-]{1,31}")
 
 
 def listing_files(root):
