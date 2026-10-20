@@ -22,6 +22,7 @@ from build_snapshot import (
     build,
     carry_forward,
     entry_dates,
+    history_key,
     precedence,
     read_listings,
     read_previous,
@@ -102,6 +103,14 @@ class Index:
             identifier=identifier, content_type=content_type, extra=extra
         )
         self.write(self.authored / "listings" / f"{identifier}.toml", text)
+
+    def vehicle(self, identifier):
+        text = LISTING.format(identifier=identifier, content_type="vehicle", extra="")
+        self.write(self.authored / "vehicles" / f"{identifier}.toml", text)
+
+    def save(self, identifier):
+        text = LISTING.format(identifier=identifier, content_type="save", extra="")
+        self.write(self.authored / "saves" / f"{identifier}.toml", text)
 
     def pack(self, identifier, version, body=None):
         text = body if body is not None else PACK.format(
@@ -401,6 +410,65 @@ class Packs(Fixture):
         self.index.pack("Shared", "1.0.0")
         with self.assertRaises(SnapshotError):
             self.index.build()
+
+
+class AcrossFolders(Fixture):
+    """Vehicles and saves share the checks of listings and packs."""
+
+    def test_an_id_held_in_two_folders_is_an_error_that_names_both(self):
+        cases = (
+            ("listing", "vehicle", "listings/Shared.toml and vehicles/Shared.toml"),
+            ("vehicle", "save", "vehicles/Shared.toml and saves/Shared.toml"),
+            ("save", "pack", "saves/Shared.toml and packs/Shared/"),
+        )
+        for first, second, named in cases:
+            with self.subTest(f"{first} and {second}"):
+                self.setUp()
+                for kind in (first, second):
+                    if kind == "pack":
+                        self.index.pack("Shared", "1.0.0")
+                    else:
+                        getattr(self.index, kind)("Shared")
+                with self.assertRaisesRegex(SnapshotError, named):
+                    self.index.build()
+
+    def test_a_state_for_a_save_or_a_vehicle_resolves(self):
+        self.index.save("ExampleSave")
+        self.index.vehicle("ExampleRover")
+        self.index.status(
+            {"id": "ExampleSave", "state": "disputed"}, {"id": "examplerover", "state": "delisted"}
+        )
+        self.index.build()
+
+    def test_a_retracted_state_on_a_vehicle_is_an_error(self):
+        self.index.vehicle("ExampleRover")
+        self.index.status({"id": "ExampleRover", "state": "retracted", "version": "1.0.0"})
+        with self.assertRaisesRegex(SnapshotError, "only a pack version can be retracted"):
+            self.index.build()
+
+    def test_a_count_for_a_vehicle_or_a_save_is_not_an_error(self):
+        self.index.vehicle("ExampleRover")
+        self.index.save("ExampleSave")
+        path = self.index.root / "download-counts.json"
+        entries = [counts_entry("ExampleRover"), counts_entry("ExampleSave")]
+        self.index.write(path, json.dumps({"spec_version": 1, "listings": entries}) + "\n")
+        self.index.build(download_counts=path)
+
+    def test_the_release_folder_of_a_vehicle_belongs_to_it(self):
+        self.index.vehicle("ExampleRover")
+        self.index.release("ExampleRover", "1.0.0", type="vehicle")
+        self.index.release("Orphan", "1.0.0")
+        self.index.build()
+        orphans = [note for note in self.index.notes if "belongs to no listing" in note]
+        self.assertEqual(len(orphans), 1)
+        self.assertIn("Orphan", orphans[0])
+
+    def test_the_history_knows_every_folder(self):
+        self.assertEqual(history_key("vehicles/ExampleRover.toml"), ("vehicles", "examplerover"))
+        self.assertEqual(history_key("saves/ExampleSave.toml"), ("saves", "examplesave"))
+        self.assertEqual(history_key("listings/AutoStage.toml"), ("listings", "autostage"))
+        self.assertEqual(history_key("packs/Pack/1.0.0.toml"), ("packs", "pack"))
+        self.assertIsNone(history_key("vehicles/nested/ExampleRover.toml"))
 
 
 class IndexStatus(Fixture):

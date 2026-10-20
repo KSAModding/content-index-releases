@@ -12,7 +12,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-from authored import type_problem
+from authored import FOLDERS, PACKS, id_holders, type_problem
 from stamp_release import SEMVER, StampError, normalize_version, valid_id
 
 SNAPSHOT_VERSION = 1
@@ -177,6 +177,21 @@ def read_listings(authored, folder="listings"):
     return listings
 
 
+def read_all_listings(authored):
+    """The authored listings of every folder of FOLDERS, each keyed as read_listings keys it."""
+    return {folder: read_listings(authored, folder) for folder in FOLDERS}
+
+
+def check_ids_unique(authored):
+    """Mods and loaders, vehicles, saves and packs share one namespace of ids (RFC 0031)."""
+    for key, holders in sorted(id_holders(authored).items()):
+        if len(holders) > 1:
+            raise SnapshotError(
+                f"the id '{key}' is held by {' and '.join(holders)}, and an id is unique "
+                "across content types, compared without case"
+            )
+
+
 def read_packs(authored):
     """The authored pack versions, keyed by lowercased id, authored casing kept."""
     folder = authored / "packs"
@@ -300,7 +315,7 @@ def check_states_resolve(whole, versioned, names, listings, packs, log):
     for key in sorted(whole):
         if key not in listings and key not in packs:
             raise SnapshotError(
-                f"index-status.toml: '{names[key]}' is neither a listing nor a pack, "
+                f"index-status.toml: '{names[key]}' is no listing, vehicle, save or pack, "
                 f"so its state cannot be placed"
             )
 
@@ -464,14 +479,14 @@ def git(authored, *arguments):
 def history_key(path):
     """The folder and lowercased id a path of the authored tree belongs to, or None.
 
-    The folder is part of the key, so an id that moves between a listing and a pack
-    does not take the time of the other one.
+    The folder is part of the key, so an id that moves between two folders, such as
+    from a pack to a listing, does not take the time of the other one.
     """
     parts = path.split("/")
-    if len(parts) == 2 and parts[0] == "listings" and parts[1].endswith(".toml"):
-        return ("listings", parts[1][: -len(".toml")].lower())
-    if len(parts) == 3 and parts[0] == "packs" and parts[2].endswith(".toml"):
-        return ("packs", parts[1].lower())
+    if len(parts) == 2 and parts[0] in FOLDERS and parts[1].endswith(".toml"):
+        return (parts[0], parts[1][: -len(".toml")].lower())
+    if len(parts) == 3 and parts[0] == PACKS and parts[2].endswith(".toml"):
+        return (PACKS, parts[1].lower())
     return None
 
 
@@ -507,7 +522,7 @@ def listed_times(authored, log):
         "log", "HEAD",
         "--first-parent", "--diff-merges=first-parent", "--root", "--reverse",
         "--no-renames", "--diff-filter=A", "--name-only", "--format=commit %ct",
-        "--", "listings", "packs",
+        "--", *FOLDERS, PACKS,
     )
     if output is None:
         log(f"the history of {authored} could not be read, so no entry carries listed_at")
@@ -527,7 +542,7 @@ def listed_times(authored, log):
 
 
 def listing_entry(document, status, releases, downloads=None, listed_at=None):
-    """One entry of `listings`. Delisted becomes a tombstone: id and status only."""
+    """One entry of `listings`, `vehicles` or `saves`. Delisted becomes a tombstone: id and status only."""
     if status is not None and status["state"] == "delisted":
         return {"id": document["id"], "index_status": status}
 
@@ -589,33 +604,30 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
     require_directory(authored / "packs", "the authored packs folder")
     require_directory(releases, "the releases folder")
 
-    listings = read_listings(authored)
+    groups = read_all_listings(authored)
+    listings = groups["listings"]
     packs = read_packs(authored)
-
-    shared = sorted(set(listings) & set(packs))
-    if shared:
-        # The id namespace is global across content types (RFC 0031).
-        raise SnapshotError(
-            f"the id(s) {', '.join(shared)} are held by both a listing and a pack"
-        )
+    check_ids_unique(authored)
+    # The ids are unique, so the folders merge without loss.
+    everything = {key: document for group in groups.values() for key, document in group.items()}
 
     whole, versioned, names = read_index_status(authored)
-    check_states_resolve(whole, versioned, names, listings, packs, log)
+    check_states_resolve(whole, versioned, names, everything, packs, log)
 
     counts = read_download_counts(download_counts)
-    unjoinable = sorted(set(counts) - set(listings))
+    unjoinable = sorted(set(counts) - set(everything))
     if unjoinable:
         raise SnapshotError(
             f"download-counts.json counts {', '.join(counts[key]['id'] for key in unjoinable)}, "
-            "which is not a listing"
+            "which is no listing, vehicle or save"
         )
 
     folders = release_folders(releases)
 
     listed = listed_times(authored, log)
     if listed is not None:
-        entries = [("listings", key, listings[key]["id"]) for key in listings]
-        entries += [("packs", key, packs[key]["id"]) for key in packs]
+        entries = [(folder, key, group[key]["id"]) for folder, group in groups.items() for key in group]
+        entries += [(PACKS, key, packs[key]["id"]) for key in packs]
         for folder, key, identifier in sorted(entries):
             if (folder, key) not in listed and whole.get(key, {}).get("state") != "delisted":
                 log(f"'{identifier}' is not in the committed history, so it carries no listed_at")
@@ -639,10 +651,10 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
         for key in sorted(packs)
     ]
 
-    for key in sorted(set(folders) - set(listings)):
+    for key in sorted(set(folders) - set(everything)):
         # The snapshot carries the release files of listed entries only.
         log(
-            f"{folders[key]} belongs to no listing, so its releases are not "
+            f"{folders[key]} belongs to no listing, vehicle or save, so its releases are not "
             f"in the snapshot"
         )
 
