@@ -615,8 +615,9 @@ def build_files(
     """Every snapshot file for the state of the two repositories on disk, by name, the main document first.
 
     A type of TYPE_FILES gets its file once its folder holds a document, a delisted one
-    included, and keeps it while the name is in `published`, because a client reads a
-    published file that goes away as a fault and keeps its copy.
+    included, and keeps it while the name is in `published` or the first-parent history
+    ever added a document to the folder, because a client reads a published file that
+    goes away as a fault and keeps its copy.
     """
     log = log or warn
 
@@ -692,9 +693,12 @@ def build_files(
     if tags.is_file():
         main["tags"] = load_toml(tags)
 
+    # The fetched copies alone can miss a published file, for example on a stale 404
+    # from the CDN, so the history counts too.
+    held = {folder for folder, _ in listed}
     files = {MAIN_FILE: main}
     for group, name in TYPE_FILES.items():
-        if groups[group] or name in published:
+        if groups[group] or group in held or name in published:
             files[name] = {**envelope(), group: rendered(group)}
     return files
 

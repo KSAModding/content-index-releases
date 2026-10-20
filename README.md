@@ -22,7 +22,7 @@ For content the watcher does not watch, the same file arrives by pull request, a
 
 ## Clients do not read this repository
 
-A client fetches one snapshot artifact, which merges both halves of the index, the game release list and the curated tag vocabulary into a single document:
+A client fetches the snapshot, which merges both halves of the index, the game release list and the curated tag vocabulary into the main document:
 
 ```text
 https://ksamodding.github.io/content-index-releases/v1/index.json
@@ -104,7 +104,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
-| `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
+| `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the snapshot documents clients fetch: the main document and a file for each type of `TYPE_FILES`. Needs no token. |
 
 A release the watcher cannot stamp, a tag that does not parse or an archive whose install root is neither derivable nor authored, becomes one open issue per listing on the authored repository, kept current rather than reopened every tick.
 
@@ -204,6 +204,7 @@ Vehicles and saves of RFC 0085 have files of their own next to it, `/v1/snapshot
 Their entries have the shape of an entry of `listings`, and each release carries `install.folder`.
 There is no file for a type while the authored half holds no document of it, delisted ones included, so nothing published changes before the first one.
 Once published, a type file is published on every deployment, with an empty array when its last document is gone, because a client keeps its copy when a published file goes away.
+The builder counts a type file as published when its fetched copy exists or when the first-parent history of the authored half ever added a document of its type, so a stale 404 from the CDN cannot drop it.
 The two file names and their place follow the proposal on [content-manager-design#94](https://github.com/KSAModding/content-manager-design/pull/94), which is not decided yet, so they are kept in `TYPE_FILES` of `tools/build_snapshot.py` and the workflow reads them from there.
 
 Mods and mod loaders, packs, vehicles and saves share one namespace of ids, and an id that two documents hold fails the build.

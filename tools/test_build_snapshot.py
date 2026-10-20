@@ -1436,6 +1436,16 @@ class ListedAt(Fixture):
         )
         self.assertEqual(self.index.notes, [])
 
+    def test_a_type_file_stays_when_the_history_held_its_last_document(self):
+        self.index.listing("AutoStage")
+        self.index.vehicle("ExampleRover")
+        self.commit("2026-09-01T10:00:00Z")
+        self.remove("vehicles/ExampleRover.toml")
+        self.commit("2026-09-02T10:00:00Z")
+        files = self.index.build_files()
+        self.assertEqual(files[TYPE_FILES["vehicles"]], {"snapshot_version": 1, "vehicles": []})
+        self.assertNotIn(TYPE_FILES["saves"], files)
+
     def test_a_tombstone_has_no_listed_at(self):
         self.index.listing("Gone")
         self.index.pack("GonePack", "1.0.0")
