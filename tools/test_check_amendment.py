@@ -746,6 +746,72 @@ class TheOwner(unittest.TestCase):
         self.assertFalse(results[PATH].owner_only)
 
 
+VEHICLE_PATH = "releases/ExampleRover/1.0.0.json"
+
+# A vehicle release has no loader, and its install data names the folder it installs to.
+VEHICLE = {
+    "spec_version": 1,
+    "id": "ExampleRover",
+    "type": "vehicle",
+    "version": "1.0.0",
+    "version_scheme": "semver",
+    "release_status": "stable",
+    "release_date": "2026-08-19T10:00:00Z",
+    "game_min": "2026.8.3.5117",
+    "game_min_revision": 5117,
+    "download": {
+        "url": "https://example.invalid/ExampleRover.zip",
+        "sha256": "D9106AA572BD2DD6CAF046990B75D3F17F16F4CC178288B7983A4B98AEE924A6",
+        "size": 2048,
+        "content_type": "application/zip",
+    },
+    "install_size": 4096,
+    "install": {"root": "Example Rover", "derived": True, "folder": "Example Rover"},
+    "dependencies": [{"id": "Wheels", "kind": "required", "source": "authored"}],
+    "listing": {"name": "Example Rover", "authors": ["Maxi"]},
+}
+
+
+class VehicleRelease(unittest.TestCase):
+    def vehicle(self, **changes):
+        document = copy.deepcopy(VEHICLE)
+        document.update(changes)
+        return document
+
+    def measured(self, document, derived=None):
+        errors, owner_only = [], []
+        check_document(VEHICLE_PATH, VEHICLE, document, errors, owner_only, derived)
+        return errors, owner_only
+
+    def test_a_steward_bounds_it_with_a_game_max(self):
+        errors, owner_only = self.measured(
+            self.vehicle(game_max="2026.8.22.5348", game_max_revision=5348)
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(owner_only, [])
+
+    def test_the_install_folder_never_changes(self):
+        document = self.vehicle()
+        document["install"]["folder"] = "Other Rover"
+        errors, _ = self.measured(document)
+        self.assertTrue(any("'install'" in message for message in errors), errors)
+
+    def test_the_owner_removes_an_authored_dependency(self):
+        document = self.vehicle(dependencies=[])
+        self.assertTrue(check_amendment.reads_archive(VEHICLE, document))
+        errors, owner_only = self.measured(document, derived=[])
+        self.assertEqual(errors, [])
+        self.assertTrue(owner_only)
+
+    def test_anyone_narrows_a_dependency_with_a_max(self):
+        document = self.vehicle(
+            dependencies=[{"id": "Wheels", "kind": "required", "max": "2.0.0", "source": "authored"}]
+        )
+        errors, owner_only = self.measured(document)
+        self.assertEqual(errors, [])
+        self.assertEqual(owner_only, [])
+
+
 class NewAndDeleted(unittest.TestCase):
     def test_a_new_release_file_is_not_an_amendment(self):
         # Not a rejection: there is no published release to measure against, and the scope rule already routes it to a steward.
