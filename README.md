@@ -328,6 +328,11 @@ The release date, the pre-release flag, the changelog link and the changelog tex
 The checks read the changelog text only for its form and its length.
 The owner changes that text later with an amendment.
 
+A `vehicle` or a `save` takes this path too, from a listing under `vehicles/` or `saves/` of the authored half.
+Its archive gets the checks the watcher runs, and its `install.folder` is compared with the release files of this repository: a folder another listing of the same type holds, compared without case, is refused.
+A file that cannot be read there gives no verdict.
+A note of the stamper, such as other files in a vehicle folder, is added to the verdict and does not reject.
+
 When it validates and the author's ownership of the listing verifies, through the repository the listing links to the way the listing flow does, it merges itself.
 A listing that names a release host is refused here, because the watcher stamps its releases from that host.
 

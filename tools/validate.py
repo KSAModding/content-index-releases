@@ -270,7 +270,9 @@ def run_release(paths, base_ref=DEFAULT_BASE_REF, authored=None, http=None, now=
             outcomes.append(REJECT)
             messages.append(f"{path} is not in the pull request's tree")
             continue
-        outcome = check_release.check(path, head, root, game_versions, http, now=now)
+        outcome = check_release.check(
+            path, head, root, game_versions, http, now=now, releases=ROOT / "releases"
+        )
         outcomes.append(outcome.outcome)
         messages.extend(f"{path}: {message}" for message in outcome.messages)
     return Check("release", worst(outcomes), messages)

@@ -6,6 +6,7 @@ The submitted files come from the stamper itself, so a passing case is the round
 """
 
 import io
+import json
 import os
 import tempfile
 import tomllib
@@ -382,6 +383,117 @@ class TagPrefix(Fixture):
             self.assertEqual(head["version"], "1.0.0")
             outcome = self.check(head)
             self.assertEqual(outcome.outcome, check_release.PASS, outcome.messages)
+
+
+VEHICLE = """\
+spec_version = 1
+id = "ExampleRover"
+type = "vehicle"
+name = "Example Rover"
+authors = ["Maxi"]
+abstract = "A rover."
+license = "CC-BY-4.0"
+
+[[dependencies]]
+id = "KittenExtensions"
+kind = "required"
+"""
+
+META = 'name = "Example Rover"\nversion = "v2026.8.19.5261"\n'
+
+ROVER_URL = "https://example.invalid/downloads/ExampleRover-1.0.0.zip"
+ROVER_PATH = "releases/ExampleRover/1.0.0.json"
+
+
+class Vehicles(Fixture):
+    """RFC 0085: a vehicle release by pull request, measured as the watcher stamps it."""
+
+    def setUp(self):
+        super().setUp()
+        (self.root / "vehicles").mkdir()
+        (self.root / "vehicles" / "ExampleRover.toml").write_text(VEHICLE, encoding="utf-8")
+        self.releases = self.root / "releases"
+        self.rover = archive({
+            "Example Rover/meta.toml": META,
+            "Example Rover/vehicle.xml": "<VehicleSaveData />",
+            "Example Rover/thumbnail.png": "x",
+        })
+        self.http = FakeHttp({ROVER_URL: self.rover})
+
+    def stamped(self, **changes):
+        document = stamp(
+            tomllib.loads(VEHICLE), dict(RELEASE, url=ROVER_URL), self.rover, GAME_VERSIONS, now=NOW
+        )
+        document.update(changes)
+        return document
+
+    def check(self, head, path=ROVER_PATH, http=None):
+        return check_release.check(
+            path, head, self.root, GAME_VERSIONS, http or self.http, now=NOW, releases=self.releases
+        )
+
+    def held_by(self, listing_id, folder):
+        path = self.releases / listing_id / "1.0.0.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"id": listing_id, "type": "vehicle", "install": {"folder": folder}}),
+            encoding="utf-8",
+        )
+
+    def test_a_vehicle_that_matches_its_archive_passes_with_its_note(self):
+        outcome = self.check(self.stamped())
+        self.assertEqual(outcome.outcome, check_release.PASS, outcome.messages)
+        self.assertEqual(len(outcome.messages), 2)
+        self.assertTrue(outcome.messages[1].startswith("note: the vehicle folder holds files"))
+        self.assertIn('"thumbnail.png"', outcome.messages[1])
+
+    def test_every_field_that_differs_gets_its_own_message(self):
+        head = self.stamped(game_min="2026.8.3.5117", game_min_revision=5117)
+        head["install"] = dict(head["install"], folder="Other Rover")
+        messages = self.rejected(head, path=ROVER_PATH)
+        self.assertIn('install.folder: the submission says "Other Rover"', messages)
+        self.assertIn('game_min: the submission says "2026.8.3.5117"', messages)
+        self.assertIn("game_min_revision", messages)
+
+    def test_a_folder_another_listing_holds_is_refused(self):
+        self.held_by("OtherRover", "example rover")
+        self.held_by("ExampleRover", "Example Rover")
+        messages = self.rejected(self.stamped(), path=ROVER_PATH)
+        self.assertIn("`OtherRover`", messages)
+        self.assertNotIn("`ExampleRover` already", messages)
+
+    def test_a_release_file_that_does_not_read_reaches_no_verdict(self):
+        (self.releases / "Broken").mkdir(parents=True)
+        (self.releases / "Broken" / "1.0.0.json").write_text("{", encoding="utf-8")
+        outcome = self.check(self.stamped())
+        self.assertEqual(outcome.outcome, check_release.COULD_NOT_EVALUATE, outcome.messages)
+
+    def test_a_watched_vehicle_listing_is_the_watchers(self):
+        (self.root / "vehicles" / "ExampleRover.toml").write_text(
+            VEHICLE + '\n[releases]\ngithub = "someone/shares"\n', encoding="utf-8"
+        )
+        http = FakeHttp({})
+        outcome = self.check(self.stamped(), http=http)
+        self.assertEqual(outcome.outcome, check_release.REJECT)
+        self.assertIn("watcher", outcome.messages[0])
+        self.assertEqual(http.requested, [])
+
+    def test_a_vehicle_listing_in_the_wrong_folder_is_refused_before_the_download(self):
+        (self.root / "vehicles" / "ExampleRover.toml").unlink()
+        self.listing("ExampleRover.toml", VEHICLE)
+        http = FakeHttp({})
+        outcome = self.check(self.stamped(), http=http)
+        self.assertEqual(outcome.outcome, check_release.REJECT)
+        self.assertIn("belongs under vehicles/", outcome.messages[0])
+        self.assertEqual(http.requested, [])
+
+    def test_the_folder_message_names_the_folder_the_game_sees(self):
+        errors = []
+        check_release.check_listing("examplerover", {"id": "ExampleRover", "type": "vehicle"}, errors)
+        self.assertIn("the folder the game sees is install.folder", errors[0])
+        errors = []
+        check_release.check_listing("mod", {"id": "Mod", "type": "mod"}, errors)
+        self.assertIn("the folder name is the identity the game sees", errors[0])
 
 
 class Helpers(unittest.TestCase):

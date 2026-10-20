@@ -551,6 +551,57 @@ class RunRelease(Repository):
         self.assertEqual(verdict["verdict"], validate.REJECT)
 
 
+VEHICLE_TOML = """\
+spec_version = 1
+id = "ExampleRover"
+type = "vehicle"
+name = "Example Rover"
+authors = ["Maxi"]
+abstract = "A rover."
+license = "CC-BY-4.0"
+"""
+
+ROVER = "releases/ExampleRover/1.0.0.json"
+
+
+def rover_archive():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as handle:
+        handle.writestr("Example Rover/meta.toml", 'name = "Example Rover"\nversion = "v2026.8.19.5261"\n')
+        handle.writestr("Example Rover/vehicle.xml", "<VehicleSaveData />")
+    return buffer.getvalue()
+
+
+class RunVehicleRelease(Repository):
+    """A submitted vehicle release, measured against the release files of this checkout."""
+
+    def setUp(self):
+        super().setUp()
+        (self.authored / "vehicles").mkdir()
+        (self.authored / "vehicles" / "ExampleRover.toml").write_text(VEHICLE_TOML, encoding="utf-8")
+        self.archive = rover_archive()
+        self.http = FakeHttp({URL: self.archive})
+        document = stamp(
+            tomllib.loads(VEHICLE_TOML), dict(FACTS, tag="1.0.0"), self.archive, GAME_VERSIONS["versions"], now=NOW
+        )
+        self.write(ROVER, document)
+
+    def measure(self):
+        return validate.run_release([ROVER], base_ref="main", authored=self.authored, http=self.http, now=NOW)
+
+    def test_a_vehicle_release_passes(self):
+        check = self.measure()
+        self.assertEqual(check.outcome, validate.PASS, check.messages)
+
+    def test_a_folder_another_listing_holds_here_is_refused(self):
+        self.write("releases/OtherRover/1.0.0.json", {
+            "id": "OtherRover", "type": "vehicle", "install": {"derived": True, "folder": "EXAMPLE ROVER"},
+        })
+        check = self.measure()
+        self.assertEqual(check.outcome, validate.REJECT, check.messages)
+        self.assertIn("`OtherRover`", check.messages[0])
+
+
 class LocalChanges(Repository):
     def test_a_release_file_main_lacks_is_added(self):
         changes = validate.local_changes([NEW, PATH, "tools/amend.py"], "main")

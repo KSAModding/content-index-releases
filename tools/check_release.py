@@ -8,6 +8,8 @@ They download the archive from its `download.url`, stamp the release again with 
 
 Four facts only the host knows and no archive carries: the release date, the pre-release flag, the changelog link, and the changelog text.
 Those are taken from the submission as the author's word, and the changelog text is checked only for its form and its length. Everything else is derived.
+
+A vehicle or a save release is also refused when another listing of its type holds its `install.folder` in the release files of this repository (RFC 0085).
 """
 
 import json
@@ -25,8 +27,11 @@ import authored
 import hosts
 from check_amendment import Outcome, check_changelog_form, check_path
 from stamp_release import (
+    GAME_FILES,
     StampError,
     as_archive,
+    check_folder,
+    folder_holders,
     prerelease_identifiers,
     stamp,
 )
@@ -38,6 +43,9 @@ COULD_NOT_EVALUATE = "could-not-evaluate"
 # The sibling checkout the workflow makes. A local run either has one next to
 # this repository or points at one.
 DEFAULT_AUTHORED = Path(__file__).resolve().parent.parent.parent / "content-index"
+
+# The release files of this checkout, which hold the install folders.
+DEFAULT_RELEASES = Path(__file__).resolve().parent.parent / "releases"
 
 # What the stamper writes for an archive it opened as a zip.
 ZIP_CONTENT_TYPES = ("application/zip", "application/x-zip-compressed")
@@ -159,7 +167,13 @@ def watched(document):
 
 def check_listing(folder, document, errors):
     """The listing the release belongs to, against the folder it lands in."""
-    if document.get("id") != folder:
+    if document.get("id") != folder and document.get("type") in GAME_FILES:
+        errors.append(
+            f"the folder releases/{folder}/ does not match the listing's id "
+            f"'{document.get('id')}' letter for letter, and the folder under releases/ is "
+            "the id; the folder the game sees is install.folder"
+        )
+    elif document.get("id") != folder:
         errors.append(
             f"the folder releases/{folder}/ does not match the listing's id "
             f"'{document.get('id')}' letter for letter, and the folder name is the "
@@ -193,10 +207,10 @@ def compare(submitted, derived):
             messages.append(f"'{key}' is missing, and stamping the archive gives {_show(derived[key])}")
         elif submitted[key] == derived[key]:
             continue
-        elif key == "download" and isinstance(submitted[key], dict):
+        elif key in ("download", "install") and isinstance(submitted[key], dict):
             for name in _differ(submitted[key], derived[key]):
                 messages.append(
-                    f"download.{name}: the submission says {_show(submitted[key].get(name))}, "
+                    f"{key}.{name}: the submission says {_show(submitted[key].get(name))}, "
                     f"and the archive gives {_show(derived[key].get(name))}"
                 )
         elif key == "listing" and isinstance(submitted[key], dict):
@@ -214,13 +228,15 @@ def compare(submitted, derived):
     return messages
 
 
-def check(path, head, root, game_versions, http, now=None):
+def check(path, head, root, game_versions, http, now=None, releases=None):
     """One submitted release file, as an Outcome.
 
     `head` is the submitted document and `root` the content-index checkout.
+    `releases` is the `releases/` folder whose files hold the install folders.
     The caller has already established that nothing is published at `path`.
     """
     now = now or datetime.now(timezone.utc)
+    releases = Path(releases or DEFAULT_RELEASES)
 
     if not isinstance(head, dict):
         return Outcome(REJECT, [f"{path} is not a JSON object"])
@@ -232,7 +248,8 @@ def check(path, head, root, game_versions, http, now=None):
 
     # `check_path` passed, so the path is releases/<id>/<version>.json.
     folder = path.split("/")[1]
-    if authored.find(root, folder) is None:
+    listing = authored.find(root, folder)
+    if listing is None:
         return Outcome(
             REJECT,
             [
@@ -244,6 +261,9 @@ def check(path, head, root, game_versions, http, now=None):
     if document is None:
         return Outcome(COULD_NOT_EVALUATE, [problem])
     check_listing(folder, document, errors)
+    problem = authored.type_problem(listing.parent.name, document.get("type"))
+    if problem:
+        errors.append(f"{listing.parent.name}/{listing.name}: {problem}")
     if errors:
         return Outcome(REJECT, errors)
 
@@ -270,19 +290,30 @@ def check(path, head, root, game_versions, http, now=None):
 
     submitted = facts(head)
     submitted["content_type"] = content_type
+    notes = []
     with as_archive(archive) as archive:
         try:
-            derived = stamp(document, submitted, archive, game_versions, now=now)
+            derived = stamp(document, submitted, archive, game_versions, now=now, notes=notes)
         except StampError as error:
             return Outcome(REJECT, [f"the release does not stamp: {error}"])
 
     differences = compare(head, derived)
     if differences:
         return Outcome(REJECT, differences)
+    if "folder" in (derived.get("install") or {}):
+        try:
+            holders = folder_holders(releases, derived["type"])
+        except StampError as error:
+            return Outcome(COULD_NOT_EVALUATE, [str(error)])
+        try:
+            check_folder(derived, holders)
+        except StampError as error:
+            return Outcome(REJECT, [str(error)])
     return Outcome(
         PASS,
         [
             f"every stamped field agrees with the archive at {download['url']} "
-            f"({derived['download']['size']} bytes, sha256 {derived['download']['sha256']})"
+            f"({derived['download']['size']} bytes, sha256 {derived['download']['sha256']})",
+            *(f"note: {note}" for note in notes),
         ],
     )
