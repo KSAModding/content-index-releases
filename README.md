@@ -28,6 +28,8 @@ A client fetches one snapshot artifact, which merges both halves of the index, t
 https://ksamodding.github.io/content-index-releases/v1/index.json
 ```
 
+Vehicles and saves are in files of their own next to it, see [The snapshot](#the-snapshot).
+
 ## Layout
 
 | Path | Contents |
@@ -192,13 +194,22 @@ python3 tools/watchdog.py --dry-run
 
 ## The snapshot
 
-`.github/workflows/snapshot.yml` merges both halves of the index and the game release list into the one document clients fetch, and publishes it to GitHub Pages at `/v1/index.json`.
+`.github/workflows/snapshot.yml` merges both halves of the index and the game release list into the documents clients fetch, and publishes them to GitHub Pages under `/v1/`.
+The main document, `/v1/index.json`, holds mods and mod loaders in `listings`, and packs in `packs`.
 
 The `v1` segment carries the snapshot format version, so a future break can be served next to the version it replaces. The fields are specified in [spec/snapshot.md](https://github.com/KSAModding/content-manager-design/blob/main/spec/snapshot.md).
 
+Vehicles and saves of RFC 0085 have files of their own next to it, `/v1/snapshot-vehicles.json` with the array `vehicles` and `/v1/snapshot-saves.json` with the array `saves`.
+Their entries have the shape of an entry of `listings`, and each release carries `install.folder`.
+There is no file for a type while the authored half holds no document of it, delisted ones included, so nothing published changes before the first one.
+Once published, a type file is published on every deployment, with an empty array when its last document is gone, because a client keeps its copy when a published file goes away.
+The two file names and their place follow the proposal on [content-manager-design#94](https://github.com/KSAModding/content-manager-design/pull/94), which is not decided yet, so they are kept in `TYPE_FILES` of `tools/build_snapshot.py` and the workflow reads them from there.
+
+Mods and mod loaders, packs, vehicles and saves share one namespace of ids, and an id that two documents hold fails the build.
+
 When the authored checkout has `tags.toml`, the snapshot embeds it as the optional top-level `tags` field. When the file is absent, the field is absent.
 
-When `download-counts.json` is present, each listing that is not delisted carries its entry as `downloads`. An entry for an id that is not a listing fails the build.
+When `download-counts.json` is present, each listing, vehicle and save that is not delisted carries its entry as `downloads`. An entry for an id that is none of these fails the build.
 
 Each listing and pack that is not delisted carries the dates of RFC 0058 next to its `id`.
 `published_at` is the earliest release date, yanked and retracted versions included.
@@ -218,13 +229,17 @@ To build one by hand, against a checkout of the authored half:
 python3 tools/build_snapshot.py --authored ../content-index --out _site/v1/index.json
 ```
 
+The type files are written next to the file `--out` names. Without `--out`, only the main document goes to stdout.
+
 The `sources` block naming the two commits is omitted unless both repositories and both commits are given, so a local build does not claim a provenance it does not have.
 
 ### An unchanged index is not published again
 
 A deployment issues a new ETag whether or not the bytes changed, so republishing an unchanged snapshot is a full re-download for every client.
 
-The build reads what is published today as `--previous`. Unchanged content keeps that copy's `sources` rather than restamping whatever HEAD the run saw, so an unrelated commit does not move the bytes, and the workflow then skips the deploy when the two are equal.
+The build reads what is published today as `--previous`, the main document with the published type files next to it. Each file is compared on its own: unchanged content keeps that copy's `sources` rather than restamping whatever HEAD the run saw, so an unrelated commit does not move the bytes, and the workflow then skips the deploy when every file equals its published copy.
+A deployment replaces the whole site, so a change to one file deploys all of them, and on GitHub Pages every file gets a new ETag.
+A published file that answers anything other than 404 when the workflow fetches it stops the run, because the run cannot tell whether that file is published.
 
 A build fails closed: nothing is published, and clients keep the last good snapshot.
 

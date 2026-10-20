@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-"""Both halves of the index plus the game release list, as one snapshot document.
+"""Both halves of the index plus the game release list, as the snapshot documents.
 """
 
 import argparse
@@ -16,6 +16,13 @@ from authored import FOLDERS, PACKS, id_holders, type_problem
 from stamp_release import SEMVER, StampError, normalize_version, valid_id
 
 SNAPSHOT_VERSION = 1
+
+# The published files: the main document, and one file for each type that is not
+# in it, keyed by its folder, which also names the array of the file. Whether
+# vehicles and saves get files of their own or arrays in the main document is
+# still open in RFC 0094, so the names live here and nowhere else.
+MAIN_FILE = "index.json"
+TYPE_FILES = {"vehicles": "snapshot-vehicles.json", "saves": "snapshot-saves.json"}
 
 STATES = ("delisted", "disputed", "retracted")
 
@@ -596,7 +603,21 @@ def pack_entry(pack, status, versioned, listed_at=None):
 
 
 def build(authored, releases, game_versions, sources=None, log=None, download_counts=None):
-    """The snapshot document for the state of the two repositories on disk."""
+    """The main snapshot document for the state of the two repositories on disk."""
+    return build_files(
+        authored, releases, game_versions, sources, log, download_counts
+    )[MAIN_FILE]
+
+
+def build_files(
+    authored, releases, game_versions, sources=None, log=None, download_counts=None, published=()
+):
+    """Every snapshot file for the state of the two repositories on disk, by name, the main document first.
+
+    A type of TYPE_FILES gets its file once its folder holds a document, a delisted one
+    included, and keeps it while the name is in `published`, because a client reads a
+    published file that goes away as a fault and keeps its copy.
+    """
     log = log or warn
 
     require_directory(authored, "the authored checkout")
@@ -605,7 +626,6 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
     require_directory(releases, "the releases folder")
 
     groups = read_all_listings(authored)
-    listings = groups["listings"]
     packs = read_packs(authored)
     check_ids_unique(authored)
     # The ids are unique, so the folders merge without loss.
@@ -633,18 +653,18 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
                 log(f"'{identifier}' is not in the committed history, so it carries no listed_at")
     listed = listed or {}
 
-    rendered_listings = []
-    for key in sorted(listings):
-        document = listings[key]
-        status = whole.get(key)
-        delisted = status is not None and status["state"] == "delisted"
-        folder = folders.get(key)
-        files = [] if delisted or folder is None else read_releases(folder, document["id"])
-        rendered_listings.append(
-            listing_entry(
-                document, status, files, counts.get(key), listed.get(("listings", key))
+    def rendered(group):
+        entries = []
+        for key in sorted(groups[group]):
+            document = groups[group][key]
+            status = whole.get(key)
+            delisted = status is not None and status["state"] == "delisted"
+            folder = folders.get(key)
+            files = [] if delisted or folder is None else read_releases(folder, document["id"])
+            entries.append(
+                listing_entry(document, status, files, counts.get(key), listed.get((group, key)))
             )
-        )
+        return entries
 
     rendered_packs = [
         pack_entry(packs[key], whole.get(key), versioned, listed.get(("packs", key)))
@@ -658,16 +678,25 @@ def build(authored, releases, game_versions, sources=None, log=None, download_co
             f"in the snapshot"
         )
 
-    document = {"snapshot_version": SNAPSHOT_VERSION}
-    if sources is not None:
-        document["sources"] = sources
-    document["listings"] = rendered_listings
-    document["packs"] = rendered_packs
-    document["game_versions"] = load_json(game_versions)
+    def envelope():
+        document = {"snapshot_version": SNAPSHOT_VERSION}
+        if sources is not None:
+            document["sources"] = sources
+        return document
+
+    main = envelope()
+    main["listings"] = rendered("listings")
+    main["packs"] = rendered_packs
+    main["game_versions"] = load_json(game_versions)
     tags = authored / "tags.toml"
     if tags.is_file():
-        document["tags"] = load_toml(tags)
-    return document
+        main["tags"] = load_toml(tags)
+
+    files = {MAIN_FILE: main}
+    for group, name in TYPE_FILES.items():
+        if groups[group] or name in published:
+            files[name] = {**envelope(), group: rendered(group)}
+    return files
 
 
 def serialize(document):
@@ -736,12 +765,12 @@ def carry_forward(document, previous, log=info):
 
 def parse_arguments(argv):
     parser = argparse.ArgumentParser(
-        description="Merge both halves of the index into one snapshot document."
+        description="Merge both halves of the index into the snapshot documents."
     )
     parser.add_argument(
         "--authored", default=".authored", type=Path,
         help="a checkout of the authored repository, which holds listings/, packs/, "
-        "index-status.toml and optional tags.toml",
+        "optional vehicles/ and saves/, index-status.toml and optional tags.toml",
     )
     parser.add_argument("--releases", default="releases", type=Path)
     parser.add_argument("--game-versions", default="game-versions.json", type=Path)
@@ -751,13 +780,19 @@ def parse_arguments(argv):
     )
     parser.add_argument(
         "--previous", type=Path,
-        help="the snapshot published today. Unchanged content keeps its provenance, "
+        help="the main document published today, with the published copy of each other "
+        "file next to it under its own name. Unchanged content keeps its provenance, "
         "so the bytes stay identical and the deploy can be skipped",
     )
     parser.add_argument(
         "--out", type=Path,
-        help="write here instead of to stdout. Never inside this repository: the "
-        "snapshot is published as a Pages artifact and stays out of git history",
+        help="write the main document here instead of to stdout, and each other file "
+        "next to it. Never inside this repository: the snapshot is published as a "
+        "Pages artifact and stays out of git history",
+    )
+    parser.add_argument(
+        "--published-files", action="store_true",
+        help="print the name of each file the snapshot publishes, one per line, and exit",
     )
     parser.add_argument("--authored-repo", help="for the sources block, as owner/name")
     parser.add_argument("--authored-commit", help="for the sources block")
@@ -797,35 +832,63 @@ def sources_from(arguments):
     }
 
 
+def published_files():
+    """The name of every file the snapshot publishes, the main document first."""
+    return [MAIN_FILE, *TYPE_FILES.values()]
+
+
+def sibling(path, name):
+    """Where the file `name` sits next to `path`, the place of the main document."""
+    return path if name == MAIN_FILE else path.parent / name
+
+
 def main(argv=None):
     arguments = parse_arguments(argv)
+    if arguments.published_files:
+        print("\n".join(published_files()))
+        return 0
 
+    previous = {}
+    if arguments.previous is not None:
+        previous = {name: sibling(arguments.previous, name) for name in published_files()}
     try:
-        document = build(
+        documents = build_files(
             arguments.authored,
             arguments.releases,
             arguments.game_versions,
             sources=sources_from(arguments),
             log=warn,
             download_counts=arguments.download_counts,
+            # A copy that does not parse is still published, so existence decides.
+            published=[name for name, path in previous.items() if path.is_file()],
         )
-        document = carry_forward(document, read_previous(arguments.previous))
-        rendered = serialize(document)
+        rendered = {}
+        for name, document in documents.items():
+            documents[name] = carry_forward(
+                document,
+                read_previous(previous.get(name)),
+                lambda message, name=name: info(f"{name}: {message}"),
+            )
+            rendered[name] = serialize(documents[name])
     except SnapshotError as error:
         print(f"cannot build the snapshot: {error}", file=sys.stderr)
         return 1
 
-    if arguments.out:
-        arguments.out.parent.mkdir(parents=True, exist_ok=True)
-        with arguments.out.open("w", encoding="utf-8", newline="\n") as handle:
-            handle.write(rendered)
-        info(
-            f"wrote {arguments.out}: {len(document['listings'])} listing(s), "
-            f"{len(document['packs'])} pack(s), "
-            f"{len(rendered.encode('utf-8'))} bytes"
-        )
-    else:
-        sys.stdout.write(rendered)
+    if not arguments.out:
+        sys.stdout.write(rendered[MAIN_FILE])
+        if len(rendered) > 1:
+            info(f"stdout holds the main document only, and --out also writes {', '.join(list(rendered)[1:])}")
+        return 0
+
+    arguments.out.parent.mkdir(parents=True, exist_ok=True)
+    for name, text in rendered.items():
+        path = sibling(arguments.out, name)
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        counted = [
+            f"{len(value)} in {key}" for key, value in documents[name].items() if isinstance(value, list)
+        ]
+        info(f"wrote {path}: {', '.join(counted)}, {len(text.encode('utf-8'))} bytes")
     return 0
 
 
