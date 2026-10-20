@@ -24,7 +24,8 @@ PACKS = "packs"
 HOSTS = "hosts.toml"
 
 # The form of a table name in HOSTS, which is the key a listing names the host
-# with. The schema of hosts.toml in the authored repository has the same pattern.
+# with. The watcher, the counts and the snapshot read no table name of another
+# form, so a schema of hosts.toml in the authored repository must use this pattern.
 HOST_KEY = re.compile(r"[a-z][a-z0-9-]{1,31}")
 
 # The keys of `[releases]` that name no host.

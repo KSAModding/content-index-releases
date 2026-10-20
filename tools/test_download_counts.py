@@ -723,6 +723,15 @@ class ShareHostCounts(Fixture):
             self.assertEqual(self.refresh(http, stored), stored, text)
             self.assertEqual(http.asked, [])
 
+    def test_a_table_name_of_another_form_is_not_counted_and_the_refresh_passes(self):
+        (self.authored / "hosts.toml").write_text(HOSTS_TOML.replace("[ksamods]", "[KSAmods]"), encoding="utf-8")
+        self.listing("ExampleRover", releases=SHARED.replace("ksamods", "KSAmods"), content_type="vehicle")
+        self.listing("Mod", releases=GITHUB_ONLY)
+        http = FakeHttp({GITHUB: github(github_release("v1.0.0", 3, assets=[asset("Mod.zip", 3)]))})
+        result = self.refresh(http)
+        self.assertEqual([entry["id"] for entry in result["listings"]], ["Mod"])
+        self.assertTrue(any("is not" in note for note in self.notes))
+
     def test_a_listing_that_no_longer_names_the_host_keeps_its_count(self):
         self.listing("ExampleRover", releases=GITHUB_ONLY, content_type="vehicle")
         stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))

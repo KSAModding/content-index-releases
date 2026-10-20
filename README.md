@@ -106,6 +106,7 @@ An entry without its GitHub release, with another archive, with an unknown `stat
 Because a deleted GitHub release does not change the list, the list is read in full at least once a day, and once an hour while one of its entries is refused.
 A key under `[releases]` that is neither `github`, `spacedock` nor a registered host is reported, and so is a listing of a type the host does not take.
 A `hosts.toml` that does not read holds the listings on a share host back as an outage does, and reaches their issues only after the same number of ticks.
+The same is true for a table whose name is not lowercase letters, digits and hyphens of 2 to 32 characters that start with a letter, because the snapshot keeps download counts only under such a key.
 
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 

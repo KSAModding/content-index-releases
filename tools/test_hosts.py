@@ -931,6 +931,13 @@ class NamedShareHosts(unittest.TestCase):
             with self.assertRaises(HostError, msg=table):
                 named({"ksamods": "R"}, FakeHttp({}), "R", "vehicle", {"ksamods": table})
 
+    def test_a_table_name_the_snapshot_cannot_count_under_is_a_host_error(self):
+        # Counts under such a key would make the whole counts document fail its check.
+        for key in ("KSAmods", "k", "ksa_mods", "k" * 33):
+            with self.assertRaises(HostError, msg=key) as caught:
+                named({key: "R"}, FakeHttp({}), "R", "vehicle", {key: SHARE_TABLE})
+            self.assertIn("is not", str(caught.exception))
+
     def test_a_share_host_can_be_the_authority_next_to_github(self):
         section = {"ksamods": "R", "github": "o/shares", "tag_prefix": "vehicle/R/", "authority": "ksamods"}
         authority, mirrors = build(section, FakeHttp({}), "R", "vehicle", REGISTRY)

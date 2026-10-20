@@ -32,7 +32,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from authored import HOSTS, RELEASES_KEYS
+from authored import HOST_KEY, HOSTS, RELEASES_KEYS, host_key
 from stamp_release import (
     Archive,
     StampError,
@@ -964,6 +964,11 @@ def share_keys(releases_section):
 
 def _share_table(key, table):
     """The registered table of `key`, or HostError when the watcher cannot read a host from it."""
+    if not host_key(key):
+        raise HostError(
+            f"the host `{key}` of {HOSTS} has a name that is not {HOST_KEY.pattern}, "
+            "so its download counts could not go into the snapshot"
+        )
     if table.get("kind") != "share":
         raise HostError(f"the host `{key}` of {HOSTS} is of kind {table.get('kind')!r}, and only share is read")
     storage = table.get("storage")
