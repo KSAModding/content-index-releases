@@ -2,6 +2,10 @@
 # SPDX-License-Identifier: MIT
 """Authored document plus release archive in, release file out, per RFC 0031.
 
+It stamps the types `mod` and `mod-loader`, and `vehicle` and `save`, whose
+archive holds a game folder with `meta.toml` and `vehicle.xml` or `universe.xml`
+(RFC 0085).
+
 The one place a release file is derived: the watcher stamps with it and the
 release pull request checks re-derive with it, so the two paths cannot
 disagree. It needs no token and no network, which is what makes it testable
@@ -11,7 +15,8 @@ Anything wrong with the release itself raises StampError for the caller to
 report.
 
 RFC 0031 defines the format, RFC 0035 the install descriptor, RFC 0017 the
-version ordering the month bounds resolve against.
+version ordering the month bounds resolve against, RFC 0085 the vehicles and
+saves.
 """
 
 import argparse
@@ -23,6 +28,7 @@ import re
 import sys
 import tomllib
 import unicodedata
+import xml.parsers.expat
 import zipfile
 import zlib
 from datetime import datetime, timezone
@@ -30,8 +36,8 @@ from pathlib import Path
 
 SPEC_VERSION = 1
 
-# The one entry the stamper decompresses. A mod.toml is a few hundred bytes,
-# and the declared size bounds what the zip reader unpacks.
+# The entries the stamper unpacks whole, mod.toml and meta.toml. Each is a few
+# hundred bytes, and the declared size bounds what the zip reader unpacks.
 MOD_TOML_LIMIT = 1024 * 1024
 
 # What the zip reader raises for an entry it cannot unpack: a corrupt entry, an
@@ -78,6 +84,26 @@ GAME_MONTH = re.compile(r"^(\d{4})\.(\d{1,2})$")
 DEV_IDENTIFIERS = frozenset({"dev", "nightly", "snapshot", "canary", "ci", "git", "pre"})
 
 MOD_TOML = "mod.toml"
+
+# The file the game reads to see a vehicle or a save folder at all
+# (`VehicleSaveData.ExistsIn`, `UniverseData.ExistsIn`), by type.
+GAME_FILES = {"vehicle": "vehicle.xml", "save": "universe.xml"}
+
+META_TOML = "meta.toml"
+
+# `version` in a meta.toml as `VersionInfo.Parse` reads it, without a suffix.
+# ASCII digits only, because `\d` matches every Unicode digit.
+META_VERSION = re.compile(r"^v?([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$")
+
+# The declared size of a game file the stamper parses. A real save is under
+# 1 MiB, and the zip reader stops at the declared size, so this bounds the work
+# a crafted archive can cause.
+GAME_FILE_LIMIT = 256 * 1024 * 1024
+
+XML_CHUNK = 64 * 1024
+
+# How many file names one note names.
+NOTE_NAMES = 20
 
 # The listing facts a release file freezes, in the order RFC 0031 lists them.
 # `status` and `superseded_by` are deliberately not here: deprecation has to
@@ -355,9 +381,28 @@ def read_mod_toml(handle, root):
     """
     name = f"{root}/{MOD_TOML}" if root else MOD_TOML
     try:
-        info = handle.getinfo(name)
+        handle.getinfo(name)
     except KeyError:
         return None
+    return _read_toml(handle, name)
+
+
+def read_meta_toml(handle, root):
+    """The meta.toml of the game folder at `root`, parsed.
+
+    The game reads it at start (`SaveMetaData.FromDirectory`) and nothing
+    catches a failure there, so a file that does not parse is refused.
+    """
+    name = f"{root}/{META_TOML}" if root else META_TOML
+    try:
+        handle.getinfo(name)
+    except KeyError:
+        raise StampError(f"the archive has no {name}, which the game reads for every folder") from None
+    return _read_toml(handle, name)
+
+
+def _read_toml(handle, name):
+    info = handle.getinfo(name)
     if info.file_size > MOD_TOML_LIMIT:
         raise StampError(
             f"the archive's {name} is {info.file_size} bytes, above the "
@@ -368,8 +413,8 @@ def read_mod_toml(handle, root):
     except UNREADABLE_ENTRY as error:
         raise StampError(f"the archive's {name} cannot be read, {error}") from error
     try:
-        # The game reads mod.toml with File.ReadAllText, which drops a UTF-8 BOM,
-        # and Visual Studio writes one, so a BOM is accepted here too.
+        # The game reads mod.toml and meta.toml with File.ReadAllText, which drops
+        # a UTF-8 BOM, and Visual Studio writes one, so a BOM is accepted here too.
         return tomllib.loads(raw.decode("utf-8-sig"))
     except (UnicodeDecodeError, tomllib.TOMLDecodeError) as error:
         raise StampError(f"the archive's {name} is not valid TOML, {error}") from error
@@ -380,11 +425,15 @@ def derive_root(handle, listing_id, content_type):
 
     For a mod, RFC 0031's rule: one top-level directory containing mod.toml,
     its name matching the id, because that name is the identity the game will
-    see. For every other type the derived root is the archive root itself
-    (RFC 0035, rule 9), which this returns as "".
+    see. For a vehicle or a save, RFC 0085's rule: the archive root when it
+    holds meta.toml and the game file, otherwise the one top-level directory
+    that holds both. For every other type the derived root is the archive root
+    itself (RFC 0035, rule 9), which this returns as "".
 
     Returns None when nothing is derivable, which needs an authored `root`.
     """
+    if content_type in GAME_FILES:
+        return _game_root(handle, GAME_FILES[content_type])
     if content_type != "mod":
         return ""
 
@@ -410,6 +459,24 @@ def derive_root(handle, listing_id, content_type):
         f"the archive's top-level directory is '{name}', which does not match "
         f"the id '{listing_id}'"
     )
+
+
+def _game_root(handle, game_file):
+    names = set(handle.namelist())
+    if META_TOML in names and game_file in names:
+        return ""
+    directories = top_level_directories(handle)
+    complete = [
+        name for name in directories
+        if f"{name}/{META_TOML}" in names and f"{name}/{game_file}" in names
+    ]
+    if complete:
+        return complete[0] if len(complete) == 1 else None
+    # Not a game folder either way, but the one place that holds a meta.toml
+    # lets `game_folder` name what is missing there.
+    with_meta = [""] if META_TOML in names else []
+    with_meta += [name for name in directories if f"{name}/{META_TOML}" in names]
+    return with_meta[0] if len(with_meta) == 1 else None
 
 
 def relative_path(value, what):
@@ -457,6 +524,12 @@ def install_object(handle, listing_id, content_type, authored_install, provides=
             raise StampError(f"the authored install root '{root}' is not in the archive")
     else:
         root, derived = derive_root(handle, listing_id, content_type), True
+        if root is None and content_type in GAME_FILES:
+            raise StampError(
+                "the install root is neither derivable from the archive nor authored: "
+                "the standard layout is one top-level directory named after `name` in "
+                f"its meta.toml, holding meta.toml and {GAME_FILES[content_type]}"
+            )
         if root is None:
             raise StampError(
                 "the install root is neither derivable from the archive nor authored: "
@@ -471,6 +544,13 @@ def install_object(handle, listing_id, content_type, authored_install, provides=
 
     target = authored_install.get("target")
     path = authored_install.get("path")
+    if content_type in GAME_FILES and any(
+        key in authored_install for key in ("target", "path", "manages", "folder")
+    ):
+        # The game decides the place, and `name` in meta.toml the folder.
+        raise StampError(
+            f"a {content_type} cannot author an install target, path, manages or folder (RFC 0085)"
+        )
     if content_type == "mod" and (target is not None or path is not None):
         # A mod's install location is not the author's to choose: the folder
         # name is the identity the game sees, and RFC 0035 states the location
@@ -490,7 +570,7 @@ def install_object(handle, listing_id, content_type, authored_install, provides=
 
     _check_provides(handle, root, target, provides)
 
-    if set(install) == {"derived"}:
+    if set(install) == {"derived"} and content_type not in GAME_FILES:
         # Nothing but the fact that nobody authored anything, which the absence
         # of the object already says.
         return None
@@ -533,6 +613,112 @@ def _check_launch(names, root, launch, what):
     entry = f"{root}/{launch}" if root else launch
     if entry not in names:
         raise StampError(f"{what} '{launch}' is not in the release archive")
+
+
+def game_folder(handle, root, content_type, notes=None):
+    """The checks of RFC 0085 on the game folder at `root`, and its parsed meta.toml.
+
+    For a vehicle, `notes` gets one note that names the files besides meta.toml
+    and vehicle.xml, because the game writes only those two when it saves a
+    vehicle (`UncompressedVehicleSave.Write`). In a save, another file is the
+    state of a mod, so it gets no note.
+    """
+    meta_entry = f"{root}/{META_TOML}" if root else META_TOML
+    meta = read_meta_toml(handle, root)
+    name = meta.get("name")
+    if not isinstance(name, str):
+        raise StampError(f"the archive's {meta_entry} has no `name` string, which the game shows")
+    problem = save_name_problem(name)
+    if problem:
+        raise StampError(
+            f"`name` in the archive's {meta_entry} is {name!r}, and {problem} (RFC 0085)"
+        )
+    folder = root.rsplit("/", 1)[-1] if root else None
+    if folder is not None and folder != name:
+        if folder.lower() == name.lower():
+            raise StampError(
+                f"the archive's folder is '{folder}' and `name` in its meta.toml is "
+                f"'{name}': the game saves into a folder named after `name`, so the "
+                "casing has to match"
+            )
+        raise StampError(
+            f"the archive's folder is '{folder}', which does not match `name` '{name}' "
+            "in its meta.toml: the game saves into a folder named after `name`"
+        )
+
+    game = GAME_FILES[content_type]
+    entry = f"{root}/{game}" if root else game
+    names = handle.namelist()
+    if entry not in names:
+        near = next((other for other in names if other.lower() == entry.lower()), None)
+        if near is not None:
+            raise StampError(
+                f"the archive has {near!r} and no {entry!r}, and the game opens {game} "
+                "with that exact case"
+            )
+        raise StampError(f"the archive has no {entry}, so the game does not see the {content_type}")
+    check_xml(handle, entry)
+
+    if content_type == "vehicle" and notes is not None:
+        prefix = f"{root}/" if root else ""
+        others = [
+            info.filename.replace("\\", "/")[len(prefix):]
+            for info in entries_under(handle, root)
+            if info.filename.replace("\\", "/") not in (meta_entry, entry)
+        ]
+        if others:
+            shown = ", ".join(json.dumps(other) for other in others[:NOTE_NAMES])
+            if len(others) > NOTE_NAMES:
+                shown += f", and {len(others) - NOTE_NAMES} more"
+            notes.append(
+                f"the vehicle folder holds files besides {META_TOML} and {game}, which "
+                f"the game drops when it saves the vehicle again: {shown}"
+            )
+    return meta
+
+
+def check_xml(handle, entry):
+    """Refuse a game file that is not well-formed XML, read as a stream.
+
+    `XmlSerializer` never writes a DOCTYPE, and a DOCTYPE is the way in for
+    entity expansion, so one is refused.
+    """
+    info = handle.getinfo(entry)
+    if info.file_size > GAME_FILE_LIMIT:
+        raise StampError(
+            f"the archive's {entry} is {info.file_size} bytes, above the "
+            f"{GAME_FILE_LIMIT} byte limit"
+        )
+
+    def doctype(*details):
+        raise StampError(f"the archive's {entry} carries a DOCTYPE, which the game never writes")
+
+    parser = xml.parsers.expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = doctype
+    try:
+        with handle.open(info) as stream:
+            while chunk := stream.read(XML_CHUNK):
+                parser.Parse(chunk, False)
+        parser.Parse(b"", True)
+    except xml.parsers.expat.ExpatError as error:
+        raise StampError(f"the archive's {entry} is not well-formed XML, {error}") from error
+    except UNREADABLE_ENTRY as error:
+        raise StampError(f"the archive's {entry} cannot be read, {error}") from error
+
+
+def meta_game_min(meta):
+    """`game_min` and its revision from `version` in meta.toml, the build that wrote the folder."""
+    version = meta.get("version")
+    match = META_VERSION.fullmatch(version) if isinstance(version, str) else None
+    if match is None:
+        reason = "not a game version Y.M.B.R without a suffix"
+    elif int(match.group(4)) == 0:
+        reason = "the game's mark of an unknown build"
+    else:
+        return version.removeprefix("v"), int(match.group(4))
+    raise StampError(
+        f"meta.toml says version {version!r}, which is {reason}, and the listing authors no game_min"
+    )
 
 
 def install_size(handle, root):
@@ -691,7 +877,7 @@ def listing_snapshot(authored):
     return snapshot
 
 
-def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
+def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes=None):
     """The release file for one release.
 
     `archive` is an Archive or the archive's bytes.
@@ -706,7 +892,8 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
         changelog       URL of the release's changelog, optional
         changelog_text  the release notes as the host reports them, optional
 
-    Only the open month bound depends on `now`.
+    Only the open month bound depends on `now`. A list in `notes` gets what is
+    worth telling but does not stop the release.
     """
     now = now or datetime.now(timezone.utc)
 
@@ -718,7 +905,7 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
         raise StampError(
             f"the id '{listing_id}' does not satisfy the id rules of RFC 0031"
         )
-    if content_type not in ("mod", "mod-loader"):
+    if content_type not in ("mod", "mod-loader", *GAME_FILES):
         raise StampError(f"type '{content_type}' has no generated release file")
     if authored.get("spec_version") != SPEC_VERSION:
         raise StampError(
@@ -726,6 +913,8 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
             f"{authored.get('spec_version')!r}, and this stamper implements "
             f"{SPEC_VERSION}"
         )
+    if content_type in GAME_FILES and authored.get("loader") is not None:
+        raise StampError(f"a {content_type} carries no [loader] (RFC 0085)")
 
     version = normalize_version(release.get("tag"))
     archive = as_archive(archive)
@@ -736,6 +925,10 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
         provides=authored.get("provides"),
     )
     root = (install or {}).get("root", "")
+    meta = None
+    if content_type in GAME_FILES:
+        meta = game_folder(handle, root, content_type, notes)
+        install["folder"] = meta["name"]
 
     mod_toml = read_mod_toml(handle, root) if content_type == "mod" else None
     dependencies = merge_dependencies(
@@ -743,11 +936,14 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None):
     )
 
     compatibility = authored.get("compatibility") or {}
-    if not compatibility.get("game_min"):
+    if compatibility.get("game_min"):
+        game_min, game_min_revision = resolve_bound(
+            compatibility.get("game_min"), "game_min", game_versions, now
+        )
+    elif meta is not None:
+        game_min, game_min_revision = meta_game_min(meta)
+    else:
         raise StampError("the authored document states no game_min")
-    game_min, game_min_revision = resolve_bound(
-        compatibility.get("game_min"), "game_min", game_versions, now
-    )
     game_max, game_max_revision = resolve_bound(
         compatibility.get("game_max"), "game_max", game_versions, now
     )
@@ -856,6 +1052,7 @@ def main(argv=None):
         print(f"cannot read the inputs: {error}", file=sys.stderr)
         return 1
 
+    notes = []
     try:
         document = stamp(
             authored,
@@ -863,10 +1060,13 @@ def main(argv=None):
             archive,
             game_versions,
             mirrors=arguments.mirror,
+            notes=notes,
         )
     except StampError as error:
         print(f"cannot stamp {arguments.listing}: {error}", file=sys.stderr)
         return 1
+    for note in notes:
+        print(f"note: {note}", file=sys.stderr)
 
     rendered = serialize(document)
     if arguments.out:

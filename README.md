@@ -15,6 +15,9 @@ Problems with a listing or archive use the [content-index takedown and dispute p
 
 A watcher polls each listing's release host, downloads the archive, computes the checksum and the sizes, reads the code dependencies out of the archive, merges them with the authored document, and commits the result.
 
+A `vehicle` or a `save` ([RFC 0085](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0085-vehicles-and-saves.md)) has no code dependencies, so its dependencies are the authored ones.
+Its archive holds the folder as the game wrote it, with `meta.toml` and `vehicle.xml` or `universe.xml`, and the stamper reads both: `name` in `meta.toml` becomes `install.folder`, and `version` becomes `game_min` when the listing authors none.
+
 For content the watcher does not watch, the same file arrives by pull request, and the checks re-download the archive and recompute every stamped field from the actual bytes.
 
 ## Clients do not read this repository
