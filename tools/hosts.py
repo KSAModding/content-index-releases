@@ -957,8 +957,10 @@ def registered(root):
 
 def share_keys(releases_section):
     """The keys of a `[releases]` section that name a share host."""
+    if not isinstance(releases_section, dict):
+        return []
     return [
-        key for key in releases_section or {}
+        key for key in releases_section
         if key not in ("github", "spacedock", *RELEASES_KEYS)
     ]
 

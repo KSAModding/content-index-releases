@@ -821,6 +821,7 @@ class Watcher:
         self.gone_budget = options.gone_budget
         self.images = None
         self.proofs = None
+        self._registry = None
         # The authored document of every listing this tick read, and the owner
         # line of every listing it told something. Neither outlives the tick.
         self.documents = {}
@@ -1114,10 +1115,17 @@ class Watcher:
         images = self.image_pass(listing_id, authored)
         errors.extend(images or [])
 
+        section = authored.get("releases")
         try:
+            registry = self.registry() if hosts.share_keys(section) else None
             authority, mirrors = hosts.build(
-                authored.get("releases"), self.http, listing_id
+                section, self.http, listing_id, authored.get("type"), registry
             )
+        except HostError as error:
+            # A hosts.toml that does not read is no fault of the author, so the listing waits as in a host outage.
+            self.listing_edit_pass(listing_id, authored, path, errors)
+            self.unreachable(listing_id, state, str(error))
+            return
         except StampError as error:
             self.listing_edit_pass(listing_id, authored, path, errors)
             self.failed.append(listing_id)
@@ -1235,6 +1243,32 @@ class Watcher:
                 self.log(f"the images are not checked this tick: {error!r}")
                 self.images = False
         return self.images or None
+
+    def registry(self):
+        """The share hosts of `hosts.toml` in the authored checkout, read once per tick.
+
+        Raises HostError for every listing on a share host when the file does not read.
+        """
+        if self._registry is None:
+            try:
+                self._registry = hosts.registered(self.authored_root)
+            except HostError as error:
+                self.log(f"the share hosts are not read this tick: {error}")
+                self._registry = error
+        if isinstance(self._registry, HostError):
+            raise self._registry
+        return self._registry
+
+    def share_tables(self, authored):
+        """The registered tables of the share hosts a listing names, or the error that kept them unread."""
+        keys = hosts.share_keys(authored.get("releases"))
+        if not keys:
+            return {}
+        try:
+            registry = self.registry()
+        except HostError as error:
+            return str(error)
+        return {key: registry.get(key) for key in keys}
 
     def owner_proofs(self):
         """`ownership.py` of the authored checkout, or None when it does not load."""
@@ -1569,14 +1603,23 @@ class Watcher:
         folders = self.folder_inputs(listing_id, authored)
         if folders is not None:
             inputs.append(folders)
+        tables = self.share_tables(authored)
+        if tables:
+            inputs.append({"hosts": tables})
         return self.authored_digest(inputs)
 
     def poll_digest(self, listing_id, authored):
-        """What a stored ETag stands for besides the host's answer, see `poll_etag`."""
+        """What a stored ETag stands for besides the host's answer, see `poll_etag`.
+
+        The table of a share host is part of it, so a steward who raises its
+        `max_bytes` or adds a type gets a refused release read again at once.
+        """
         folders = self.folder_inputs(listing_id, authored)
-        if folders is None:
-            return self.authored_digest(authored)
-        return self.authored_digest([authored, folders])
+        tables = self.share_tables(authored)
+        inputs = [authored] if folders is None else [authored, folders]
+        if tables:
+            inputs.append({"hosts": tables})
+        return self.authored_digest(inputs[0] if len(inputs) == 1 else inputs)
 
     def folder_inputs(self, listing_id, authored):
         """The listings that hold the folders a release of this listing was refused for, or None.

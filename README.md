@@ -95,12 +95,22 @@ A `vehicle` or a `save` is stamped from the game folder in its archive: `meta.to
 A release whose `install.folder` another listing of the same type already holds, compared without case, is refused, and it is tried again once the release files of that listing change.
 A vehicle folder with files besides `meta.toml` and `vehicle.xml` is stamped with a note, which goes into the body of the stamp commit and not into the issue.
 
+A vehicle or a save can also be on a share host, which the stewards register as a table of `hosts.toml` in the authored half, and which the listing names with its id, for example `ksamods = "ExampleRover"` under `[releases]`.
+The rules follow the text of [RFC 0094](https://github.com/KSAModding/content-manager-design/pull/94), which is not accepted yet, and its names are in `tools/hosts.py` in one place.
+The watcher reads the release list `releases/<type>/<id>.json` from the host's `storage` repository through the GitHub API, conditionally against an ETag, and for each entry the GitHub release tagged `<type>/<id>/<version>`, which has to carry exactly one archive, named `<id>-<version>.zip`.
+The host's own service is never asked.
+The `status` of an entry becomes `release_status` together with the pre-release part of the version, and the less stable of the two wins.
+An entry without its GitHub release, with another archive, with an unknown `status`, or with an archive above the host's `max_bytes` for the type is reported in the listing's issue.
+Because a deleted GitHub release does not change the list, the list is read in full at least once a day, and once an hour while one of its entries is refused.
+A key under `[releases]` that is neither `github`, `spacedock` nor a registered host is reported, and so is a listing of a type the host does not take.
+A `hosts.toml` that does not read holds the listings on a share host back as an outage does, and reaches their issues only after the same number of ticks.
+
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
 | Tool | What it does |
 |---|---|
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
-| `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
+| `tools/hosts.py` | The release hosts, GitHub, SpaceDock and the share hosts of `hosts.toml`, behind one interface. GitHub and a share host are polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
