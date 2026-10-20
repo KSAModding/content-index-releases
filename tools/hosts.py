@@ -107,6 +107,8 @@ class HostRelease:
     archives: tuple = ()
     # The `tag_prefix` of the listing, which the tag starts with (RFC 0096).
     tag_prefix: str = ""
+    # The release status the publisher chose on a share host (RFC 0094).
+    status: str | None = None
 
     @property
     def rest(self):
@@ -121,6 +123,7 @@ class HostRelease:
             "url": self.url,
             "content_type": self.content_type,
             "prerelease": self.prerelease,
+            "status": self.status,
             "changelog": self.changelog,
             "changelog_text": self.changelog_text,
         }
