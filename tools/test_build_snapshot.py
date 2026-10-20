@@ -1125,6 +1125,31 @@ class DownloadCounts(Fixture):
         with self.assertRaisesRegex(SnapshotError, "download-counts[.]json"):
             self.index.build(download_counts=path)
 
+    def test_a_share_host_counts_under_its_key(self):
+        # RFC 0094: the key of hosts.toml, which needs no entry there, because a
+        # host that left the file keeps its last count.
+        self.index.listing("AutoStage")
+        entry = {
+            "id": "AutoStage",
+            "total": 15,
+            "hosts": {"github": 12, "ksamods": 3},
+            "releases": [{"version": "1.0.0", "total": 15, "hosts": {"github": 12, "ksamods": 3}}],
+        }
+        built = self.entry(self.index.build(download_counts=self.counts(entry)), "AutoStage")
+        self.assertEqual(built["downloads"]["hosts"], {"github": 12, "ksamods": 3})
+
+    def test_a_count_under_a_key_that_names_no_host_is_an_error(self):
+        self.index.listing("AutoStage")
+        for key in ("authority", "since", "tag_prefix", "Not A Key", "k", "Ksamods"):
+            entry = {
+                "id": "AutoStage",
+                "total": 1,
+                "hosts": {key: 1},
+                "releases": [{"version": "1.0.0", "total": 1, "hosts": {key: 1}}],
+            }
+            with self.assertRaisesRegex(SnapshotError, "RFC 0094", msg=key):
+                self.index.build(download_counts=self.counts(entry))
+
     def test_the_same_counts_give_the_same_bytes(self):
         self.index.listing("AutoStage")
         self.index.release("AutoStage", "0.4.3")

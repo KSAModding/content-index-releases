@@ -32,7 +32,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from authored import HOSTS
+from authored import HOSTS, RELEASES_KEYS
 from stamp_release import (
     Archive,
     StampError,
@@ -75,9 +75,6 @@ TAG_PREFIX = re.compile(r"[!-~]+")
 
 # The answers that say an archive is gone, a fact about the release and not a bad moment of the host.
 GONE = (404, 410, 451)
-
-# The keys of `[releases]` that name no host.
-RELEASES_KEYS = ("authority", "since", "tag_prefix")
 
 # The files of a share host in its storage repository, by RFC 0094. That RFC is
 # not accepted yet, so its names are here and nowhere else.

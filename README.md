@@ -52,6 +52,8 @@ That poll only ever sees the build that is current when it runs, so a build supe
 Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
+A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
+A share host that left `hosts.toml`, or that the listing no longer names, keeps its last known count.
 
 Known limit: a deleted GitHub release without its own version entry, and an archive uploaded again, lower a count that the host did not lower.
 

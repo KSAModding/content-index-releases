@@ -15,6 +15,7 @@ from authored import holder
 from build_snapshot import SnapshotError, check_download_counts, serialize
 from download_counts import main, refresh
 from hosts import HostError, Response
+from test_hosts import STORAGE, Storage, rover, share_entry
 
 GITHUB = "https://api.github.com/repos/o/r/releases"
 SPACEDOCK = "https://spacedock.info/api/mod/7"
@@ -439,8 +440,8 @@ class CommandLine(Fixture):
             "a total that is not the sum": json.dumps(document({**entry, "total": 10})),
             "an unknown key": json.dumps(document({**entry, "fetched_at": "today"})),
             "a spec_version it does not know": json.dumps({"spec_version": 2, "listings": []}),
-            "a host RFC 0052 does not define": json.dumps(
-                document(counted("Mod", {"curseforge": 9}))
+            "a key that names no host": json.dumps(
+                document(counted("Mod", {"Curse Forge": 9}))
             ),
             "a negative count": json.dumps(document(counted("Mod", {"github": -1}))),
             "a boolean count": json.dumps(document(counted("Mod", {"github": True}))),
@@ -666,6 +667,69 @@ class VehiclesAndSaves(Fixture):
         self.listing("Shared", releases=GITHUB_ONLY, content_type="vehicle")
         with self.assertRaisesRegex(SnapshotError, "listings/Shared.toml and vehicles/Shared.toml"):
             self.refresh(FakeHttp({}))
+
+
+SHARED = '[releases]\nksamods = "ExampleRover"\n'
+
+HOSTS_TOML = """\
+[ksamods]
+kind = "share"
+storage = "ksamods-content/share"
+types = ["vehicle", "save"]
+max_bytes = { vehicle = 10485760, save = 104857600 }
+"""
+
+
+class ShareHostCounts(Fixture):
+    """RFC 0094: a share host is counted from the assets in its storage repository, under its key."""
+
+    def setUp(self):
+        super().setUp()
+        (self.authored / "hosts.toml").write_text(HOSTS_TOML, encoding="utf-8")
+        self.listing("ExampleRover", releases=SHARED, content_type="vehicle")
+
+    def test_the_counts_come_from_the_assets_under_the_key_of_the_host(self):
+        # Storage fails on every URL outside the storage repository, so the
+        # host's own service and counter are never asked.
+        http = Storage(
+            [share_entry("1.0.0"), share_entry("1.1.0")], [rover("1.0.0", count=5), rover("1.1.0", count=7)]
+        )
+        entry = self.only(self.refresh(http))
+        self.assertEqual(entry["hosts"], {"ksamods": 12})
+        self.assertEqual(
+            [(release["version"], release["hosts"]) for release in entry["releases"]],
+            [("1.1.0", {"ksamods": 7}), ("1.0.0", {"ksamods": 5})],
+        )
+        self.assertTrue(all(url.startswith(STORAGE) for url, _ in http.asked))
+        self.assertEqual(self.notes, [])
+
+    def test_an_entry_without_its_github_release_counts_nothing_and_the_rest_count(self):
+        http = Storage([share_entry("1.0.0"), share_entry("1.1.0")], [rover("1.1.0", count=7)])
+        entry = self.only(self.refresh(http))
+        self.assertEqual(entry["hosts"], {"ksamods": 7})
+        self.assertEqual([release["version"] for release in entry["releases"]], ["1.1.0"])
+
+    def test_a_release_that_left_the_list_keeps_its_count_and_its_share_of_the_total(self):
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        http = Storage([share_entry("1.1.0")], [rover("1.1.0", count=7)])
+        entry = self.only(self.refresh(http, stored))
+        self.assertEqual(entry["hosts"], {"ksamods": 16})
+
+    def test_a_host_hosts_toml_does_not_register_keeps_the_last_counts(self):
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        for text in ("", "[ksamods\n"):
+            (self.authored / "hosts.toml").write_text(text, encoding="utf-8")
+            http = Storage([])
+            self.assertEqual(self.refresh(http, stored), stored, text)
+            self.assertEqual(http.asked, [])
+
+    def test_a_listing_that_no_longer_names_the_host_keeps_its_count(self):
+        self.listing("ExampleRover", releases=GITHUB_ONLY, content_type="vehicle")
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        http = FakeHttp({GITHUB: github(github_release("v1.0.0", 3, assets=[asset("ExampleRover.zip", 3)]))})
+        entry = self.only(self.refresh(http, stored))
+        self.assertEqual(entry["hosts"], {"github": 3, "ksamods": 9})
+        self.assertEqual(entry["releases"][0]["hosts"], {"github": 3, "ksamods": 9})
 
 
 class Cache(Fixture):

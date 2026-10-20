@@ -27,6 +27,18 @@ HOSTS = "hosts.toml"
 # with. The schema of hosts.toml in the authored repository has the same pattern.
 HOST_KEY = re.compile(r"[a-z][a-z0-9-]{1,31}")
 
+# The keys of `[releases]` that name no host.
+RELEASES_KEYS = ("authority", "since", "tag_prefix")
+
+
+def host_key(key):
+    """Whether `key` can name a share host: of the HOST_KEY form, and no other key of `[releases]`."""
+    return (
+        isinstance(key, str)
+        and HOST_KEY.fullmatch(key) is not None
+        and key not in ("github", "spacedock", *RELEASES_KEYS)
+    )
+
 
 def listing_files(root):
     """Every listing document, folder by folder in FOLDERS order. A missing folder is empty."""
