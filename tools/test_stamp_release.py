@@ -17,6 +17,7 @@ import tempfile
 import unittest
 import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 from check_release import authored_root
@@ -25,7 +26,9 @@ from stamp_release import (
     Archive,
     StampError,
     changelog_text,
+    check_folder,
     derived_dependencies,
+    folder_holders,
     merge_dependencies,
     normalize_version,
     relative_path,
@@ -721,6 +724,67 @@ class Saves(unittest.TestCase):
     def test_a_save_needs_universe_xml(self):
         with self.assertRaisesRegex(StampError, "universe.xml"):
             self.stamp(archive({"Example Rover/meta.toml": META, "Example Rover/vehicle.xml": VEHICLE_XML}))
+
+
+class InstallFolders(unittest.TestCase):
+    """RFC 0085: one folder per type, held by the listing that took it first."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.releases = Path(directory.name) / "releases"
+
+    def release(self, listing_id, version, content_type="vehicle", folder="Example Rover", **extra):
+        path = self.releases / listing_id / f"{version}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        document = {"id": listing_id, "type": content_type, "version": version, **extra}
+        if folder is not None:
+            document["install"] = {"root": folder, "derived": True, "folder": folder}
+        path.write_text(serialize(document), encoding="utf-8")
+
+    def holders(self, content_type="vehicle"):
+        return folder_holders(self.releases, content_type)
+
+    def document(self, listing_id, folder, content_type="vehicle"):
+        return {"id": listing_id, "type": content_type, "install": {"derived": True, "folder": folder}}
+
+    def test_another_listing_cannot_take_a_folder_without_case(self):
+        self.release("ExampleRover", "1.0.0")
+        with self.assertRaises(StampError) as raised:
+            check_folder(self.document("OtherRover", "example rover"), self.holders())
+        message = str(raised.exception)
+        self.assertIn("`OtherRover`", message)
+        self.assertIn("`ExampleRover`", message)
+        self.assertIn("without case", message)
+
+    def test_a_later_release_of_the_same_listing_keeps_its_folder(self):
+        self.release("ExampleRover", "1.0.0")
+        check_folder(self.document("examplerover", "Example Rover"), self.holders())
+
+    def test_a_save_and_a_vehicle_do_not_collide(self):
+        self.release("ExampleRover", "1.0.0")
+        self.release("MoonBase", "1.0.0", content_type="save", folder="Moon Base")
+        check_folder(self.document("RoverSave", "Example Rover", "save"), self.holders("save"))
+        self.assertEqual(self.holders("save"), {"moon base": ["MoonBase"]})
+
+    def test_a_yanked_or_gone_release_still_holds_its_folder(self):
+        self.release("Yanked", "1.0.0", folder="A", yanked=True)
+        self.release("Gone", "1.0.0", folder="B", download={"unavailable_since": "2026-09-01T00:00:00Z"})
+        self.release("Mod", "1.0.0", content_type="mod", folder=None)
+        self.assertEqual(self.holders(), {"a": ["Yanked"], "b": ["Gone"]})
+
+    def test_a_missing_releases_folder_holds_nothing(self):
+        self.assertEqual(self.holders(), {})
+
+    def test_an_unreadable_release_file_is_an_error(self):
+        self.release("ExampleRover", "1.0.0")
+        (self.releases / "Broken").mkdir()
+        (self.releases / "Broken" / "1.0.0.json").write_text("not json", encoding="utf-8")
+        with self.assertRaisesRegex(StampError, "releases/Broken/1.0.0.json"):
+            self.holders()
+
+    def test_a_document_without_a_folder_is_never_refused(self):
+        check_folder({"id": "M", "type": "mod"}, {"m": ["Other"]})
 
 
 class Rfc0035(unittest.TestCase):

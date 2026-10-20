@@ -721,6 +721,60 @@ def meta_game_min(meta):
     )
 
 
+def folder_holders(releases_root, content_type):
+    """Each `install.folder` of `content_type` under `releases_root`, lowercased, to the listings that hold it.
+
+    `releases_root` is the `releases/` folder, and a listing is the name of its
+    folder there. Every release counts, also a yanked, a gone or a delisted
+    one, because a player can still have its folder. A file that does not read
+    raises, so a check never passes on part of the picture.
+    """
+    holders = {}
+    root = Path(releases_root)
+    for path in sorted(root.glob("*/*.json")) if root.is_dir() else []:
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise StampError(
+                f"releases/{path.parent.name}/{path.name} is not readable JSON, so the "
+                f"install folders cannot be compared: {error}"
+            ) from error
+        if not isinstance(document, dict) or document.get("type") != content_type:
+            continue
+        install = document.get("install")
+        folder = install.get("folder") if isinstance(install, dict) else None
+        if isinstance(folder, str):
+            listings = holders.setdefault(folder.lower(), [])
+            if path.parent.name not in listings:
+                listings.append(path.parent.name)
+    return holders
+
+
+def check_folder(document, holders):
+    """Refuse a release whose `install.folder` another listing of its type holds (RFC 0085).
+
+    `holders` is what `folder_holders` gives for the type. The game shows two
+    folders whose names differ only in case as one, so they are compared
+    without case. Another release of the same listing is no collision.
+    """
+    install = document.get("install")
+    folder = install.get("folder") if isinstance(install, dict) else None
+    if not isinstance(folder, str):
+        return
+    listing_id = str(document.get("id") or "")
+    others = [
+        other for other in holders.get(folder.lower(), []) if other.lower() != listing_id.lower()
+    ]
+    if others:
+        content_type = document.get("type")
+        raise StampError(
+            f"`{listing_id}` installs into the folder `{folder}`, which the {content_type} "
+            f"listing {', '.join(f'`{other}`' for other in others)} already holds, compared "
+            f"without case; a player who has that {content_type} could not install this one "
+            "(RFC 0085)"
+        )
+
+
 def install_size(handle, root):
     """The unpacked size of what gets installed, in bytes."""
     return sum(info.file_size for info in entries_under(handle, root))
