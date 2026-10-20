@@ -1590,7 +1590,7 @@ class Watcher:
             return None
         try:
             holders = self.install_folders(content_type)
-        except StampError as error:
+        except HostError as error:
             return str(error)
         return {
             folder: sorted(
@@ -1600,7 +1600,12 @@ class Watcher:
         }
 
     def install_folders(self, content_type):
-        """The install folders of `content_type` under releases/, to the listings that hold them."""
+        """The install folders of `content_type` under releases/, to the listings that hold them.
+
+        A release file that does not read is a fault of this repository, not
+        of the listing, so it raises HostError: the release stays unsettled and
+        the next tick tries it again.
+        """
         if content_type not in self._folders:
             try:
                 self._folders[content_type] = folder_holders(self.releases_root, content_type)
@@ -1608,7 +1613,7 @@ class Watcher:
                 self._folders[content_type] = str(error)
         holders = self._folders[content_type]
         if isinstance(holders, str):
-            raise StampError(holders)
+            raise HostError(holders)
         return holders
 
     def known_rejection(self, listing_id, authored, release, any_age=False):
@@ -1647,6 +1652,9 @@ class Watcher:
         The archive is closed before a mirror downloads, so at most one archive
         is on disk and the mirror is checked against the stamped digest.
         """
+        if authored.get("type") in GAME_FILES:
+            # Read first, so a broken release file does not cost a download every tick.
+            self.install_folders(authored["type"])
         archive, content_type = authority.download(release)
         notes = []
         with as_archive(archive) as archive:

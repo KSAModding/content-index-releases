@@ -3810,6 +3810,24 @@ class VehiclesAndSaves(WatcherCase):
         self.assertEqual(self.stamped("OtherRover")["install"]["folder"], "example rover")
         self.assertNotIn("taken", watcher.cache.data["listings"]["OtherRover"])
 
+    def test_a_release_file_that_does_not_read_holds_the_vehicle_back_without_an_issue(self):
+        broken = self.folder / "releases" / "Broken" / "1.0.0.json"
+        broken.parent.mkdir(parents=True)
+        broken.write_text("{", encoding="utf-8")
+        self.listing("ExampleRover")
+        watcher = self.tick()
+
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertFalse((self.folder / "releases" / "ExampleRover").exists())
+        self.assertEqual(self.http.downloaded, [])
+        self.assertTrue(any("releases/Broken/1.0.0.json" in line for line in self.lines))
+
+        # The repaired file lets the next tick stamp, because no ETag was kept.
+        broken.unlink()
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped("ExampleRover")["install"]["folder"], "Example Rover")
+
     def test_a_version_with_a_suffix_needs_an_authored_game_min(self):
         url = f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
         self.http.archives[url] = rover_zip(version="v2026.9.22.5482-dev")
