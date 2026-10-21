@@ -12,7 +12,10 @@
     "url": "https://github.com/MrJeranimo/ModMenu/releases/download/v0.2.3/ModMenu.zip",
     "sha256": "19E16CECBF69F48E684E20DC591076C68053E48A723B0ACDC1AF7A6D483046B6",
     "size": 10490,
-    "content_type": "application/x-zip-compressed"
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://spacedock.info/mod/4054/ModMenu/download/0.2.3"
+    ]
   },
   "install_size": 20657,
   "install": {
