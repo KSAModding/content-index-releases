@@ -8,6 +8,8 @@
   "release_date": "2026-09-02T22:08:53Z",
   "game_min": "2026.9.7.5402",
   "game_min_revision": 5402,
+  "game_max": "2026.10.13.5602",
+  "game_max_revision": 5602,
   "download": {
     "url": "https://github.com/MrJeranimo/ModMenu/releases/download/v0.2.2/ModMenu.zip",
     "sha256": "6C3B149C82FFA5CCF187CE8A839D18295B238E22E88117FBDC723AB99E6086B6",
