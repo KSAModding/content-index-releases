@@ -6,8 +6,8 @@
   "version_scheme": "semver",
   "release_status": "stable",
   "release_date": "2026-10-20T18:05:48Z",
-  "game_min": "2026.8.3.5117",
-  "game_min_revision": 5117,
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
   "download": {
     "url": "https://github.com/StarMapLoader/StarMap/releases/download/0.4.8/StarMap-0.4.8.zip",
     "sha256": "5324240F15D6841835158940057359EF011149BBC30B4D50F7B27480DF7B2D5C",
