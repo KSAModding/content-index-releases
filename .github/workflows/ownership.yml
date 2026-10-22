@@ -42,6 +42,13 @@ jobs:
           repository: KSAModding/content-index
           path: .authored
 
+      # The ownership check verifies the signatures of a data host with the
+      # cryptography package. No pip cache, because this job holds the App key.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: pip install --only-binary=:all: -r tools/requirements.txt
+
       - uses: actions/download-artifact@v8
         id: verdict
         continue-on-error: true
@@ -72,7 +79,7 @@ jobs:
           RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
           set -euo pipefail
-          python3 tools/decide.py \
+          python tools/decide.py \
             --verdict verdict.json \
             --authored .authored \
             --event "$EVENT" \

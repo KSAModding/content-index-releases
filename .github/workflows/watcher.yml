@@ -87,6 +87,14 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
+      # The signatures of a data host need the cryptography package, and the
+      # system Python takes no pip install. No pip cache, because this job holds
+      # the App key.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: pip install --only-binary=:all: -r tools/requirements.txt
+
       # Derived cache, never state: the per-listing ETags, the failure counts
       # and the issue numbers. Losing it costs one expensive tick.
       - name: Restore the derived cache
@@ -129,7 +137,7 @@ jobs:
             arguments+=(--dry-run)
           fi
 
-          python3 tools/watch.py "${arguments[@]}"
+          python tools/watch.py "${arguments[@]}"
 
       - name: Push
         if: ${{ success() && inputs.dry_run != true }}
