@@ -1104,6 +1104,14 @@ class Signatures(unittest.TestCase):
         self.assertTrue(signed(self.BODY, (self.signature + "\r\n").encode("ascii"), self.key))
         self.assertFalse(signed(self.BODY, self.signature[:40] + "\n" + self.signature[40:], self.key))
 
+    def test_a_key_of_small_order_verifies_nothing(self):
+        # Under the identity key, R = identity and S = 0 verify for any body.
+        prefix = base64.b64decode(self.key)[:12]
+        identity = bytes([1]) + bytes(31)
+        key = base64.b64encode(prefix + identity).decode("ascii")
+        forged = base64.b64encode(identity + bytes(32)).decode("ascii")
+        self.assertFalse(signed(self.BODY, forged, key))
+
 
 class Containment(unittest.TestCase):
     """Rules 21 and 28: an archive url is parsed and has to be under a prefix in `downloads`."""
