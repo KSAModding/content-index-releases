@@ -55,11 +55,19 @@ def observe_github(host, remembered):
     releases, answered_etag = host.releases(etag)
     if releases is None:
         return remembered["observation"]
+    observation = summed(host, releases)
+    remembered.clear()
+    if answered_etag:
+        remembered.update({"etag": answered_etag, "pages": host.pages, "observation": observation})
+    return observation
+
+
+def summed(host, releases):
+    """The counts of the archives of `releases`, whose sum is the total."""
     if host.truncated:
         raise HostError(
             f"{host.key} lists more releases than one scan covers, so its total would be short"
         )
-
     total = None
     versions = {}
     for release in releases:
@@ -68,12 +76,17 @@ def observe_github(host, remembered):
         total = (total or 0) + release.downloads
         if release.version is not None:
             versions[release.version] = versions.get(release.version, 0) + release.downloads
+    return {"total": total, "versions": versions}
 
-    observation = {"total": total, "versions": versions}
-    remembered.clear()
-    if answered_etag:
-        remembered.update({"etag": answered_etag, "pages": host.pages, "observation": observation})
-    return observation
+
+def observe_share(host):
+    """The counts of the assets in the storage repository of a share host (RFC 0094).
+
+    The list is read in full, because a count changes while the list does not.
+    The host's own counter is never read, so the host cannot raise a count.
+    """
+    releases, _ = host.releases()
+    return summed(host, releases)
 
 
 def observe_spacedock(host):
@@ -92,6 +105,8 @@ def observe(host, remembered):
     """What one host reports now. Raises HostError or StampError when it cannot say."""
     if host.kind == "github":
         return observe_github(host, remembered)
+    if host.kind == "share":
+        return observe_share(host)
     return observe_spacedock(host)
 
 
@@ -109,7 +124,8 @@ def stored_values(entry):
 def merge(kind, stored, observation):
     """One host's (total, versions) after an observation, keeping versions the answer lacks.
 
-    On GitHub a kept version also keeps its share of the total. SpaceDock reports its own total.
+    On GitHub and on a share host a kept version also keeps its share of the total,
+    because the total is the sum of the archives. SpaceDock reports its own total.
     """
     total, versions = stored if stored is not None else (None, {})
     kept = {
@@ -120,16 +136,20 @@ def merge(kind, stored, observation):
     merged = {**kept, **observation["versions"]}
     if observation["total"] is None:
         return total, merged
-    if kind == "github":
+    if kind in ("github", "share"):
         return observation["total"] + sum(kept.values()), merged
     return observation["total"], merged
 
 
 def entry_of(identifier, values):
-    """One listing entry from {host: (total, versions)}, or None when nothing is known."""
+    """One listing entry from {host: (total, versions)}, or None when nothing is known.
+
+    A share host is kept under its key in hosts.toml, after the hosts of RFC 0052.
+    """
+    order = [*DOWNLOAD_HOSTS, *sorted(set(values) - set(DOWNLOAD_HOSTS))]
     known = [
         (host, values[host])
-        for host in DOWNLOAD_HOSTS
+        for host in order
         if host in values and values[host][0] is not None
     ]
     if not known:
@@ -152,10 +172,15 @@ def entry_of(identifier, values):
     }
 
 
-def named_hosts(document, http, identifier, log):
+def named_hosts(document, http, identifier, log, registry=None):
+    """The hosts a listing names, as (key, host), where the key is the one under `[releases]`."""
     try:
-        return list(hosts.named(document.get("releases"), http, identifier).values())
-    except StampError as error:
+        return list(
+            hosts.named(
+                document.get("releases"), http, identifier, document.get("type"), registry
+            ).items()
+        )
+    except (StampError, HostError) as error:
         log(f"{identifier}: [releases] cannot be read, so its last known counts stay: {error}")
         return []
 
@@ -171,6 +196,12 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
     }
     whole, _, _ = read_index_status(authored)
     current = current or {}
+    registry = {}
+    if ask:
+        try:
+            registry = hosts.registered(authored)
+        except HostError as error:
+            log(f"the share hosts cannot be read, so the counts of their listings stay: {error}")
 
     for key in sorted(set(current) - set(listings)):
         note(f"{current[key]['id']}: no longer a listing, so its counts are dropped")
@@ -190,7 +221,7 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
         elif document.get("type") not in COUNTED_TYPES:
             note(f"{identifier}: a {document.get('type')!r} listing has no counts")
         else:
-            for host in named_hosts(document, http, identifier, log):
+            for name, host in named_hosts(document, http, identifier, log, registry):
                 slot = f"{key}/{host.key}"
                 asked.add(slot)
                 remembered = cache.setdefault(slot, {})
@@ -199,19 +230,19 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
                     observation = observe(host, remembered)
                 except (HostError, StampError) as error:
                     log(
-                        f"{identifier}: {host.kind} could not be counted, so its last "
+                        f"{identifier}: {name} could not be counted, so its last "
                         f"known values stay: {error}"
                     )
                     continue
                 except Exception as error:  # noqa: BLE001 - one host never stops the refresh
                     log(
-                        f"{identifier}: {host.kind} failed unexpectedly, so its last "
+                        f"{identifier}: {name} failed unexpectedly, so its last "
                         f"known values stay: {error!r}"
                     )
                     continue
                 if previous is not None and observation is previous:
                     note(f"{identifier}: {host.key} is unchanged since the last run")
-                values[host.kind] = merge(host.kind, values.get(host.kind), observation)
+                values[name] = merge(host.kind, values.get(name), observation)
 
         entry = entry_of(identifier, values)
         if entry is not None:
