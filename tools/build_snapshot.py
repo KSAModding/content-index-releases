@@ -18,9 +18,8 @@ from stamp_release import SEMVER, StampError, normalize_version, valid_id
 SNAPSHOT_VERSION = 1
 
 # The published files: the main document, and one file for each type that is not
-# in it, keyed by its folder, which also names the array of the file. Whether
-# vehicles and saves get files of their own or arrays in the main document is
-# still open in RFC 0094, so the names live here and nowhere else.
+# in it, keyed by its folder, which also names the array of the file. RFC 0094
+# names the two files, and the names live here and nowhere else.
 MAIN_FILE = "index.json"
 TYPE_FILES = {"vehicles": "snapshot-vehicles.json", "saves": "snapshot-saves.json"}
 

@@ -205,7 +205,7 @@ Their entries have the shape of an entry of `listings`, and each release carries
 There is no file for a type while the authored half holds no document of it, delisted ones included, so nothing published changes before the first one.
 Once published, a type file is published on every deployment, with an empty array when its last document is gone, because a client keeps its copy when a published file goes away.
 The builder counts a type file as published when its fetched copy exists or when the first-parent history of the authored half ever added a document of its type, so a stale 404 from the CDN cannot drop it.
-The two file names and their place follow the proposal on [content-manager-design#94](https://github.com/KSAModding/content-manager-design/pull/94), which is not decided yet, so they are kept in `TYPE_FILES` of `tools/build_snapshot.py` and the workflow reads them from there.
+The two file names and their place are those of [RFC 0094](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0094-share-host.md); they are kept in `TYPE_FILES` of `tools/build_snapshot.py`, and the workflow reads them from there.
 
 Mods and mod loaders, packs, vehicles and saves share one namespace of ids, and an id that two documents hold fails the build.
 
