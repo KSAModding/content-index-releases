@@ -1162,11 +1162,15 @@ class DataHosts(unittest.TestCase):
             data_host(DataHost([data_entry()], self.private), new, retired=[self.key]).releases()
 
     def test_a_url_outside_downloads_or_a_missing_date_is_a_problem(self):
+        tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
         entries = [
             data_entry("1.0.0", url="https://cdn.example.org.evil/archives/ExampleRover-1.0.0.zip"),
             data_entry("1.0.1", url="https://data.example.org/share/ExampleRover-1.0.1.zip"),
             data_entry("1.0.2", date=None),
             data_entry("1.0.3", date="yesterday"),
+            data_entry("1.0.4", date="2026-10-11"),
+            data_entry("1.0.5", date="2026-10-11T09:14:30"),
+            data_entry("1.0.6", date=tomorrow),
         ]
         releases, _ = data_host(DataHost(entries, self.private), self.key).releases()
         for release in releases:
@@ -1175,7 +1179,9 @@ class DataHosts(unittest.TestCase):
                 data_host(DataHost([], self.private), self.key).download(release)
         self.assertEqual([release.url for release in releases[:2]], [None, None])
         self.assertIn("downloads", releases[0].problem)
-        self.assertIn("date", releases[2].problem)
+        for release in releases[2:]:
+            self.assertIn("date", release.problem, release.tag)
+        self.assertIn("future", releases[6].problem)
 
     def test_an_unchanged_list_sends_no_signature_request(self):
         http = DataHost([data_entry()], self.private)

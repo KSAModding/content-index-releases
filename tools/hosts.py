@@ -113,6 +113,15 @@ MAX_SIGNATURE = 1024
 SPKI_BYTES = 44
 SIGNATURE_BYTES = 64
 
+# The `date` of a data-host entry is an RFC 3339 time in UTC (rule 21). It is
+# the only source of `release_date` for such a host, so a date without a time,
+# a time without an offset or a basic-format time is refused, not guessed.
+RFC3339_UTC = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]00:00)")
+
+# How far past the clock of the watcher a data-host date may be. A later date
+# would make every real release after it look like history, so it is a problem.
+DATE_SKEW = timedelta(minutes=10)
+
 ASCII_WHITESPACE = " \t\n\r\x0b\x0c"
 
 # A percent-encoded dot, slash or backslash in a path, which a server can
@@ -912,7 +921,7 @@ class ShareHost(Host):
         """A release of the list that `data` serves, made from the url and the date of its entry (rule 21)."""
         url, date, status = entry.get("url"), entry.get("date"), entry.get("status")
         kept = url if _within(url, self.downloads) else None
-        release_date = _utc(date) if isinstance(date, str) else None
+        release_date = _utc(date) if isinstance(date, str) and RFC3339_UTC.fullmatch(date) else None
         problem = None
         if kept is None:
             problem = (
@@ -920,7 +929,9 @@ class ShareHost(Host):
                 f"in downloads of `{self.name}`"
             )
         elif release_date is None:
-            problem = f"the date {date!r} of `{tag}` is not an RFC 3339 time"
+            problem = f"the date {date!r} of `{tag}` is not an RFC 3339 time in UTC"
+        elif datetime.fromisoformat(release_date) > datetime.now(timezone.utc) + DATE_SKEW:
+            problem = f"the date {date!r} of `{tag}` is in the future"
         elif status not in SHARE_STATUSES:
             problem = f"the status {status!r} is not one of {', '.join(SHARE_STATUSES)}"
         return HostRelease(
