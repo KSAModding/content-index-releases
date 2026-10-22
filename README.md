@@ -229,6 +229,8 @@ Mods and mod loaders, packs, vehicles and saves share one namespace of ids, and 
 
 When the authored checkout has `tags.toml`, the snapshot embeds it as the optional top-level `tags` field. When the file is absent, the field is absent.
 
+In the same way, `hosts.toml` of the authored checkout becomes the optional top-level `hosts` field of the main document, right after `tags`, so a client learns the registered share hosts of [RFC 0104](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0104-share-host-conformance.md). The vehicle and save files never carry it. A file that holds only comments gives an empty object.
+
 When `download-counts.json` is present, each listing, vehicle and save that is not delisted carries its entry as `downloads`. An entry for an id that is none of these fails the build.
 
 Each listing and pack that is not delisted carries the dates of RFC 0058 next to its `id`.
