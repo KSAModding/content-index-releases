@@ -7,15 +7,19 @@ HTTPError that escapes either becomes an "unexpected" log line with no
 author-facing issue, which is exactly what the watcher must not do.
 """
 
+import base64
 import dataclasses
 import hashlib
 import http.client
 import json
+import subprocess
+import sys
 import tempfile
 import types
 import unittest
 import urllib.error
 import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -29,16 +33,20 @@ from hosts import (
     HostRelease,
     Http,
     OversizeError,
+    RedirectError,
     Response,
     ShareHost,
     SpaceDockHost,
+    _Contained,
     _utc,
+    _within,
     build,
     download,
     listed_mirrors,
     named,
     registered,
     share_keys,
+    signed,
     stamped_dependencies,
 )
 from stamp_release import Archive, StampError
@@ -652,6 +660,21 @@ SHARE_TABLE = {
 }
 REGISTRY = {"ksamods": SHARE_TABLE}
 
+# A share host that serves its files itself (RFC 0104). The key has the form of
+# an Ed25519 key, and the tests that check a signature make their own.
+DATA_TABLE = {
+    "kind": "share",
+    "name": "example.org",
+    "bot": 12345678,
+    "api": "https://example.org/api/share/v1/",
+    "data": "https://data.example.org/share/",
+    "downloads": ["https://cdn.example.org/archives/"],
+    "key": "MCowBQYDK2VwAyEA" + "A" * 43 + "=",
+    "retired_keys": [],
+    "types": ["vehicle", "save"],
+    "max_bytes": {"vehicle": 8, "save": 64},
+}
+
 
 def share_entry(version, status="stable", mirrors=None):
     entry = {"version": version, "status": status}
@@ -726,6 +749,62 @@ class Storage:
         if limit is not None and len(body) > limit:
             raise OversizeError("the archive is larger than the limit")
         return Archive.of_bytes(body), {"Content-Type": "application/zip"}
+
+
+DATA = DATA_TABLE["data"]
+DATA_LIST = f"{DATA}releases/vehicle/ExampleRover.json"
+CDN = DATA_TABLE["downloads"][0]
+
+
+def data_entry(version="1.0.0", url=None, date="2026-10-11T09:14:30Z"):
+    entry = {"version": version, "status": "stable", "url": url or f"{CDN}ExampleRover-{version}.zip"}
+    if date is not None:
+        entry["date"] = date
+    return entry
+
+
+class DataHost:
+    """A share host that serves its files itself (RFC 0104).
+
+    It answers the release list under DATA with an ETag and a 304 on a match,
+    and the .sig beside it, which `private` signs at the time of the read unless
+    `signature` replaces it. Each request is kept with its api flag and the
+    headers that Http with a token would send for it, so a test sees whether the
+    token could reach the host.
+    """
+
+    def __init__(self, entries, private, signature=None):
+        self.document = {"id": "ExampleRover", "type": "vehicle", "releases": entries}
+        self.private = private
+        self.signature = signature
+        self.asked = []
+        self.lines = []
+        self.with_token = Http(token="a token")
+
+    def log(self, message):
+        self.lines.append(message)
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        self.asked.append((url, api, self.with_token._headers(accept, etag, api)))
+        body = json.dumps(self.document).encode()
+        if url == DATA_LIST:
+            current = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+            if etag == current:
+                return Response(304, {}, b"")
+            # The lower case shows that the header name is read in any case.
+            return Response(200, {"etag": current}, body)
+        if url == DATA_LIST + ".sig":
+            if isinstance(self.signature, Exception):
+                raise self.signature
+            if self.signature is not None:
+                return Response(200, {}, self.signature)
+            return Response(200, {}, base64.b64encode(self.private.sign(body)) + b"\n")
+        raise AssertionError(f"unexpected URL {url}")
+
+
+def data_host(http, key, retired=()):
+    table = {**DATA_TABLE, "key": key, "retired_keys": list(retired)}
+    return named({"example": "ExampleRover"}, http, "ExampleRover", "vehicle", {"example": table})["example"]
 
 
 def rover(version="1.0.0", **extra):
@@ -929,12 +1008,22 @@ class NamedShareHosts(unittest.TestCase):
                 named({"ksamods": value}, FakeHttp({}), "R", "vehicle", REGISTRY)
 
     def test_a_table_the_watcher_cannot_read_is_a_host_error(self):
+        host = named({"example": "R"}, FakeHttp({}), "R", "vehicle", {"example": DATA_TABLE})["example"]
+        self.assertIsInstance(host, ShareHost)
+        storage_only = {key: value for key, value in SHARE_TABLE.items() if key != "storage"}
         for table in (
             {**SHARE_TABLE, "kind": "mirror"},
-            {key: value for key, value in SHARE_TABLE.items() if key != "storage"},
+            storage_only,
             {**SHARE_TABLE, "storage": "https://github.com/x/y"},
             {**SHARE_TABLE, "types": "vehicle"},
             {**SHARE_TABLE, "max_bytes": {"vehicle": "10 MiB"}},
+            {**DATA_TABLE, "storage": "ksamods-content/share"},
+            {key: value for key, value in DATA_TABLE.items() if key != "key"},
+            {**DATA_TABLE, "data": "http://data.example.org/share/"},
+            {**DATA_TABLE, "data": "https://data.example.org/share"},
+            {**DATA_TABLE, "data": "https://[data.example.org/"},
+            {**DATA_TABLE, "downloads": []},
+            {**DATA_TABLE, "retired_keys": "old"},
         ):
             with self.assertRaises(HostError, msg=table):
                 named({"ksamods": "R"}, FakeHttp({}), "R", "vehicle", {"ksamods": table})
@@ -971,6 +1060,230 @@ class NamedShareHosts(unittest.TestCase):
                 (root / "hosts.toml").write_text(text, encoding="utf-8")
                 with self.assertRaises(HostError, msg=text):
                     registered(root)
+
+
+def signing_key(label):
+    """A test key made from a public seed, and its public key text as `hosts.toml` holds it."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    private = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(label.encode()).digest())
+    spki = private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+    return private, base64.b64encode(spki).decode("ascii")
+
+
+class Signatures(unittest.TestCase):
+    """Rule 22: a data file is valid only with an Ed25519 signature of its exact bytes by `key`."""
+
+    BODY = b'{"id": "ExampleRover", "type": "vehicle", "releases": []}'
+
+    def setUp(self):
+        self.private, self.key = signing_key("content-index-releases test key")
+        self.signature = base64.b64encode(self.private.sign(self.BODY)).decode("ascii")
+
+    def test_a_signature_by_the_key_is_valid_and_a_changed_byte_is_not(self):
+        self.assertTrue(signed(self.BODY, self.signature, self.key))
+        self.assertTrue(signed(self.BODY, self.signature.encode("ascii"), self.key))
+        self.assertFalse(signed(self.BODY.replace(b"[]", b"[ ]"), self.signature, self.key))
+        _, other = signing_key("another test key")
+        self.assertFalse(signed(self.BODY, self.signature, other))
+
+    def test_a_signature_of_another_size_or_alphabet_is_refused(self):
+        short = base64.b64encode(self.private.sign(self.BODY)[:63]).decode("ascii")
+        self.assertFalse(signed(self.BODY, short, self.key))
+        # Only a signature whose base64 holds + or / changes in the URL-safe alphabet.
+        body = next(
+            body for body in (self.BODY + b" " * count for count in range(64))
+            if set(base64.b64encode(self.private.sign(body))) & set(b"+/")
+        )
+        urlsafe = base64.urlsafe_b64encode(self.private.sign(body)).decode("ascii")
+        self.assertFalse(signed(body, urlsafe, self.key))
+
+    def test_a_trailing_newline_is_accepted(self):
+        self.assertTrue(signed(self.BODY, self.signature + "\n", self.key))
+        self.assertTrue(signed(self.BODY, (self.signature + "\r\n").encode("ascii"), self.key))
+        self.assertFalse(signed(self.BODY, self.signature[:40] + "\n" + self.signature[40:], self.key))
+
+    def test_a_key_of_small_order_verifies_nothing(self):
+        # Under the identity key, R = identity and S = 0 verify for any body.
+        prefix = base64.b64decode(self.key)[:12]
+        identity = bytes([1]) + bytes(31)
+        key = base64.b64encode(prefix + identity).decode("ascii")
+        forged = base64.b64encode(identity + bytes(32)).decode("ascii")
+        self.assertFalse(signed(self.BODY, forged, key))
+
+
+class Containment(unittest.TestCase):
+    """Rules 21 and 28: an archive url is parsed and has to be under a prefix in `downloads`."""
+
+    PREFIXES = ["https://cdn.example.org/archives/"]
+
+    def test_a_url_under_the_prefix_is_within(self):
+        self.assertTrue(_within("https://cdn.example.org/archives/R-1.0.0.zip", self.PREFIXES))
+        self.assertTrue(_within("https://CDN.example.org:443/archives/a/R-1.0.0.zip", self.PREFIXES))
+
+    def test_a_url_that_only_looks_under_the_prefix_is_not(self):
+        for url in (
+            "https://cdn.example.org.evil/archives/R.zip",
+            "https://cdn.example.org/archives/../private/R.zip",
+            "https://cdn.example.org/archives/%2e%2e/private/R.zip",
+            "https://cdn.example.org/archives/%2E%2E%2Fprivate/R.zip",
+            "https://user@cdn.example.org/archives/R.zip",
+            "https://cdn.example.org:8443/archives/R.zip",
+            "http://cdn.example.org/archives/R.zip",
+            "https://cdn.example.org/archives-old/R.zip",
+            "https://[cdn.example.org/archives/R.zip",
+        ):
+            self.assertFalse(_within(url, self.PREFIXES), url)
+
+
+class DataHosts(unittest.TestCase):
+    """RFC 0104: a data host's release list counts only with a signature by `key`."""
+
+    def setUp(self):
+        self.private, self.key = signing_key("content-index-releases data host")
+
+    def test_a_list_signed_by_key_gives_the_releases_from_url_and_date(self):
+        http = DataHost([data_entry()], self.private)
+        [release], etag = data_host(http, self.key).releases()
+        self.assertEqual(release.url, f"{CDN}ExampleRover-1.0.0.zip")
+        self.assertEqual(release.archives, (release.url,))
+        self.assertEqual((release.release_date, release.status, release.problem), ("2026-10-11T09:14:30Z", "stable", None))
+        self.assertEqual((release.downloads, release.size, release.asset_name), (None, None, None))
+        self.assertEqual([url for url, _, _ in http.asked], [DATA_LIST, DATA_LIST + ".sig"])
+        self.assertTrue(etag.split(" ")[1].startswith('"'))
+
+    def test_a_wrong_or_missing_signature_is_a_host_error(self):
+        other, _ = signing_key("another data host")
+        for signature in (
+            base64.b64encode(other.sign(b"{}")),
+            base64.b64encode(self.private.sign(b"another list")),
+            b"not base64",
+            b"",
+            http_error(404),
+        ):
+            with self.assertRaises(HostError, msg=signature) as caught:
+                data_host(DataHost([data_entry()], self.private, signature), self.key).releases()
+            self.assertIn("has no valid signature by key", str(caught.exception))
+
+    def test_a_signature_by_a_retired_key_alone_is_a_host_error(self):
+        # Rule 22: a retired key checks an old record and never a live read.
+        _, new = signing_key("the next data host key")
+        with self.assertRaises(HostError):
+            data_host(DataHost([data_entry()], self.private), new, retired=[self.key]).releases()
+
+    def test_a_url_outside_downloads_or_a_missing_date_is_a_problem(self):
+        tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        entries = [
+            data_entry("1.0.0", url="https://cdn.example.org.evil/archives/ExampleRover-1.0.0.zip"),
+            data_entry("1.0.1", url="https://data.example.org/share/ExampleRover-1.0.1.zip"),
+            data_entry("1.0.2", date=None),
+            data_entry("1.0.3", date="yesterday"),
+            data_entry("1.0.4", date="2026-10-11"),
+            data_entry("1.0.5", date="2026-10-11T09:14:30"),
+            data_entry("1.0.6", date=tomorrow),
+        ]
+        releases, _ = data_host(DataHost(entries, self.private), self.key).releases()
+        for release in releases:
+            self.assertIsNotNone(release.problem, release.tag)
+            with self.assertRaises(StampError, msg=release.tag):
+                data_host(DataHost([], self.private), self.key).download(release)
+        self.assertEqual([release.url for release in releases[:2]], [None, None])
+        self.assertIn("downloads", releases[0].problem)
+        for release in releases[2:]:
+            self.assertIn("date", release.problem, release.tag)
+        self.assertIn("future", releases[6].problem)
+
+    def test_an_unchanged_list_sends_no_signature_request(self):
+        http = DataHost([data_entry()], self.private)
+        host = data_host(http, self.key)
+        _, etag = host.releases()
+        http.asked.clear()
+        self.assertEqual(host.releases(etag), (None, etag))
+        self.assertEqual([url for url, _, _ in http.asked], [DATA_LIST])
+
+    def test_no_request_uses_the_api_or_carries_the_token(self):
+        http = DataHost([data_entry()], self.private)
+        host = data_host(http, self.key)
+        _, etag = host.releases()
+        host.releases(etag)
+        self.assertEqual(len(http.asked), 3)
+        for url, api, headers in http.asked:
+            self.assertFalse(api, url)
+            self.assertNotIn("Authorization", headers, url)
+
+
+class Moved(Answer):
+    """An Answer whose final URL, after its redirects, is `url`."""
+
+    def __init__(self, body, url):
+        super().__init__(body)
+        self.url = url
+
+    def geturl(self):
+        return self.url
+
+
+class Redirects(unittest.TestCase):
+    """Rule 28: a data host's archive follows a redirect only while it stays under `downloads`."""
+
+    INSIDE = f"{CDN}ExampleRover-1.0.0.zip"
+    OUTSIDE = "https://elsewhere.example.org/ExampleRover-1.0.0.zip"
+
+    def test_a_hop_outside_downloads_is_refused(self):
+        handler = _Contained([CDN])
+        request = urllib.request.Request(self.INSIDE)
+        moved = handler.redirect_request(request, None, 302, "Found", {}, f"{CDN}mirror/ExampleRover-1.0.0.zip")
+        self.assertEqual(moved.full_url, f"{CDN}mirror/ExampleRover-1.0.0.zip")
+        with self.assertRaises(RedirectError):
+            handler.redirect_request(request, None, 302, "Found", {}, self.OUTSIDE)
+
+    def test_a_final_url_outside_downloads_is_a_stamp_error_before_any_byte_is_read(self):
+        for final, refused in ((self.OUTSIDE, True), (self.INSIDE, False)):
+            answer = Moved(b"zip", final)
+            with patch("hosts.urllib.request.build_opener") as build_opener:
+                build_opener.return_value.open.side_effect = [answer]
+                if refused:
+                    with self.assertRaises(StampError) as caught:
+                        download(Http(), release(self.INSIDE), within=(CDN,))
+                    self.assertIn("redirects outside its downloads", str(caught.exception))
+                    self.assertEqual(answer.read_bytes, 0)
+                else:
+                    archive, _ = download(Http(), release(self.INSIDE), within=(CDN,))
+                    with archive:
+                        self.assertEqual(archive.size, 3)
+
+    def test_a_listed_copy_of_a_data_host_is_downloaded_without_containment(self):
+        class Archives(DataHost):
+            def archive(self, url, **options):
+                self.asked.append((url, options))
+                return Archive.of_bytes(b"zip"), {}
+
+        private, key = signing_key("content-index-releases mirror")
+        copy = "https://archive.org/download/x/ExampleRover-1.0.0.zip"
+        http = Archives([dict(data_entry(), mirrors=[copy])], private)
+        host = data_host(http, key)
+        [entry], _ = host.releases()
+        mirror, served = listed_mirrors(host, entry)[0]
+        archive, _ = mirror.download(served)
+        archive.close()
+        self.assertEqual(http.asked[-1], (copy, {"api": False, "limit": 8}))
+
+
+class LazyImport(unittest.TestCase):
+    def test_the_tools_import_without_cryptography(self):
+        # The jobs that verify nothing install no package, and content-index
+        # imports this module too, so only a signature check may need the package.
+        code = (
+            "import sys; sys.modules['cryptography'] = None\n"
+            "import hosts, watch, decide, download_counts, build_snapshot\n"
+            "print(hosts.signature_ready())\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], cwd=Path(__file__).parent,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, "False"), result.stderr)
 
 
 if __name__ == "__main__":

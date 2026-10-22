@@ -42,11 +42,23 @@ jobs:
           repository: KSAModding/content-index
           path: .authored
 
+      # The ownership check verifies the signatures of a data host with the
+      # cryptography package. No pip cache, because this job holds the App key.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: pip install --only-binary=:all: -r tools/requirements.txt
+
+      # A pull request can change checks.yml and so put any file into this
+      # artifact. It goes outside the checkout, so it can not replace the tools
+      # or the authored half, and after the install, so it can not change what
+      # pip installs.
       - uses: actions/download-artifact@v8
         id: verdict
         continue-on-error: true
         with:
           name: validation-verdict
+          path: ${{ runner.temp }}/verdict
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
 
@@ -72,8 +84,8 @@ jobs:
           RUN_URL: ${{ github.event.workflow_run.html_url }}
         run: |
           set -euo pipefail
-          python3 tools/decide.py \
-            --verdict verdict.json \
+          python tools/decide.py \
+            --verdict "$RUNNER_TEMP/verdict/verdict.json" \
             --authored .authored \
             --event "$EVENT" \
             --head-repository "$HEAD_REPOSITORY" \

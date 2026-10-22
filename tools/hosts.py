@@ -16,8 +16,18 @@ validator, so a SpaceDock authority costs one request per tick. A share host
 (RFC 0094) is a host that `hosts.toml` of the authored repository registers. Its
 release list and its archives are in a GitHub repository, its `storage`, and
 the list is polled conditionally too.
+
+A share host without GitHub storage (RFC 0104) names `data`, `downloads` and
+`key` instead. Each data file comes with an Ed25519 signature beside it, and
+only a signature by `key` makes a live read valid (rule 22 of
+spec/share-host.md). The earlier keys in `retired_keys` are read and checked
+for their form, but they never verify a live read, because they exist only so
+that old recorded signatures can still be checked. The `cryptography` package
+is imported only when a signature is checked, so this module and the modules
+that import it still load on a runner that installs nothing.
 """
 
+import base64
 import dataclasses
 import hashlib
 import http.client
@@ -94,6 +104,48 @@ FULL_READ_HOURS = 24
 REFUSED_READ_HOURS = 1
 
 REPOSITORY = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+
+# The longest .sig file of a data host that is read. A signature is 88
+# characters of base64, so a file near this size holds no signature.
+MAX_SIGNATURE = 1024
+
+# The sizes of an Ed25519 SubjectPublicKeyInfo and of an Ed25519 signature.
+SPKI_BYTES = 44
+SIGNATURE_BYTES = 64
+
+# The point encodings of small order that libsodium refuses, each with the
+# sign bit clear and set. One fixed signature is valid for every body under
+# such a key, so signed refuses it. This list is a copy of SMALL_ORDER in
+# tools/signature.py of content-index, and the two must stay the same.
+_SMALL_ORDER_BASES = (
+    "0100000000000000000000000000000000000000000000000000000000000000",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+)
+SMALL_ORDER = frozenset(
+    bytes.fromhex(base[:-2]) + bytes([int(base[-2:], 16) | sign])
+    for base in _SMALL_ORDER_BASES
+    for sign in (0x00, 0x80)
+)
+
+# The `date` of a data-host entry is an RFC 3339 time in UTC (rule 21). It is
+# the only source of `release_date` for such a host, so a date without a time,
+# a time without an offset or a basic-format time is refused, not guessed.
+RFC3339_UTC = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-]00:00)")
+
+# How far past the clock of the watcher a data-host date may be. A later date
+# would make every real release after it look like history, so it is a problem.
+DATE_SKEW = timedelta(minutes=10)
+
+ASCII_WHITESPACE = " \t\n\r\x0b\x0c"
+
+# A percent-encoded dot, slash or backslash in a path, which a server can
+# decode into a segment that leaves the prefix the path seems to be under.
+ENCODED_SEPARATOR = re.compile(r"%(2e|2f|5c)", re.IGNORECASE)
 
 
 class HostError(Exception):
@@ -194,12 +246,14 @@ class Http:
             ),
         )
 
-    def archive(self, url, api=False, limit=None):
+    def archive(self, url, api=False, limit=None, within=None):
         """GET an archive into an anonymous temporary file.
 
         Returns (Archive, headers). The SHA-256 and size are taken while the
         body streams, and a retry starts the file again. Raises what `get`
-        raises, and OversizeError past `limit` or MAX_ARCHIVE_BYTES.
+        raises, and OversizeError past `limit` or MAX_ARCHIVE_BYTES. With
+        `within`, every redirect and the final URL have to be under one of
+        those base URLs, or RedirectError comes before any byte is read.
         """
         return self._send(
             url,
@@ -208,6 +262,7 @@ class Http:
                 _stream(answer, limit or MAX_ARCHIVE_BYTES),
                 dict(answer.headers),
             ),
+            within,
         )
 
     def status(self, url, api=False):
@@ -231,14 +286,24 @@ class Http:
             headers["X-GitHub-Api-Version"] = "2022-11-28"
         return headers
 
-    def _send(self, url, headers, read):
-        """The retry loop around one GET, with `read` turning the answer into the result."""
+    def _send(self, url, headers, read, within=None):
+        """The retry loop around one GET, with `read` turning the answer into the result.
+
+        With `within`, a redirect outside those base URLs is refused as RedirectError,
+        which is not retried because the next attempt meets the same redirect.
+        """
         last = None
         for attempt in range(self.retries):
             request = urllib.request.Request(url, headers=headers, method="GET")
+            if within is None:
+                open_url = urllib.request.urlopen
+            else:
+                open_url = urllib.request.build_opener(_Contained(within)).open
             try:
                 self.requests += 1
-                with urllib.request.urlopen(request, timeout=self.timeout) as answer:
+                with open_url(request, timeout=self.timeout) as answer:
+                    if within is not None and not _within(answer.geturl(), within):
+                        raise RedirectError(answer.geturl())
                     return read(answer)
             except urllib.error.HTTPError as error:
                 if error.code == 304:
@@ -257,6 +322,22 @@ class Http:
                 time.sleep(2 ** attempt)
 
         raise HostError(f"{url}: {last}")
+
+
+class RedirectError(Exception):
+    """A redirect that would take a download outside the `downloads` of its host. Its message is the URL it went to."""
+
+
+class _Contained(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to a URL under one of the base URLs `within` (rule 28 of spec/share-host.md)."""
+
+    def __init__(self, within):
+        self.within = within
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _within(newurl, self.within):
+            raise RedirectError(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _read(answer, limit):
@@ -382,6 +463,123 @@ def _on_host(base, value, what):
             f"{wanted.netloc}"
         )
     return resolved
+
+
+def _https_url(value):
+    """The split parts of `value` when it is an https URL with a host, no user info and a clean path, else None.
+
+    A clean path has no `.` or `..` segment and no percent-encoded dot, slash or
+    backslash, because a server can resolve each of them to a path outside the
+    prefix that the text seems to be under.
+    """
+    if not isinstance(value, str) or "\\" in value or any(char <= " " or char == "\x7f" for char in value):
+        return None
+    try:
+        parts = urllib.parse.urlsplit(value)
+        parts.port
+    except ValueError:
+        return None
+    if parts.scheme != "https" or not parts.hostname or "@" in parts.netloc:
+        return None
+    if ENCODED_SEPARATOR.search(parts.path) or any(segment in (".", "..") for segment in parts.path.split("/")):
+        return None
+    return parts
+
+
+def _base_url(value):
+    """Whether `value` is an https base URL that ends in '/', as `data` and each prefix of `downloads` are."""
+    parts = _https_url(value)
+    return parts is not None and parts.path.endswith("/") and not parts.query and not parts.fragment
+
+
+def _within(url, prefixes):
+    """Whether `url` is under one of the base URLs `prefixes` (rules 21 and 28 of spec/share-host.md).
+
+    Both sides are parsed and never compared as text, so a look-alike host such
+    as cdn.example.org.evil is not under cdn.example.org. The url has to use
+    https without user info, name the same host and port as the prefix, and
+    have a clean path that starts with the path of the prefix.
+    """
+    got = _https_url(url)
+    if got is None:
+        return False
+    for prefix in prefixes:
+        if not _base_url(prefix):
+            continue
+        wanted = urllib.parse.urlsplit(prefix)
+        if (got.hostname, got.port or 443) == (wanted.hostname, wanted.port or 443) and got.path.startswith(wanted.path):
+            return True
+    return False
+
+
+def _base64(text):
+    """The bytes that `text` holds as strict, padded, standard base64, or None.
+
+    The decoded bytes must encode back to the same text, so the URL-safe
+    alphabet, whitespace inside the text, a missing pad and stray bits are
+    all refused.
+    """
+    try:
+        raw = base64.b64decode(text, validate=True)
+    except ValueError:
+        return None
+    return raw if base64.b64encode(raw).decode("ascii") == text else None
+
+
+def signature_ready():
+    """Whether the cryptography package imports, so that a data host can be verified at all."""
+    try:
+        import cryptography.hazmat.primitives.asymmetric.ed25519  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def signed(body, signature_text, key):
+    """Whether `signature_text` is a valid Ed25519 signature of the exact bytes `body` by `key`.
+
+    `key` is one key text, the standard padded base64 of a 44-byte Ed25519
+    SubjectPublicKeyInfo, and never a list, so that a retired key cannot verify
+    a live read (rule 22). The signature is the text of a .sig file, as bytes or
+    str of at most MAX_SIGNATURE bytes. Surrounding ASCII whitespace is
+    stripped, so a trailing newline is allowed, and the rest has to be strict
+    standard base64 of exactly 64 bytes. The signature is checked over the raw
+    bytes before anything decodes them. A missing cryptography package is a
+    HostError and never False, because it is a fault of the run and not of the
+    host.
+    """
+    try:
+        from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        from cryptography.hazmat.primitives.serialization import load_der_public_key
+    except ImportError as error:
+        raise HostError("cryptography is not installed, so the signature of a data host cannot be checked") from error
+    if isinstance(signature_text, (bytes, bytearray)):
+        if len(signature_text) > MAX_SIGNATURE:
+            return False
+        try:
+            signature_text = bytes(signature_text).decode("ascii")
+        except UnicodeDecodeError:
+            return False
+    if not isinstance(signature_text, str) or len(signature_text) > MAX_SIGNATURE or not isinstance(key, str):
+        return False
+    signature = _base64(signature_text.strip(ASCII_WHITESPACE))
+    der = _base64(key)
+    if signature is None or len(signature) != SIGNATURE_BYTES or der is None or len(der) != SPKI_BYTES:
+        return False
+    if der[12:] in SMALL_ORDER:
+        return False
+    try:
+        public = load_der_public_key(der)
+    except (ValueError, UnsupportedAlgorithm):
+        return False
+    if not isinstance(public, Ed25519PublicKey):
+        return False
+    try:
+        public.verify(signature, bytes(body))
+    except InvalidSignature:
+        return False
+    return True
 
 
 class Host:
@@ -620,19 +818,27 @@ class SpaceDockHost(Host):
 
 
 class ShareHost(Host):
-    """The releases of one listing on a share host, read from its storage repository (RFC 0094).
+    """The releases of one listing on a share host (RFC 0094 and RFC 0104).
 
-    The release list in `storage` names the versions, and the GitHub release of
-    each version gives the archive, the date and the download count. The host's
-    own service is never asked. The stored ETag carries the time of the next
-    full read, see FULL_READ_HOURS.
+    With `storage`, the release list in that GitHub repository names the
+    versions, and the GitHub release of each version gives the archive, the date
+    and the download count. With `data`, the host serves the release list
+    itself, and each entry gives the archive in its `url` and the date in its
+    `date`. That list is read over plain HTTPS without the token, and it counts
+    only with a valid signature by `key` beside it (rule 22). Such a host has no
+    download counts. The host's own service is never asked. The stored ETag
+    carries the time of the next full read, see FULL_READ_HOURS.
     """
 
     kind = "share"
 
     def __init__(self, name, table, listing_id, content_type, http, max_releases=500):
         self.name = name
-        self.storage = table["storage"]
+        self.storage = table.get("storage")
+        self.data = table.get("data")
+        self.downloads = tuple(table.get("downloads") or ())
+        # The signing key of `data`. The name `key` is taken by the cache key.
+        self.public_key = table.get("key")
         self.listing_id = listing_id
         self.content_type = content_type
         self.http = http
@@ -649,20 +855,28 @@ class ShareHost(Host):
     def releases(self, etag=None):
         self.truncated = False
         path = SHARE_LIST.format(type=self.content_type, id=self.listing_id)
-        url = f"{GITHUB_API}/repos/{self.storage}/contents/{urllib.parse.quote(path)}"
         try:
-            answer = self.http.get(
-                url, accept="application/vnd.github.raw+json", etag=_current(etag), api=True
-            )
+            if self.data is None:
+                where = self.storage
+                url = f"{GITHUB_API}/repos/{self.storage}/contents/{urllib.parse.quote(path)}"
+                answer = self.http.get(
+                    url, accept="application/vnd.github.raw+json", etag=_current(etag), api=True
+                )
+            else:
+                where = self.data
+                url = self.data + urllib.parse.quote(path)
+                answer = self.http.get(url, etag=_current(etag), api=False)
         except urllib.error.HTTPError as error:
             if error.code in (404, 451):
                 raise StampError(
                     f"the share host `{self.name}` has no release list for this listing: "
-                    f"{self.storage} holds no {path}"
+                    f"{where} holds no {path}"
                 ) from error
             raise HostError(f"{url}: HTTP {error.code}") from error
         if answer.status == 304:
             return None, etag
+        if self.data is not None:
+            self._verify(url, answer.body)
 
         payload = _parse_json(url, answer.body)
         if not isinstance(payload, dict):
@@ -681,12 +895,29 @@ class ShareHost(Host):
             entries = entries[-self.max_releases:]
 
         releases = [self._release(entry) for entry in entries]
-        tag = answer.headers.get("ETag")
+        # A host other than GitHub can send the header name in another case.
+        tag = next((value for name, value in answer.headers.items() if name.lower() == "etag"), None)
         if not tag:
             return releases, None
         hours = REFUSED_READ_HOURS if any(item.problem for item in releases) else FULL_READ_HOURS
         due = datetime.now(timezone.utc) + timedelta(hours=hours)
         return releases, f"{due.strftime('%Y-%m-%dT%H:%M:%SZ')} {tag}"
+
+    def _verify(self, url, body):
+        """HostError unless the .sig beside `url` is a valid signature of `body` by `key` (rule 22).
+
+        A retired key never makes a live read valid, so during a key rotation
+        the listings of the host wait until it signs its files again.
+        """
+        problem = f"{url} has no valid signature by key"
+        try:
+            answer = self.http.get(url + ".sig", api=False, limit=MAX_SIGNATURE)
+        except urllib.error.HTTPError as error:
+            raise HostError(f"{problem}, because its .sig answers HTTP {error.code}") from error
+        except OversizeError as error:
+            raise HostError(f"{problem}, because its .sig is larger than {MAX_SIGNATURE} bytes") from error
+        if answer.status != 200 or not signed(body, answer.body, self.public_key):
+            raise HostError(problem)
 
     def _release(self, entry):
         version = entry.get("version")
@@ -697,6 +928,8 @@ class ShareHost(Host):
                 host=self.kind, tag=tag, tag_prefix=prefix, version=None,
                 release_date=None, url=None,
             )
+        if self.data is not None:
+            return self._data_release(entry, tag, prefix, version)
 
         problem = None
         payload = self._github_release(tag)
@@ -734,6 +967,36 @@ class ShareHost(Host):
             mirrors=self._mirrors(tag, entry.get("mirrors")),
         )
 
+    def _data_release(self, entry, tag, prefix, version):
+        """A release of the list that `data` serves, made from the url and the date of its entry (rule 21)."""
+        url, date, status = entry.get("url"), entry.get("date"), entry.get("status")
+        kept = url if _within(url, self.downloads) else None
+        release_date = _utc(date) if isinstance(date, str) and RFC3339_UTC.fullmatch(date) else None
+        problem = None
+        if kept is None:
+            problem = (
+                f"the url {url!r} of `{tag}` is not an https URL under a prefix "
+                f"in downloads of `{self.name}`"
+            )
+        elif release_date is None:
+            problem = f"the date {date!r} of `{tag}` is not an RFC 3339 time in UTC"
+        elif datetime.fromisoformat(release_date) > datetime.now(timezone.utc) + DATE_SKEW:
+            problem = f"the date {date!r} of `{tag}` is in the future"
+        elif status not in SHARE_STATUSES:
+            problem = f"the status {status!r} is not one of {', '.join(SHARE_STATUSES)}"
+        return HostRelease(
+            host=self.kind,
+            tag=tag,
+            tag_prefix=prefix,
+            version=_version_of(version),
+            release_date=release_date,
+            url=kept,
+            archives=(kept,) if kept else (),
+            status=status if status in SHARE_STATUSES else None,
+            problem=problem,
+            mirrors=self._mirrors(tag, entry.get("mirrors")),
+        )
+
     def _github_release(self, tag):
         """The published GitHub release tagged `tag` in storage, or None."""
         url = f"{GITHUB_API}/repos/{self.storage}/releases/tags/{urllib.parse.quote(tag, safe='')}"
@@ -761,7 +1024,8 @@ class ShareHost(Host):
     def download(self, release):
         if release.problem:
             raise StampError(release.problem)
-        return download(self.http, release, self.max_bytes)
+        within = self.downloads if self.data is not None else None
+        return download(self.http, release, self.max_bytes, within)
 
 
 class ListedMirror(Host):
@@ -788,7 +1052,8 @@ class ListedMirror(Host):
         )
 
     def download(self, release):
-        return self.host.download(release)
+        # A copy is on the Internet Archive and not under the `downloads` of the host.
+        return download(self.host.http, release, self.host.max_bytes)
 
 
 def listed_mirror_url(url):
@@ -819,10 +1084,12 @@ def _current(etag):
     return tag if tag and datetime.now(timezone.utc) < moment else None
 
 
-def download(http, release, limit=None):
+def download(http, release, limit=None, within=None):
     """The archive of `release`, as (Archive, content type). The caller closes the Archive.
 
     `limit` is the largest archive the host takes, MAX_ARCHIVE_BYTES when it names none.
+    `within` is the `downloads` of a data host, which every redirect has to stay under.
+
     Shared with the release pull request check, which downloads from the URL a
     submission names rather than from a host it polled.
     """
@@ -841,8 +1108,14 @@ def download(http, release, limit=None):
             f"the archive is {_mib(release.size)}, above the {_mib(limit)} limit"
         )
     api = urllib.parse.urlsplit(release.url).hostname == GITHUB_API_HOST
+    # Only a data host passes `within`, so the Http of the other callers needs no such parameter.
+    contained = {} if within is None else {"within": within}
     try:
-        archive, headers = http.archive(release.url, api=api, limit=limit)
+        archive, headers = http.archive(release.url, api=api, limit=limit, **contained)
+    except RedirectError as error:
+        raise StampError(
+            f"the archive at {release.url} redirects outside its downloads, to {error}"
+        ) from error
     except OversizeError as error:
         # Permanent, unlike the transient failures HostError stands for: the
         # release stays too large next tick too, so the author hears about it
@@ -976,12 +1249,27 @@ def _share_table(key, table):
         )
     if table.get("kind") != "share":
         raise HostError(f"the host `{key}` of {HOSTS} is of kind {table.get('kind')!r}, and only share is read")
-    storage = table.get("storage")
-    if not isinstance(storage, str) or not REPOSITORY.fullmatch(storage):
+    storage, data = table.get("storage"), table.get("data")
+    if (storage is None) == (data is None):
         raise HostError(
-            f"the host `{key}` of {HOSTS} names no storage repository as owner/repo, "
-            "and a host that serves its files itself is not read yet"
+            f"the host `{key}` of {HOSTS} names {'both' if data is not None else 'neither'} storage "
+            "and data, and a share host names exactly one of them"
         )
+    if storage is not None and (not isinstance(storage, str) or not REPOSITORY.fullmatch(storage)):
+        raise HostError(f"the host `{key}` of {HOSTS} names no storage repository as owner/repo")
+    if data is not None:
+        downloads = table.get("downloads")
+        if not _base_url(data) or not isinstance(downloads, list) or not downloads or not all(
+            _base_url(prefix) for prefix in downloads
+        ):
+            raise HostError(
+                f"the host `{key}` of {HOSTS} needs data and a list of downloads as https URLs that end in '/'"
+            )
+        retired = table.get("retired_keys", [])
+        if not isinstance(table.get("key"), str) or not isinstance(retired, list) or not all(
+            isinstance(value, str) for value in retired
+        ):
+            raise HostError(f"the host `{key}` of {HOSTS} needs a key, and retired_keys as a list of keys")
     types = table.get("types")
     limits = table.get("max_bytes", {})
     if not isinstance(types, list) or not isinstance(limits, dict) or not all(
