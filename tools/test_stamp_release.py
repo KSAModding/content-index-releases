@@ -17,21 +17,28 @@ import tempfile
 import unittest
 import zipfile
 from datetime import datetime, timezone
+from pathlib import Path
+from unittest.mock import patch
 
+from check_release import authored_root
 from stamp_release import (
     CHANGELOG_TEXT_LIMIT,
     Archive,
     StampError,
     changelog_text,
+    check_folder,
     derived_dependencies,
+    folder_holders,
     merge_dependencies,
     normalize_version,
     relative_path,
     release_status,
     resolve_bound,
+    save_name_problem,
     serialize,
     stamp,
     valid_id,
+    valid_save_name,
 )
 
 GAME_VERSIONS = [
@@ -495,6 +502,289 @@ class Ids(unittest.TestCase):
         listing = dict(LISTING, id="../AutoStage")
         with self.assertRaises(StampError):
             stamp(listing, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW)
+
+
+class SaveNames(unittest.TestCase):
+    """The name rule of RFC 0085, as `SaveName.IsSanitized` decides it."""
+
+    def test_names_the_game_keeps(self):
+        for name in ("Example Rover", "Rover_2-b", "CON_", "a" * 64, "R\xe4ver", "-"):
+            with self.subTest(name=name):
+                self.assertTrue(valid_save_name(name))
+                self.assertIsNone(save_name_problem(name))
+
+    def test_names_the_game_changes(self):
+        for name in (
+            "", "a" * 65, " Rover", "Rover ", "Two  spaces", "con", "Lpt9", "Rover.v2",
+            "Rover\xb2", "\U0001d400", "Rover\n", None, 7,
+        ):
+            with self.subTest(name=name):
+                self.assertFalse(valid_save_name(name))
+                self.assertTrue(save_name_problem(name))
+
+    def test_the_limit_counts_utf_16_code_units(self):
+        self.assertIn("65 UTF-16 code units", save_name_problem("a" * 63 + "\U0001d400"))
+
+    def test_a_character_the_game_drops_is_named(self):
+        self.assertIn("U+00B2", save_name_problem("Rover\xb2"))
+
+    def test_the_vector_file_of_the_authored_repository(self):
+        path = authored_root() / "schemas" / "save-names.json"
+        if not path.is_file():
+            self.skipTest(f"{path} is not there yet")
+        vectors = json.loads(path.read_text(encoding="utf-8"))["vectors"]
+        self.assertTrue(vectors)
+        for vector in vectors:
+            with self.subTest(name=vector["name"]):
+                self.assertEqual(valid_save_name(vector["value"]), vector["accepted"], vector.get("why"))
+
+
+VEHICLE = {
+    "spec_version": 1,
+    "id": "ExampleRover",
+    "type": "vehicle",
+    "name": "Example Rover",
+    "authors": ["Maxi"],
+    "abstract": "A rover for the Moon.",
+    "license": "CC-BY-4.0",
+    "dependencies": [{"id": "KittenExtensions", "kind": "required", "min": "0.4"}],
+}
+
+# As the game writes it, with seven fraction digits in a local date-time.
+META = """\
+name = "Example Rover"
+created = 2026-09-22T14:22:28.6152545
+updated = 2026-09-22T14:30:01.1000000
+version = "v2026.9.22.5482"
+systems = [ "Sol", ]
+"""
+
+VEHICLE_XML = '<?xml version="1.0" encoding="utf-8"?>\n<VehicleSaveData><Parts /></VehicleSaveData>\n'
+
+UNIVERSE_XML = '<?xml version="1.0" encoding="utf-8"?>\n<UniverseData />\n'
+
+
+def game_archive(folder="Example Rover", meta=META, game="vehicle.xml", content=VEHICLE_XML, **more):
+    prefix = f"{folder}/" if folder else ""
+    files = {f"{prefix}meta.toml": meta, f"{prefix}{game}": content}
+    files.update({f"{prefix}{name}": text for name, text in more.items()})
+    return archive(files)
+
+
+class Vehicles(unittest.TestCase):
+    """RFC 0085: a vehicle is stamped from the game folder in its archive."""
+
+    def stamp(self, listing=None, data=None, notes=None, **changes):
+        return stamp(
+            {**(listing or VEHICLE), **changes},
+            dict(RELEASE, tag="1.0.0"),
+            data if data is not None else game_archive(),
+            GAME_VERSIONS,
+            now=NOW,
+            notes=notes,
+        )
+
+    def refused(self, data=None, **changes):
+        with self.assertRaises(StampError) as raised:
+            self.stamp(data=data, **changes)
+        return str(raised.exception)
+
+    def test_one_top_level_folder_is_the_example_of_the_rfc(self):
+        notes = []
+        document = self.stamp(notes=notes)
+        self.assertEqual(
+            document["install"], {"root": "Example Rover", "derived": True, "folder": "Example Rover"}
+        )
+        self.assertEqual((document["game_min"], document["game_min_revision"]), ("2026.9.22.5482", 5482))
+        self.assertEqual(
+            document["dependencies"],
+            [{"id": "KittenExtensions", "kind": "required", "min": "0.4.0", "source": "authored"}],
+        )
+        self.assertNotIn("loader", document)
+        self.assertEqual(document["install_size"], len(META) + len(VEHICLE_XML))
+        self.assertEqual(notes, [])
+
+    def test_a_folder_at_the_archive_root(self):
+        document = self.stamp(data=game_archive(folder=""))
+        self.assertEqual(document["install"], {"derived": True, "folder": "Example Rover"})
+
+    def test_an_authored_root(self):
+        data = archive({"share/Example Rover/meta.toml": META, "share/Example Rover/vehicle.xml": VEHICLE_XML})
+        document = self.stamp(data=data, install={"root": "share/Example Rover"})
+        self.assertEqual(
+            document["install"], {"root": "share/Example Rover", "derived": False, "folder": "Example Rover"}
+        )
+
+    def test_an_authored_game_min_wins(self):
+        document = self.stamp(compatibility={"game_min": "2026.8.3.5117"})
+        self.assertEqual((document["game_min"], document["game_min_revision"]), ("2026.8.3.5117", 5117))
+        meta = META.replace("v2026.9.22.5482", "v2026.9.22.5482-beta")
+        document = self.stamp(data=game_archive(meta=meta), compatibility={"game_min": "2026.8.3.5117"})
+        self.assertEqual(document["game_min_revision"], 5117)
+
+    def test_a_version_that_is_no_build_needs_an_authored_game_min(self):
+        for version, reason in (
+            ("v2026.9.22.5482-beta", "without a suffix"),
+            ("0.0.0.0", "unknown build"),
+            ("2026.9.22", "without a suffix"),
+            ("v2026.9.22.5482\\n", "without a suffix"),
+        ):
+            meta = META.replace("v2026.9.22.5482", version)
+            with self.subTest(version=version):
+                self.assertIn(reason, self.refused(data=game_archive(meta=meta)))
+        self.assertIn("without a suffix", self.refused(data=game_archive(meta='name = "Example Rover"\n')))
+
+    def test_the_meta_toml_has_to_be_there_and_parse(self):
+        self.assertIn("meta.toml", self.refused(data=archive({"Example Rover/vehicle.xml": VEHICLE_XML})))
+        data = archive({"Example Rover/vehicle.xml": VEHICLE_XML})
+        self.assertIn(
+            "has no Example Rover/meta.toml", self.refused(data=data, install={"root": "Example Rover"})
+        )
+        self.assertIn("not valid TOML", self.refused(data=game_archive(meta="name = ")))
+
+    def test_the_name_has_to_pass_the_name_rule(self):
+        self.assertIn("no `name` string", self.refused(data=game_archive(meta='version = "v2026.9.22.5482"\n')))
+        self.assertIn("no `name` string", self.refused(data=game_archive(meta=META.replace('"Example Rover"', "7"))))
+        meta = META.replace('"Example Rover"', '"Example  Rover"')
+        self.assertIn("two spaces", self.refused(data=game_archive(folder="Example  Rover", meta=meta)))
+
+    def test_the_folder_has_to_be_the_name(self):
+        self.assertIn("does not match", self.refused(data=game_archive(folder="Rover")))
+        self.assertIn("casing", self.refused(data=game_archive(folder="example rover")))
+
+    def test_the_game_file_has_to_be_there_with_its_exact_case(self):
+        data = archive({"Example Rover/meta.toml": META})
+        self.assertIn("has no Example Rover/vehicle.xml", self.refused(data=data))
+        refused = self.refused(data=game_archive(game="Vehicle.xml"))
+        self.assertIn("'Example Rover/Vehicle.xml'", refused)
+        self.assertIn("exact case", refused)
+
+    def test_the_game_file_has_to_be_well_formed_xml(self):
+        self.assertIn("not well-formed", self.refused(data=game_archive(content="<VehicleSaveData>")))
+        self.assertIn("not well-formed", self.refused(data=game_archive(content="")))
+
+    def test_a_doctype_is_refused(self):
+        content = '<?xml version="1.0"?>\n<!DOCTYPE a [<!ENTITY x "y">]>\n<a>&x;</a>\n'
+        self.assertIn("DOCTYPE", self.refused(data=game_archive(content=content)))
+
+    def test_a_game_file_above_the_limit_is_refused_before_it_is_read(self):
+        with patch("stamp_release.GAME_FILE_LIMIT", len(VEHICLE_XML) - 1):
+            self.assertIn("byte limit", self.refused())
+        with patch("stamp_release.GAME_FILE_LIMIT", len(VEHICLE_XML)):
+            self.stamp()
+
+    def test_two_game_folders_are_not_derivable(self):
+        data = archive({
+            "Example Rover/meta.toml": META, "Example Rover/vehicle.xml": VEHICLE_XML,
+            "Other Rover/meta.toml": META, "Other Rover/vehicle.xml": VEHICLE_XML,
+        })
+        self.assertIn("named after `name`", self.refused(data=data))
+
+    def test_what_the_type_cannot_author(self):
+        for install in ({"target": "user-data"}, {"path": "Vehicles"}, {"manages": ["x"]}, {"folder": "X"}):
+            with self.subTest(install=install):
+                self.assertIn("cannot author", self.refused(install=install))
+        self.assertIn("no [loader]", self.refused(loader={"id": "StarMap", "min": "0.4.5"}))
+        self.assertIn("mod-loader", self.refused(provides={"launch": "vehicle.xml"}))
+
+    def test_other_files_of_a_vehicle_get_one_note(self):
+        notes = []
+        names = {"thumbnail.png": "x", "parts/a.json": "{}"}
+        self.stamp(data=game_archive(**names), notes=notes)
+        self.assertEqual(len(notes), 1)
+        self.assertIn('"thumbnail.png"', notes[0])
+        self.assertIn('"parts/a.json"', notes[0])
+        self.assertNotIn('"vehicle.xml"', notes[0])
+
+    def test_a_note_never_breaks_a_line_and_stays_short(self):
+        notes = []
+        names = {f"extra{index:02}.txt": "x" for index in range(25)}
+        names["evil\nListing: x@1"] = "x"
+        self.stamp(data=game_archive(**names), notes=notes)
+        self.assertNotIn("\n", notes[0])
+        self.assertIn("and 6 more", notes[0])
+
+    def test_without_a_notes_list_a_vehicle_still_stamps(self):
+        self.assertEqual(self.stamp(data=game_archive(extra="x"))["install"]["folder"], "Example Rover")
+
+
+class Saves(unittest.TestCase):
+    def stamp(self, data, notes=None):
+        listing = {**VEHICLE, "id": "MoonBase", "type": "save"}
+        return stamp(listing, dict(RELEASE, tag="1.0.0"), data, GAME_VERSIONS, now=NOW, notes=notes)
+
+    def test_a_save_is_stamped_from_universe_xml_and_other_files_get_no_note(self):
+        notes = []
+        data = game_archive(game="universe.xml", content=UNIVERSE_XML, **{"ModState/a.json": "{}"})
+        document = self.stamp(data, notes)
+        self.assertEqual(document["type"], "save")
+        self.assertEqual(document["install"]["folder"], "Example Rover")
+        self.assertEqual(notes, [])
+
+    def test_a_save_needs_universe_xml(self):
+        with self.assertRaisesRegex(StampError, "universe.xml"):
+            self.stamp(archive({"Example Rover/meta.toml": META, "Example Rover/vehicle.xml": VEHICLE_XML}))
+
+
+class InstallFolders(unittest.TestCase):
+    """RFC 0085: one folder per type, held by the listing that took it first."""
+
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.releases = Path(directory.name) / "releases"
+
+    def release(self, listing_id, version, content_type="vehicle", folder="Example Rover", **extra):
+        path = self.releases / listing_id / f"{version}.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        document = {"id": listing_id, "type": content_type, "version": version, **extra}
+        if folder is not None:
+            document["install"] = {"root": folder, "derived": True, "folder": folder}
+        path.write_text(serialize(document), encoding="utf-8")
+
+    def holders(self, content_type="vehicle"):
+        return folder_holders(self.releases, content_type)
+
+    def document(self, listing_id, folder, content_type="vehicle"):
+        return {"id": listing_id, "type": content_type, "install": {"derived": True, "folder": folder}}
+
+    def test_another_listing_cannot_take_a_folder_without_case(self):
+        self.release("ExampleRover", "1.0.0")
+        with self.assertRaises(StampError) as raised:
+            check_folder(self.document("OtherRover", "example rover"), self.holders())
+        message = str(raised.exception)
+        self.assertIn("`OtherRover`", message)
+        self.assertIn("`ExampleRover`", message)
+        self.assertIn("without case", message)
+
+    def test_a_later_release_of_the_same_listing_keeps_its_folder(self):
+        self.release("ExampleRover", "1.0.0")
+        check_folder(self.document("examplerover", "Example Rover"), self.holders())
+
+    def test_a_save_and_a_vehicle_do_not_collide(self):
+        self.release("ExampleRover", "1.0.0")
+        self.release("MoonBase", "1.0.0", content_type="save", folder="Moon Base")
+        check_folder(self.document("RoverSave", "Example Rover", "save"), self.holders("save"))
+        self.assertEqual(self.holders("save"), {"moon base": ["MoonBase"]})
+
+    def test_a_yanked_or_gone_release_still_holds_its_folder(self):
+        self.release("Yanked", "1.0.0", folder="A", yanked=True)
+        self.release("Gone", "1.0.0", folder="B", download={"unavailable_since": "2026-09-01T00:00:00Z"})
+        self.release("Mod", "1.0.0", content_type="mod", folder=None)
+        self.assertEqual(self.holders(), {"a": ["Yanked"], "b": ["Gone"]})
+
+    def test_a_missing_releases_folder_holds_nothing(self):
+        self.assertEqual(self.holders(), {})
+
+    def test_an_unreadable_release_file_is_an_error(self):
+        self.release("ExampleRover", "1.0.0")
+        (self.releases / "Broken").mkdir()
+        (self.releases / "Broken" / "1.0.0.json").write_text("not json", encoding="utf-8")
+        with self.assertRaisesRegex(StampError, "releases/Broken/1.0.0.json"):
+            self.holders()
+
+    def test_a_document_without_a_folder_is_never_refused(self):
+        check_folder({"id": "M", "type": "mod"}, {"m": ["Other"]})
 
 
 class Rfc0035(unittest.TestCase):

@@ -24,7 +24,9 @@ the field goes again once the host serves the stamped bytes (RFC 0078).
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
 
-Per-release derivation is tools/stamp_release.py, the hosts are tools/hosts.py.
+The listings are the documents under `listings/`, `vehicles/` and `saves/`
+(tools/authored.py). Per-release derivation is tools/stamp_release.py, the hosts
+are tools/hosts.py.
 The image fetch rules are tools/images.py of the authored checkout, the code the
 checks of RFC 0058 run, so the two cannot disagree. The owner an issue mentions
 is who tools/ownership.py of the authored checkout names, through tools/decide.py.
@@ -50,14 +52,18 @@ from pathlib import Path
 import decide
 import hosts
 import listing_edit
+from authored import id_holders, listing_files, type_problem
 from check_amendment import RELEASE_PATH, precedence
 from hosts import HostError
 from stamp_release import (
+    GAME_FILES,
     GAME_MONTH,
     VERSION_FORMS,
     StampError,
     as_archive,
     changelog_text,
+    check_folder,
+    folder_holders,
     month_is_over,
     normalize_version,
     resolve_bound,
@@ -834,6 +840,10 @@ class Watcher:
         self._release_pulls = None
         self._edits_from = None
         self.listing_paths = {}
+        self.id_holders = {}
+        # The install folders of each type under releases/, read once per tick
+        # and kept current as the tick stamps, or the message of a failed read.
+        self._folders = {}
 
     def log(self, message):
         print(message, flush=True)
@@ -949,8 +959,10 @@ class Watcher:
             self.log("index-status.toml is unreadable, so no listing is scanned this tick")
             return []
         self.disputed = {key for key, state in states.items() if state == "disputed"}
+        # Before the filters, because a delisted document still holds its id.
+        self.id_holders = id_holders(self.authored_root)
         chosen = []
-        for path in sorted(folder.glob("*.toml")):
+        for path in listing_files(self.authored_root):
             if wanted and path.stem.lower() not in wanted:
                 continue
             if states.get(path.stem.lower()) == "delisted":
@@ -982,13 +994,14 @@ class Watcher:
             if entry.get("state") in ("delisted", "disputed")
         }
 
-    def listing_problem(self, path, listing_id):
+    def listing_problem(self, path, listing_id, content_type=None):
         """Why this listing cannot be processed at all, or None.
 
         The id becomes a path segment under releases/, so the id rules are the
         gate in front of every path this tick builds from it, and the file stem
         is what the delisting and `--listing` filters match, so it has to name
-        the same listing.
+        the same listing. Two documents with one id would stamp into the same
+        folder under releases/, and the watcher cannot tell which one owns it.
         """
         if not valid_id(listing_id):
             return (
@@ -1000,9 +1013,23 @@ class Watcher:
                 f"the file is named '{path.stem}.toml' but the document says "
                 f"id = '{listing_id}'; the file name and the id must match"
             )
+        problem = type_problem(path.parent.name, content_type)
+        if problem:
+            return problem
+        others = [
+            other for other in self.id_holders.get(listing_id.lower(), [])
+            if other != f"{path.parent.name}/{path.name}"
+        ]
+        if others:
+            return (
+                f"the id '{listing_id}' is also held by {', '.join(others)}; an id is unique "
+                "across listings/, vehicles/, saves/ and packs/, compared without case "
+                "(RFC 0031), so the watcher does not use it"
+            )
         return None
 
     def tick(self):
+        self._folders = {}
         try:
             paths = self.listings()
             for path in paths:
@@ -1012,7 +1039,7 @@ class Watcher:
                         authored = tomllib.load(handle)
                     listing_id = (authored.get("id") or path.stem).strip()
                     self.documents[listing_id] = authored
-                    problem = self.listing_problem(path, listing_id)
+                    problem = self.listing_problem(path, listing_id, authored.get("type"))
                     if problem:
                         self.log(f"{listing_id}: {problem}")
                         self.failed.append(listing_id)
@@ -1118,7 +1145,7 @@ class Watcher:
         # Keyed per listing, not per host: two listings naming the same
         # repository must not blind each other through a shared ETag.
         host_state = self.cache.section("hosts", f"{listing_id}/{authority.key}")
-        digest = self.authored_digest(authored)
+        digest = self.poll_digest(listing_id, authored)
         try:
             releases, etag = authority.releases(self.poll_etag(host_state, digest))
         except HostError as error:
@@ -1169,7 +1196,8 @@ class Watcher:
             # a fixed tag is picked up at once.
             if etag:
                 host_state["etag"] = etag
-            host_state["authored"] = digest
+            # Again, because a folder this tick refused is part of it now.
+            host_state["authored"] = self.poll_digest(listing_id, authored)
             host_state["checked"] = iso(now())
         else:
             host_state.pop("etag", None)
@@ -1535,9 +1563,58 @@ class Watcher:
             )
             return None
 
-    def stamp_inputs(self, authored):
+    def stamp_inputs(self, listing_id, authored):
         """What a stamp reads besides the archive, so a rejection is retried once it changes."""
-        return self.authored_digest([authored, self.game_versions])
+        inputs = [authored, self.game_versions]
+        folders = self.folder_inputs(listing_id, authored)
+        if folders is not None:
+            inputs.append(folders)
+        return self.authored_digest(inputs)
+
+    def poll_digest(self, listing_id, authored):
+        """What a stored ETag stands for besides the host's answer, see `poll_etag`."""
+        folders = self.folder_inputs(listing_id, authored)
+        if folders is None:
+            return self.authored_digest(authored)
+        return self.authored_digest([authored, folders])
+
+    def folder_inputs(self, listing_id, authored):
+        """The listings that hold the folders a release of this listing was refused for, or None.
+
+        Only those folders count, so a new vehicle of somebody else does not
+        drop the ETag of every vehicle listing.
+        """
+        taken = (self.cache.data["listings"].get(listing_id) or {}).get("taken")
+        content_type = authored.get("type")
+        if content_type not in GAME_FILES or not taken:
+            return None
+        try:
+            holders = self.install_folders(content_type)
+        except HostError as error:
+            return str(error)
+        return {
+            folder: sorted(
+                other for other in holders.get(folder, []) if other.lower() != listing_id.lower()
+            )
+            for folder in taken
+        }
+
+    def install_folders(self, content_type):
+        """The install folders of `content_type` under releases/, to the listings that hold them.
+
+        A release file that does not read is a fault of this repository, not
+        of the listing, so it raises HostError: the release stays unsettled and
+        the next tick tries it again.
+        """
+        if content_type not in self._folders:
+            try:
+                self._folders[content_type] = folder_holders(self.releases_root, content_type)
+            except StampError as error:
+                self._folders[content_type] = str(error)
+        holders = self._folders[content_type]
+        if isinstance(holders, str):
+            raise HostError(holders)
+        return holders
 
     def known_rejection(self, listing_id, authored, release, any_age=False):
         """The error an older release got from the same inputs within REJECTION_HOURS, or None.
@@ -1555,7 +1632,7 @@ class Watcher:
             or (not any_age and now() - checked >= timedelta(hours=REJECTION_HOURS))
             or seen.get("url") != release.url
             or seen.get("size") != release.size
-            or seen.get("inputs") != self.stamp_inputs(authored)
+            or seen.get("inputs") != self.stamp_inputs(listing_id, authored)
         ):
             return None
         return seen.get("error")
@@ -1564,7 +1641,7 @@ class Watcher:
         self.cache.data["rejected"][f"{listing_id}/{release.version}"] = {
             "url": release.url,
             "size": release.size,
-            "inputs": self.stamp_inputs(authored),
+            "inputs": self.stamp_inputs(listing_id, authored),
             "checked": iso(now()),
             "error": message,
         }
@@ -1575,35 +1652,67 @@ class Watcher:
         The archive is closed before a mirror downloads, so at most one archive
         is on disk and the mirror is checked against the stamped digest.
         """
+        if authored.get("type") in GAME_FILES:
+            # Read first, so a broken release file does not cost a download every tick.
+            self.install_folders(authored["type"])
         archive, content_type = authority.download(release)
+        notes = []
         with as_archive(archive) as archive:
             facts = release.facts()
             facts["content_type"] = content_type
-            document = stamp(authored, facts, archive, self.game_versions, now=now())
+            document = stamp(authored, facts, archive, self.game_versions, now=now(), notes=notes)
+
+        folder = (document.get("install") or {}).get("folder")
+        holders = None
+        if folder is not None:
+            holders = self.install_folders(document["type"])
+            state = self.cache.section("listings", listing_id)
+            try:
+                check_folder(document, holders)
+            except StampError:
+                # Kept, so the release is tried again once the holder changes.
+                state["taken"] = sorted(set(state.get("taken") or []) | {folder.lower()})
+                raise
 
         download = document["download"]
         mirrors = self.mirrors_for(mirror_hosts, release, download["sha256"])
         if mirrors:
             download["mirrors"] = mirrors
         path = self.folder(listing_id) / f"{document['version']}.json"
-        self.write(path, serialize(document), self.stamp_message(listing_id, document["version"]))
+        self.write(
+            path, serialize(document), self.stamp_message(listing_id, document["version"], notes)
+        )
         self.log(f"    stamped {document['version']} ({download['size']} bytes)")
+        for note in notes:
+            self.log(f"    note: {note}")
         self.stamped.append(f"{listing_id} {document['version']}")
+        if holders is not None:
+            holding = holders.setdefault(folder.lower(), [])
+            if listing_id not in holding:
+                holding.append(listing_id)
+            taken = [other for other in state.get("taken") or [] if other != folder.lower()]
+            if taken:
+                state["taken"] = taken
+            else:
+                state.pop("taken", None)
 
-    def stamp_message(self, listing_id, version):
+    def stamp_message(self, listing_id, version, notes=()):
         """The commit message of a stamp, which names the listing commit the stamp read when git can say.
 
         A listing edit is measured from that commit, because a listing merged
         while the tick ran is older than the stamp commit but not in the stamp.
+        The notes of the stamper follow it, one `Note:` line each.
         """
         message = f"Stamp {listing_id} {version}"
         path = self.listing_paths.get(listing_id)
-        if path is None or self.history_problem():
-            return message
-        change = self.history.listing_change(path)
-        if change is None:
-            return message
-        return f"{message}\n\nListing: {self.options.authored_repo}@{change[0]}"
+        change = None
+        if path is not None and not self.history_problem():
+            change = self.history.listing_change(path)
+        if change is not None:
+            message += f"\n\nListing: {self.options.authored_repo}@{change[0]}"
+        if notes:
+            message += "\n\n" + "\n".join(f"Note: {note}" for note in notes)
+        return message
 
     def check_for_a_swap(self, listing_id, authority, release, path, errors):
         """A stamped version is never overwritten, and a swap gets reported.
