@@ -748,6 +748,62 @@ class Storage:
         return Archive.of_bytes(body), {"Content-Type": "application/zip"}
 
 
+DATA = DATA_TABLE["data"]
+DATA_LIST = f"{DATA}releases/vehicle/ExampleRover.json"
+CDN = DATA_TABLE["downloads"][0]
+
+
+def data_entry(version="1.0.0", url=None, date="2026-10-11T09:14:30Z"):
+    entry = {"version": version, "status": "stable", "url": url or f"{CDN}ExampleRover-{version}.zip"}
+    if date is not None:
+        entry["date"] = date
+    return entry
+
+
+class DataHost:
+    """A share host that serves its files itself (RFC 0104).
+
+    It answers the release list under DATA with an ETag and a 304 on a match,
+    and the .sig beside it, which `private` signs at the time of the read unless
+    `signature` replaces it. Each request is kept with its api flag and the
+    headers that Http with a token would send for it, so a test sees whether the
+    token could reach the host.
+    """
+
+    def __init__(self, entries, private, signature=None):
+        self.document = {"id": "ExampleRover", "type": "vehicle", "releases": entries}
+        self.private = private
+        self.signature = signature
+        self.asked = []
+        self.lines = []
+        self.with_token = Http(token="a token")
+
+    def log(self, message):
+        self.lines.append(message)
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        self.asked.append((url, api, self.with_token._headers(accept, etag, api)))
+        body = json.dumps(self.document).encode()
+        if url == DATA_LIST:
+            current = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+            if etag == current:
+                return Response(304, {}, b"")
+            # The lower case shows that the header name is read in any case.
+            return Response(200, {"etag": current}, body)
+        if url == DATA_LIST + ".sig":
+            if isinstance(self.signature, Exception):
+                raise self.signature
+            if self.signature is not None:
+                return Response(200, {}, self.signature)
+            return Response(200, {}, base64.b64encode(self.private.sign(body)) + b"\n")
+        raise AssertionError(f"unexpected URL {url}")
+
+
+def data_host(http, key, retired=()):
+    table = {**DATA_TABLE, "key": key, "retired_keys": list(retired)}
+    return named({"example": "ExampleRover"}, http, "ExampleRover", "vehicle", {"example": table})["example"]
+
+
 def rover(version="1.0.0", **extra):
     tag = f"vehicle/ExampleRover/{version}"
     return share_release(tag, f"ExampleRover-{version}.zip", **extra)
@@ -1068,6 +1124,76 @@ class Containment(unittest.TestCase):
             "https://[cdn.example.org/archives/R.zip",
         ):
             self.assertFalse(_within(url, self.PREFIXES), url)
+
+
+class DataHosts(unittest.TestCase):
+    """RFC 0104: a data host's release list counts only with a signature by `key`."""
+
+    def setUp(self):
+        self.private, self.key = signing_key("content-index-releases data host")
+
+    def test_a_list_signed_by_key_gives_the_releases_from_url_and_date(self):
+        http = DataHost([data_entry()], self.private)
+        [release], etag = data_host(http, self.key).releases()
+        self.assertEqual(release.url, f"{CDN}ExampleRover-1.0.0.zip")
+        self.assertEqual(release.archives, (release.url,))
+        self.assertEqual((release.release_date, release.status, release.problem), ("2026-10-11T09:14:30Z", "stable", None))
+        self.assertEqual((release.downloads, release.size, release.asset_name), (None, None, None))
+        self.assertEqual([url for url, _, _ in http.asked], [DATA_LIST, DATA_LIST + ".sig"])
+        self.assertTrue(etag.split(" ")[1].startswith('"'))
+
+    def test_a_wrong_or_missing_signature_is_a_host_error(self):
+        other, _ = signing_key("another data host")
+        for signature in (
+            base64.b64encode(other.sign(b"{}")),
+            base64.b64encode(self.private.sign(b"another list")),
+            b"not base64",
+            b"",
+            http_error(404),
+        ):
+            with self.assertRaises(HostError, msg=signature) as caught:
+                data_host(DataHost([data_entry()], self.private, signature), self.key).releases()
+            self.assertIn("has no valid signature by key", str(caught.exception))
+
+    def test_a_signature_by_a_retired_key_alone_is_a_host_error(self):
+        # Rule 22: a retired key checks an old record and never a live read.
+        _, new = signing_key("the next data host key")
+        with self.assertRaises(HostError):
+            data_host(DataHost([data_entry()], self.private), new, retired=[self.key]).releases()
+
+    def test_a_url_outside_downloads_or_a_missing_date_is_a_problem(self):
+        entries = [
+            data_entry("1.0.0", url="https://cdn.example.org.evil/archives/ExampleRover-1.0.0.zip"),
+            data_entry("1.0.1", url="https://data.example.org/share/ExampleRover-1.0.1.zip"),
+            data_entry("1.0.2", date=None),
+            data_entry("1.0.3", date="yesterday"),
+        ]
+        releases, _ = data_host(DataHost(entries, self.private), self.key).releases()
+        for release in releases:
+            self.assertIsNotNone(release.problem, release.tag)
+            with self.assertRaises(StampError, msg=release.tag):
+                data_host(DataHost([], self.private), self.key).download(release)
+        self.assertEqual([release.url for release in releases[:2]], [None, None])
+        self.assertIn("downloads", releases[0].problem)
+        self.assertIn("date", releases[2].problem)
+
+    def test_an_unchanged_list_sends_no_signature_request(self):
+        http = DataHost([data_entry()], self.private)
+        host = data_host(http, self.key)
+        _, etag = host.releases()
+        http.asked.clear()
+        self.assertEqual(host.releases(etag), (None, etag))
+        self.assertEqual([url for url, _, _ in http.asked], [DATA_LIST])
+
+    def test_no_request_uses_the_api_or_carries_the_token(self):
+        http = DataHost([data_entry()], self.private)
+        host = data_host(http, self.key)
+        _, etag = host.releases()
+        host.releases(etag)
+        self.assertEqual(len(http.asked), 3)
+        for url, api, headers in http.asked:
+            self.assertFalse(api, url)
+            self.assertNotIn("Authorization", headers, url)
 
 
 class LazyImport(unittest.TestCase):

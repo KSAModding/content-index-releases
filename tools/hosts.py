@@ -759,12 +759,16 @@ class SpaceDockHost(Host):
 
 
 class ShareHost(Host):
-    """The releases of one listing on a share host, read from its storage repository (RFC 0094).
+    """The releases of one listing on a share host (RFC 0094 and RFC 0104).
 
-    The release list in `storage` names the versions, and the GitHub release of
-    each version gives the archive, the date and the download count. The host's
-    own service is never asked. The stored ETag carries the time of the next
-    full read, see FULL_READ_HOURS.
+    With `storage`, the release list in that GitHub repository names the
+    versions, and the GitHub release of each version gives the archive, the date
+    and the download count. With `data`, the host serves the release list
+    itself, and each entry gives the archive in its `url` and the date in its
+    `date`. That list is read over plain HTTPS without the token, and it counts
+    only with a valid signature by `key` beside it (rule 22). Such a host has no
+    download counts. The host's own service is never asked. The stored ETag
+    carries the time of the next full read, see FULL_READ_HOURS.
     """
 
     kind = "share"
@@ -772,6 +776,10 @@ class ShareHost(Host):
     def __init__(self, name, table, listing_id, content_type, http, max_releases=500):
         self.name = name
         self.storage = table.get("storage")
+        self.data = table.get("data")
+        self.downloads = tuple(table.get("downloads") or ())
+        # The signing key of `data`. The name `key` is taken by the cache key.
+        self.public_key = table.get("key")
         self.listing_id = listing_id
         self.content_type = content_type
         self.http = http
@@ -787,23 +795,29 @@ class ShareHost(Host):
 
     def releases(self, etag=None):
         self.truncated = False
-        if self.storage is None:
-            raise HostError(f"the share host `{self.name}` serves its files itself, which is not read yet")
         path = SHARE_LIST.format(type=self.content_type, id=self.listing_id)
-        url = f"{GITHUB_API}/repos/{self.storage}/contents/{urllib.parse.quote(path)}"
         try:
-            answer = self.http.get(
-                url, accept="application/vnd.github.raw+json", etag=_current(etag), api=True
-            )
+            if self.data is None:
+                where = self.storage
+                url = f"{GITHUB_API}/repos/{self.storage}/contents/{urllib.parse.quote(path)}"
+                answer = self.http.get(
+                    url, accept="application/vnd.github.raw+json", etag=_current(etag), api=True
+                )
+            else:
+                where = self.data
+                url = self.data + urllib.parse.quote(path)
+                answer = self.http.get(url, etag=_current(etag), api=False)
         except urllib.error.HTTPError as error:
             if error.code in (404, 451):
                 raise StampError(
                     f"the share host `{self.name}` has no release list for this listing: "
-                    f"{self.storage} holds no {path}"
+                    f"{where} holds no {path}"
                 ) from error
             raise HostError(f"{url}: HTTP {error.code}") from error
         if answer.status == 304:
             return None, etag
+        if self.data is not None:
+            self._verify(url, answer.body)
 
         payload = _parse_json(url, answer.body)
         if not isinstance(payload, dict):
@@ -822,12 +836,29 @@ class ShareHost(Host):
             entries = entries[-self.max_releases:]
 
         releases = [self._release(entry) for entry in entries]
-        tag = answer.headers.get("ETag")
+        # A host other than GitHub can send the header name in another case.
+        tag = next((value for name, value in answer.headers.items() if name.lower() == "etag"), None)
         if not tag:
             return releases, None
         hours = REFUSED_READ_HOURS if any(item.problem for item in releases) else FULL_READ_HOURS
         due = datetime.now(timezone.utc) + timedelta(hours=hours)
         return releases, f"{due.strftime('%Y-%m-%dT%H:%M:%SZ')} {tag}"
+
+    def _verify(self, url, body):
+        """HostError unless the .sig beside `url` is a valid signature of `body` by `key` (rule 22).
+
+        A retired key never makes a live read valid, so during a key rotation
+        the listings of the host wait until it signs its files again.
+        """
+        problem = f"{url} has no valid signature by key"
+        try:
+            answer = self.http.get(url + ".sig", api=False, limit=MAX_SIGNATURE)
+        except urllib.error.HTTPError as error:
+            raise HostError(f"{problem}, because its .sig answers HTTP {error.code}") from error
+        except OversizeError as error:
+            raise HostError(f"{problem}, because its .sig is larger than {MAX_SIGNATURE} bytes") from error
+        if answer.status != 200 or not signed(body, answer.body, self.public_key):
+            raise HostError(problem)
 
     def _release(self, entry):
         version = entry.get("version")
@@ -838,6 +869,8 @@ class ShareHost(Host):
                 host=self.kind, tag=tag, tag_prefix=prefix, version=None,
                 release_date=None, url=None,
             )
+        if self.data is not None:
+            return self._data_release(entry, tag, prefix, version)
 
         problem = None
         payload = self._github_release(tag)
@@ -870,6 +903,34 @@ class ShareHost(Host):
             asset_name=asset.get("name"),
             downloads=_count(asset.get("download_count")),
             archives=tuple(item["browser_download_url"] for item in uploaded if item.get("browser_download_url")),
+            status=status if status in SHARE_STATUSES else None,
+            problem=problem,
+            mirrors=self._mirrors(tag, entry.get("mirrors")),
+        )
+
+    def _data_release(self, entry, tag, prefix, version):
+        """A release of the list that `data` serves, made from the url and the date of its entry (rule 21)."""
+        url, date, status = entry.get("url"), entry.get("date"), entry.get("status")
+        kept = url if _within(url, self.downloads) else None
+        release_date = _utc(date) if isinstance(date, str) else None
+        problem = None
+        if kept is None:
+            problem = (
+                f"the url {url!r} of `{tag}` is not an https URL under a prefix "
+                f"in downloads of `{self.name}`"
+            )
+        elif release_date is None:
+            problem = f"the date {date!r} of `{tag}` is not an RFC 3339 time"
+        elif status not in SHARE_STATUSES:
+            problem = f"the status {status!r} is not one of {', '.join(SHARE_STATUSES)}"
+        return HostRelease(
+            host=self.kind,
+            tag=tag,
+            tag_prefix=prefix,
+            version=_version_of(version),
+            release_date=release_date,
+            url=kept,
+            archives=(kept,) if kept else (),
             status=status if status in SHARE_STATUSES else None,
             problem=problem,
             mirrors=self._mirrors(tag, entry.get("mirrors")),

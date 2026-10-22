@@ -7,6 +7,7 @@ The API is a stub that records what the watcher would send, which is what makes
 """
 
 import base64
+import contextlib
 import hashlib
 import importlib.util
 import io
@@ -4208,6 +4209,46 @@ class ShareHostListings(WatcherCase):
         self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
         [state] = watcher.cache.data["hosts"].values()
         self.assertIn("etag", state)
+
+    def test_a_run_without_cryptography_fails_before_a_data_host_listing_is_counted(self):
+        self.hosts(0, DATA_HOSTS_TOML)
+        self.listing("ExampleRover", share_listing("ExampleRover", key="example"))
+        (self.folder / "game-versions.json").write_text(json.dumps(GAME_VERSIONS), encoding="utf-8")
+        cache_path = self.folder / "cache.json"
+        cached = {"version": watch.CACHE_VERSION, "listings": {"ExampleRover": {"unreachable": 2}}}
+        cache_path.write_text(json.dumps(cached), encoding="utf-8")
+        argv = [
+            "--authored", str(self.folder / ".authored"),
+            "--releases", str(self.folder / "releases"),
+            "--game-versions", str(self.folder / "game-versions.json"),
+            "--cache", str(cache_path),
+            "--no-sweep", "--no-commit", "--dry-run",
+        ]
+        stderr = io.StringIO()
+        with (
+            patch.dict(os.environ, {"GITHUB_TOKEN": "", "INDEX_TOKEN": ""}),
+            patch("hosts.signature_ready", return_value=False),
+            patch.object(Issues, "report") as report,
+            contextlib.redirect_stderr(stderr),
+        ):
+            code = watch.main(argv)
+        self.assertNotEqual(code, 0)
+        self.assertIn("cryptography is not installed", stderr.getvalue())
+        report.assert_not_called()
+        self.assertEqual(json.loads(cache_path.read_text(encoding="utf-8")), cached)
+
+
+DATA_HOSTS_TOML = """\
+[example]
+kind = "share"
+name = "example.org"
+bot = 12345678
+api = "https://example.org/api/share/v1/"
+data = "https://data.example.org/share/"
+downloads = ["https://cdn.example.org/archives/"]
+key = "MCowBQYDK2VwAyEA3+V7O/oWx/V+Qq8hQGpnhy11Ug7Fz/zMB/oLb4PNmlk="
+types = ["vehicle", "save"]
+"""
 
 
 class VehicleGoneFromTheHost(GoneCase):
