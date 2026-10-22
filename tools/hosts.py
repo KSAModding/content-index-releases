@@ -76,8 +76,8 @@ TAG_PREFIX = re.compile(r"[!-~]+")
 # The answers that say an archive is gone, a fact about the release and not a bad moment of the host.
 GONE = (404, 410, 451)
 
-# The files of a share host in its storage repository, by RFC 0094. That RFC is
-# not accepted yet, so its names are here and nowhere else.
+# The files of a share host in its storage repository, by RFC 0094. Its names
+# are here and nowhere else.
 SHARE_LIST = "releases/{type}/{id}.json"
 SHARE_TAG = "{type}/{id}/{version}"
 SHARE_ASSET = "{id}-{version}.zip"

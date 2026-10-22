@@ -98,7 +98,7 @@ A release whose `install.folder` another listing of the same type already holds,
 A vehicle folder with files besides `meta.toml` and `vehicle.xml` is stamped with a note, which goes into the body of the stamp commit and not into the issue.
 
 A vehicle or a save can also be on a share host, which the stewards register as a table of `hosts.toml` in the authored half, and which the listing names with its id, for example `ksamods = "ExampleRover"` under `[releases]`.
-The rules follow the text of [RFC 0094](https://github.com/KSAModding/content-manager-design/pull/94), which is not accepted yet, and its names are in `tools/hosts.py` in one place.
+The rules follow [RFC 0094](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0094-share-host.md), and its names are in `tools/hosts.py` in one place.
 The watcher reads the release list `releases/<type>/<id>.json` from the host's `storage` repository through the GitHub API, conditionally against an ETag, and for each entry the GitHub release tagged `<type>/<id>/<version>`, which has to carry exactly one archive, named `<id>-<version>.zip`.
 The host's own service is never asked.
 The `status` of an entry becomes `release_status` together with the pre-release part of the version, and the less stable of the two wins.
