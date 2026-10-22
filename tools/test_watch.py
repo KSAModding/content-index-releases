@@ -4318,22 +4318,25 @@ class DataHostListings(WatcherCase):
 
     def test_a_wrong_signature_holds_the_listing_back_as_an_outage_does(self):
         self.tick()
-        # The host lists a new release, and the signature beside the changed list is not by key.
+        # The changed list drops 1.0.0, its url answers 410, and the signature beside the list is not by
+        # key. A list without a valid signature does not exist, so it cannot make 1.0.0 gone.
         other, _ = signing_key("another data host")
-        self.http.document["releases"].append(data_entry("1.1.0"))
+        self.http.document["releases"] = [data_entry("1.1.0")]
         self.http.signature = base64.b64encode(other.sign(b"{}"))
-        for count in (1, 2):
-            watcher = self.tick(argv=["--unreachable-ticks", "3"])
+        self.http.answers[self.url] = 410
+        for count, hours in ((1, 0), (2, watch.GONE_HOURS)):
+            watcher = self.tick(hours, argv=["--unreachable-ticks", "3"])
             self.assertEqual(watcher.issues.reported, [])
             self.assertEqual(watcher.cache.data["listings"]["ExampleRover"]["unreachable"], count)
 
-        watcher = self.tick(argv=["--unreachable-ticks", "3"])
+        watcher = self.tick(watch.GONE_HOURS + 1, argv=["--unreachable-ticks", "3"])
         [(listing_id, errors)] = watcher.issues.reported
         self.assertEqual(listing_id, "ExampleRover")
         self.assertIn("has no valid signature by key", errors[0])
         self.assertIsNone(self.stamped("1.1.0"))
+        self.assertEqual(watcher.marked, [])
         self.assertNotIn("unavailable_since", self.stamped()["download"])
-        self.assertEqual(watcher.cache.data["gone"], {})
+        self.assertNotIn("ExampleRover/1.0.0", watcher.cache.data["gone"])
 
     def test_an_entry_the_host_removes_is_marked_gone_once_its_url_answers_410(self):
         self.tick()
