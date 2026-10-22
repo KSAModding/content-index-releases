@@ -417,8 +417,8 @@ def _https_url(value):
     """
     if not isinstance(value, str) or "\\" in value or any(char <= " " or char == "\x7f" for char in value):
         return None
-    parts = urllib.parse.urlsplit(value)
     try:
+        parts = urllib.parse.urlsplit(value)
         parts.port
     except ValueError:
         return None

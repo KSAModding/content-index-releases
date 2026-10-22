@@ -962,6 +962,7 @@ class NamedShareHosts(unittest.TestCase):
             {key: value for key, value in DATA_TABLE.items() if key != "key"},
             {**DATA_TABLE, "data": "http://data.example.org/share/"},
             {**DATA_TABLE, "data": "https://data.example.org/share"},
+            {**DATA_TABLE, "data": "https://[data.example.org/"},
             {**DATA_TABLE, "downloads": []},
             {**DATA_TABLE, "retired_keys": "old"},
         ):
@@ -1064,6 +1065,7 @@ class Containment(unittest.TestCase):
             "https://cdn.example.org:8443/archives/R.zip",
             "http://cdn.example.org/archives/R.zip",
             "https://cdn.example.org/archives-old/R.zip",
+            "https://[cdn.example.org/archives/R.zip",
         ):
             self.assertFalse(_within(url, self.PREFIXES), url)
 
