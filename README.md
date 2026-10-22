@@ -22,11 +22,13 @@ For content the watcher does not watch, the same file arrives by pull request, a
 
 ## Clients do not read this repository
 
-A client fetches one snapshot artifact, which merges both halves of the index, the game release list and the curated tag vocabulary into a single document:
+A client fetches the snapshot, which merges both halves of the index, the game release list and the curated tag vocabulary into the main document:
 
 ```text
 https://ksamodding.github.io/content-index-releases/v1/index.json
 ```
+
+Vehicles and saves are in files of their own next to it, see [The snapshot](#the-snapshot).
 
 ## Layout
 
@@ -47,6 +49,7 @@ That poll only ever sees the build that is current when it runs, so a build supe
 ## Download counts
 
 `download-counts.json` holds the download counts GitHub and SpaceDock report for each listing and release version, as [RFC 0052](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0052-static-download-counts.md) defines them.
+Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 
@@ -101,7 +104,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
-| `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the one snapshot document clients fetch. Needs no token. |
+| `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the snapshot documents clients fetch: the main document and a file for each type of `TYPE_FILES`. Needs no token. |
 
 A release the watcher cannot stamp, a tag that does not parse or an archive whose install root is neither derivable nor authored, becomes one open issue per listing on the authored repository, kept current rather than reopened every tick.
 
@@ -192,13 +195,23 @@ python3 tools/watchdog.py --dry-run
 
 ## The snapshot
 
-`.github/workflows/snapshot.yml` merges both halves of the index and the game release list into the one document clients fetch, and publishes it to GitHub Pages at `/v1/index.json`.
+`.github/workflows/snapshot.yml` merges both halves of the index and the game release list into the documents clients fetch, and publishes them to GitHub Pages under `/v1/`.
+The main document, `/v1/index.json`, holds mods and mod loaders in `listings`, and packs in `packs`.
 
 The `v1` segment carries the snapshot format version, so a future break can be served next to the version it replaces. The fields are specified in [spec/snapshot.md](https://github.com/KSAModding/content-manager-design/blob/main/spec/snapshot.md).
 
+Vehicles and saves of RFC 0085 have files of their own next to it, `/v1/snapshot-vehicles.json` with the array `vehicles` and `/v1/snapshot-saves.json` with the array `saves`.
+Their entries have the shape of an entry of `listings`, and each release carries `install.folder`.
+There is no file for a type while the authored half holds no document of it, delisted ones included, so nothing published changes before the first one.
+Once published, a type file is published on every deployment, with an empty array when its last document is gone, because a client keeps its copy when a published file goes away.
+The builder counts a type file as published when its fetched copy exists or when the first-parent history of the authored half ever added a document of its type, so a stale 404 from the CDN cannot drop it.
+The two file names and their place are those of [RFC 0094](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0094-share-host.md); they are kept in `TYPE_FILES` of `tools/build_snapshot.py`, and the workflow reads them from there.
+
+Mods and mod loaders, packs, vehicles and saves share one namespace of ids, and an id that two documents hold fails the build.
+
 When the authored checkout has `tags.toml`, the snapshot embeds it as the optional top-level `tags` field. When the file is absent, the field is absent.
 
-When `download-counts.json` is present, each listing that is not delisted carries its entry as `downloads`. An entry for an id that is not a listing fails the build.
+When `download-counts.json` is present, each listing, vehicle and save that is not delisted carries its entry as `downloads`. An entry for an id that is none of these fails the build.
 
 Each listing and pack that is not delisted carries the dates of RFC 0058 next to its `id`.
 `published_at` is the earliest release date, yanked and retracted versions included.
@@ -218,13 +231,17 @@ To build one by hand, against a checkout of the authored half:
 python3 tools/build_snapshot.py --authored ../content-index --out _site/v1/index.json
 ```
 
+The type files are written next to the file `--out` names. Without `--out`, only the main document goes to stdout.
+
 The `sources` block naming the two commits is omitted unless both repositories and both commits are given, so a local build does not claim a provenance it does not have.
 
 ### An unchanged index is not published again
 
 A deployment issues a new ETag whether or not the bytes changed, so republishing an unchanged snapshot is a full re-download for every client.
 
-The build reads what is published today as `--previous`. Unchanged content keeps that copy's `sources` rather than restamping whatever HEAD the run saw, so an unrelated commit does not move the bytes, and the workflow then skips the deploy when the two are equal.
+The build reads what is published today as `--previous`, the main document with the published type files next to it. Each file is compared on its own: unchanged content keeps that copy's `sources` rather than restamping whatever HEAD the run saw, so an unrelated commit does not move the bytes, and the workflow then skips the deploy when every file equals its published copy.
+A deployment replaces the whole site, so a change to one file deploys all of them, and on GitHub Pages every file gets a new ETag.
+A published file that answers anything other than 404 when the workflow fetches it stops the run, because the run cannot tell whether that file is published.
 
 A build fails closed: nothing is published, and clients keep the last good snapshot.
 
