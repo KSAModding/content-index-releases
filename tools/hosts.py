@@ -227,12 +227,14 @@ class Http:
             ),
         )
 
-    def archive(self, url, api=False, limit=None):
+    def archive(self, url, api=False, limit=None, within=None):
         """GET an archive into an anonymous temporary file.
 
         Returns (Archive, headers). The SHA-256 and size are taken while the
         body streams, and a retry starts the file again. Raises what `get`
-        raises, and OversizeError past `limit` or MAX_ARCHIVE_BYTES.
+        raises, and OversizeError past `limit` or MAX_ARCHIVE_BYTES. With
+        `within`, every redirect and the final URL have to be under one of
+        those base URLs, or RedirectError comes before any byte is read.
         """
         return self._send(
             url,
@@ -241,6 +243,7 @@ class Http:
                 _stream(answer, limit or MAX_ARCHIVE_BYTES),
                 dict(answer.headers),
             ),
+            within,
         )
 
     def status(self, url, api=False):
@@ -264,14 +267,24 @@ class Http:
             headers["X-GitHub-Api-Version"] = "2022-11-28"
         return headers
 
-    def _send(self, url, headers, read):
-        """The retry loop around one GET, with `read` turning the answer into the result."""
+    def _send(self, url, headers, read, within=None):
+        """The retry loop around one GET, with `read` turning the answer into the result.
+
+        With `within`, a redirect outside those base URLs is refused as RedirectError,
+        which is not retried because the next attempt meets the same redirect.
+        """
         last = None
         for attempt in range(self.retries):
             request = urllib.request.Request(url, headers=headers, method="GET")
+            if within is None:
+                open_url = urllib.request.urlopen
+            else:
+                open_url = urllib.request.build_opener(_Contained(within)).open
             try:
                 self.requests += 1
-                with urllib.request.urlopen(request, timeout=self.timeout) as answer:
+                with open_url(request, timeout=self.timeout) as answer:
+                    if within is not None and not _within(answer.geturl(), within):
+                        raise RedirectError(answer.geturl())
                     return read(answer)
             except urllib.error.HTTPError as error:
                 if error.code == 304:
@@ -290,6 +303,22 @@ class Http:
                 time.sleep(2 ** attempt)
 
         raise HostError(f"{url}: {last}")
+
+
+class RedirectError(Exception):
+    """A redirect that would take a download outside the `downloads` of its host. Its message is the URL it went to."""
+
+
+class _Contained(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to a URL under one of the base URLs `within` (rule 28 of spec/share-host.md)."""
+
+    def __init__(self, within):
+        self.within = within
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not _within(newurl, self.within):
+            raise RedirectError(newurl)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _read(answer, limit):
@@ -974,7 +1003,8 @@ class ShareHost(Host):
     def download(self, release):
         if release.problem:
             raise StampError(release.problem)
-        return download(self.http, release, self.max_bytes)
+        within = self.downloads if self.data is not None else None
+        return download(self.http, release, self.max_bytes, within)
 
 
 class ListedMirror(Host):
@@ -1001,7 +1031,8 @@ class ListedMirror(Host):
         )
 
     def download(self, release):
-        return self.host.download(release)
+        # A copy is on the Internet Archive and not under the `downloads` of the host.
+        return download(self.host.http, release, self.host.max_bytes)
 
 
 def listed_mirror_url(url):
@@ -1032,10 +1063,12 @@ def _current(etag):
     return tag if tag and datetime.now(timezone.utc) < moment else None
 
 
-def download(http, release, limit=None):
+def download(http, release, limit=None, within=None):
     """The archive of `release`, as (Archive, content type). The caller closes the Archive.
 
     `limit` is the largest archive the host takes, MAX_ARCHIVE_BYTES when it names none.
+    `within` is the `downloads` of a data host, which every redirect has to stay under.
+
     Shared with the release pull request check, which downloads from the URL a
     submission names rather than from a host it polled.
     """
@@ -1054,8 +1087,14 @@ def download(http, release, limit=None):
             f"the archive is {_mib(release.size)}, above the {_mib(limit)} limit"
         )
     api = urllib.parse.urlsplit(release.url).hostname == GITHUB_API_HOST
+    # Only a data host passes `within`, so the Http of the other callers needs no such parameter.
+    contained = {} if within is None else {"within": within}
     try:
-        archive, headers = http.archive(release.url, api=api, limit=limit)
+        archive, headers = http.archive(release.url, api=api, limit=limit, **contained)
+    except RedirectError as error:
+        raise StampError(
+            f"the archive at {release.url} redirects outside its downloads, to {error}"
+        ) from error
     except OversizeError as error:
         # Permanent, unlike the transient failures HostError stands for: the
         # release stays too large next tick too, so the author hears about it
