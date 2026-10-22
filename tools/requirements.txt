@@ -1,0 +1,7 @@
+# Only the verify path of a share host without GitHub storage needs these
+# packages, because it checks the Ed25519 signatures of the data files.
+# cffi and pycparser are pinned too, so that no version floats into a job.
+# The privileged jobs install them with pip install --only-binary=:all:.
+cryptography==50.0.2
+cffi==2.1.1
+pycparser==3.12

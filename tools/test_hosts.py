@@ -7,10 +7,13 @@ HTTPError that escapes either becomes an "unexpected" log line with no
 author-facing issue, which is exactly what the watcher must not do.
 """
 
+import base64
 import dataclasses
 import hashlib
 import http.client
 import json
+import subprocess
+import sys
 import tempfile
 import types
 import unittest
@@ -33,12 +36,14 @@ from hosts import (
     ShareHost,
     SpaceDockHost,
     _utc,
+    _within,
     build,
     download,
     listed_mirrors,
     named,
     registered,
     share_keys,
+    signed,
     stamped_dependencies,
 )
 from stamp_release import Archive, StampError
@@ -652,6 +657,21 @@ SHARE_TABLE = {
 }
 REGISTRY = {"ksamods": SHARE_TABLE}
 
+# A share host that serves its files itself (RFC 0104). The key has the form of
+# an Ed25519 key, and the tests that check a signature make their own.
+DATA_TABLE = {
+    "kind": "share",
+    "name": "example.org",
+    "bot": 12345678,
+    "api": "https://example.org/api/share/v1/",
+    "data": "https://data.example.org/share/",
+    "downloads": ["https://cdn.example.org/archives/"],
+    "key": "MCowBQYDK2VwAyEA" + "A" * 43 + "=",
+    "retired_keys": [],
+    "types": ["vehicle", "save"],
+    "max_bytes": {"vehicle": 8, "save": 64},
+}
+
 
 def share_entry(version, status="stable", mirrors=None):
     entry = {"version": version, "status": status}
@@ -929,12 +949,21 @@ class NamedShareHosts(unittest.TestCase):
                 named({"ksamods": value}, FakeHttp({}), "R", "vehicle", REGISTRY)
 
     def test_a_table_the_watcher_cannot_read_is_a_host_error(self):
+        host = named({"example": "R"}, FakeHttp({}), "R", "vehicle", {"example": DATA_TABLE})["example"]
+        self.assertIsInstance(host, ShareHost)
+        storage_only = {key: value for key, value in SHARE_TABLE.items() if key != "storage"}
         for table in (
             {**SHARE_TABLE, "kind": "mirror"},
-            {key: value for key, value in SHARE_TABLE.items() if key != "storage"},
+            storage_only,
             {**SHARE_TABLE, "storage": "https://github.com/x/y"},
             {**SHARE_TABLE, "types": "vehicle"},
             {**SHARE_TABLE, "max_bytes": {"vehicle": "10 MiB"}},
+            {**DATA_TABLE, "storage": "ksamods-content/share"},
+            {key: value for key, value in DATA_TABLE.items() if key != "key"},
+            {**DATA_TABLE, "data": "http://data.example.org/share/"},
+            {**DATA_TABLE, "data": "https://data.example.org/share"},
+            {**DATA_TABLE, "downloads": []},
+            {**DATA_TABLE, "retired_keys": "old"},
         ):
             with self.assertRaises(HostError, msg=table):
                 named({"ksamods": "R"}, FakeHttp({}), "R", "vehicle", {"ksamods": table})
@@ -971,6 +1000,88 @@ class NamedShareHosts(unittest.TestCase):
                 (root / "hosts.toml").write_text(text, encoding="utf-8")
                 with self.assertRaises(HostError, msg=text):
                     registered(root)
+
+
+def signing_key(label):
+    """A test key made from a public seed, and its public key text as `hosts.toml` holds it."""
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+    private = Ed25519PrivateKey.from_private_bytes(hashlib.sha256(label.encode()).digest())
+    spki = private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+    return private, base64.b64encode(spki).decode("ascii")
+
+
+class Signatures(unittest.TestCase):
+    """Rule 22: a data file is valid only with an Ed25519 signature of its exact bytes by `key`."""
+
+    BODY = b'{"id": "ExampleRover", "type": "vehicle", "releases": []}'
+
+    def setUp(self):
+        self.private, self.key = signing_key("content-index-releases test key")
+        self.signature = base64.b64encode(self.private.sign(self.BODY)).decode("ascii")
+
+    def test_a_signature_by_the_key_is_valid_and_a_changed_byte_is_not(self):
+        self.assertTrue(signed(self.BODY, self.signature, self.key))
+        self.assertTrue(signed(self.BODY, self.signature.encode("ascii"), self.key))
+        self.assertFalse(signed(self.BODY.replace(b"[]", b"[ ]"), self.signature, self.key))
+        _, other = signing_key("another test key")
+        self.assertFalse(signed(self.BODY, self.signature, other))
+
+    def test_a_signature_of_another_size_or_alphabet_is_refused(self):
+        short = base64.b64encode(self.private.sign(self.BODY)[:63]).decode("ascii")
+        self.assertFalse(signed(self.BODY, short, self.key))
+        # Only a signature whose base64 holds + or / changes in the URL-safe alphabet.
+        body = next(
+            body for body in (self.BODY + b" " * count for count in range(64))
+            if set(base64.b64encode(self.private.sign(body))) & set(b"+/")
+        )
+        urlsafe = base64.urlsafe_b64encode(self.private.sign(body)).decode("ascii")
+        self.assertFalse(signed(body, urlsafe, self.key))
+
+    def test_a_trailing_newline_is_accepted(self):
+        self.assertTrue(signed(self.BODY, self.signature + "\n", self.key))
+        self.assertTrue(signed(self.BODY, (self.signature + "\r\n").encode("ascii"), self.key))
+        self.assertFalse(signed(self.BODY, self.signature[:40] + "\n" + self.signature[40:], self.key))
+
+
+class Containment(unittest.TestCase):
+    """Rules 21 and 28: an archive url is parsed and has to be under a prefix in `downloads`."""
+
+    PREFIXES = ["https://cdn.example.org/archives/"]
+
+    def test_a_url_under_the_prefix_is_within(self):
+        self.assertTrue(_within("https://cdn.example.org/archives/R-1.0.0.zip", self.PREFIXES))
+        self.assertTrue(_within("https://CDN.example.org:443/archives/a/R-1.0.0.zip", self.PREFIXES))
+
+    def test_a_url_that_only_looks_under_the_prefix_is_not(self):
+        for url in (
+            "https://cdn.example.org.evil/archives/R.zip",
+            "https://cdn.example.org/archives/../private/R.zip",
+            "https://cdn.example.org/archives/%2e%2e/private/R.zip",
+            "https://cdn.example.org/archives/%2E%2E%2Fprivate/R.zip",
+            "https://user@cdn.example.org/archives/R.zip",
+            "https://cdn.example.org:8443/archives/R.zip",
+            "http://cdn.example.org/archives/R.zip",
+            "https://cdn.example.org/archives-old/R.zip",
+        ):
+            self.assertFalse(_within(url, self.PREFIXES), url)
+
+
+class LazyImport(unittest.TestCase):
+    def test_the_tools_import_without_cryptography(self):
+        # The jobs that verify nothing install no package, and content-index
+        # imports this module too, so only a signature check may need the package.
+        code = (
+            "import sys; sys.modules['cryptography'] = None\n"
+            "import hosts, watch, decide, download_counts, build_snapshot\n"
+            "print(hosts.signature_ready())\n"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", code], cwd=Path(__file__).parent,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, "False"), result.stderr)
 
 
 if __name__ == "__main__":

@@ -16,8 +16,18 @@ validator, so a SpaceDock authority costs one request per tick. A share host
 (RFC 0094) is a host that `hosts.toml` of the authored repository registers. Its
 release list and its archives are in a GitHub repository, its `storage`, and
 the list is polled conditionally too.
+
+A share host without GitHub storage (RFC 0104) names `data`, `downloads` and
+`key` instead. Each data file comes with an Ed25519 signature beside it, and
+only a signature by `key` makes a live read valid (rule 22 of
+spec/share-host.md). The earlier keys in `retired_keys` are read and checked
+for their form, but they never verify a live read, because they exist only so
+that old recorded signatures can still be checked. The `cryptography` package
+is imported only when a signature is checked, so this module and the modules
+that import it still load on a runner that installs nothing.
 """
 
+import base64
 import dataclasses
 import hashlib
 import http.client
@@ -94,6 +104,20 @@ FULL_READ_HOURS = 24
 REFUSED_READ_HOURS = 1
 
 REPOSITORY = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+
+# The longest .sig file of a data host that is read. A signature is 88
+# characters of base64, so a file near this size holds no signature.
+MAX_SIGNATURE = 1024
+
+# The sizes of an Ed25519 SubjectPublicKeyInfo and of an Ed25519 signature.
+SPKI_BYTES = 44
+SIGNATURE_BYTES = 64
+
+ASCII_WHITESPACE = " \t\n\r\x0b\x0c"
+
+# A percent-encoded dot, slash or backslash in a path, which a server can
+# decode into a segment that leaves the prefix the path seems to be under.
+ENCODED_SEPARATOR = re.compile(r"%(2e|2f|5c)", re.IGNORECASE)
 
 
 class HostError(Exception):
@@ -384,6 +408,121 @@ def _on_host(base, value, what):
     return resolved
 
 
+def _https_url(value):
+    """The split parts of `value` when it is an https URL with a host, no user info and a clean path, else None.
+
+    A clean path has no `.` or `..` segment and no percent-encoded dot, slash or
+    backslash, because a server can resolve each of them to a path outside the
+    prefix that the text seems to be under.
+    """
+    if not isinstance(value, str) or "\\" in value or any(char <= " " or char == "\x7f" for char in value):
+        return None
+    parts = urllib.parse.urlsplit(value)
+    try:
+        parts.port
+    except ValueError:
+        return None
+    if parts.scheme != "https" or not parts.hostname or "@" in parts.netloc:
+        return None
+    if ENCODED_SEPARATOR.search(parts.path) or any(segment in (".", "..") for segment in parts.path.split("/")):
+        return None
+    return parts
+
+
+def _base_url(value):
+    """Whether `value` is an https base URL that ends in '/', as `data` and each prefix of `downloads` are."""
+    parts = _https_url(value)
+    return parts is not None and parts.path.endswith("/") and not parts.query and not parts.fragment
+
+
+def _within(url, prefixes):
+    """Whether `url` is under one of the base URLs `prefixes` (rules 21 and 28 of spec/share-host.md).
+
+    Both sides are parsed and never compared as text, so a look-alike host such
+    as cdn.example.org.evil is not under cdn.example.org. The url has to use
+    https without user info, name the same host and port as the prefix, and
+    have a clean path that starts with the path of the prefix.
+    """
+    got = _https_url(url)
+    if got is None:
+        return False
+    for prefix in prefixes:
+        if not _base_url(prefix):
+            continue
+        wanted = urllib.parse.urlsplit(prefix)
+        if (got.hostname, got.port or 443) == (wanted.hostname, wanted.port or 443) and got.path.startswith(wanted.path):
+            return True
+    return False
+
+
+def _base64(text):
+    """The bytes that `text` holds as strict, padded, standard base64, or None.
+
+    The decoded bytes must encode back to the same text, so the URL-safe
+    alphabet, whitespace inside the text, a missing pad and stray bits are
+    all refused.
+    """
+    try:
+        raw = base64.b64decode(text, validate=True)
+    except ValueError:
+        return None
+    return raw if base64.b64encode(raw).decode("ascii") == text else None
+
+
+def signature_ready():
+    """Whether the cryptography package imports, so that a data host can be verified at all."""
+    try:
+        import cryptography.hazmat.primitives.asymmetric.ed25519  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def signed(body, signature_text, key):
+    """Whether `signature_text` is a valid Ed25519 signature of the exact bytes `body` by `key`.
+
+    `key` is one key text, the standard padded base64 of a 44-byte Ed25519
+    SubjectPublicKeyInfo, and never a list, so that a retired key cannot verify
+    a live read (rule 22). The signature is the text of a .sig file, as bytes or
+    str of at most MAX_SIGNATURE bytes. Surrounding ASCII whitespace is
+    stripped, so a trailing newline is allowed, and the rest has to be strict
+    standard base64 of exactly 64 bytes. The signature is checked over the raw
+    bytes before anything decodes them. A missing cryptography package is a
+    HostError and never False, because it is a fault of the run and not of the
+    host.
+    """
+    try:
+        from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        from cryptography.hazmat.primitives.serialization import load_der_public_key
+    except ImportError as error:
+        raise HostError("cryptography is not installed, so the signature of a data host cannot be checked") from error
+    if isinstance(signature_text, (bytes, bytearray)):
+        if len(signature_text) > MAX_SIGNATURE:
+            return False
+        try:
+            signature_text = bytes(signature_text).decode("ascii")
+        except UnicodeDecodeError:
+            return False
+    if not isinstance(signature_text, str) or len(signature_text) > MAX_SIGNATURE or not isinstance(key, str):
+        return False
+    signature = _base64(signature_text.strip(ASCII_WHITESPACE))
+    der = _base64(key)
+    if signature is None or len(signature) != SIGNATURE_BYTES or der is None or len(der) != SPKI_BYTES:
+        return False
+    try:
+        public = load_der_public_key(der)
+    except (ValueError, UnsupportedAlgorithm):
+        return False
+    if not isinstance(public, Ed25519PublicKey):
+        return False
+    try:
+        public.verify(signature, bytes(body))
+    except InvalidSignature:
+        return False
+    return True
+
+
 class Host:
     """A release host of one listing."""
 
@@ -632,7 +771,7 @@ class ShareHost(Host):
 
     def __init__(self, name, table, listing_id, content_type, http, max_releases=500):
         self.name = name
-        self.storage = table["storage"]
+        self.storage = table.get("storage")
         self.listing_id = listing_id
         self.content_type = content_type
         self.http = http
@@ -648,6 +787,8 @@ class ShareHost(Host):
 
     def releases(self, etag=None):
         self.truncated = False
+        if self.storage is None:
+            raise HostError(f"the share host `{self.name}` serves its files itself, which is not read yet")
         path = SHARE_LIST.format(type=self.content_type, id=self.listing_id)
         url = f"{GITHUB_API}/repos/{self.storage}/contents/{urllib.parse.quote(path)}"
         try:
@@ -976,12 +1117,27 @@ def _share_table(key, table):
         )
     if table.get("kind") != "share":
         raise HostError(f"the host `{key}` of {HOSTS} is of kind {table.get('kind')!r}, and only share is read")
-    storage = table.get("storage")
-    if not isinstance(storage, str) or not REPOSITORY.fullmatch(storage):
+    storage, data = table.get("storage"), table.get("data")
+    if (storage is None) == (data is None):
         raise HostError(
-            f"the host `{key}` of {HOSTS} names no storage repository as owner/repo, "
-            "and a host that serves its files itself is not read yet"
+            f"the host `{key}` of {HOSTS} names {'both' if data is not None else 'neither'} storage "
+            "and data, and a share host names exactly one of them"
         )
+    if storage is not None and (not isinstance(storage, str) or not REPOSITORY.fullmatch(storage)):
+        raise HostError(f"the host `{key}` of {HOSTS} names no storage repository as owner/repo")
+    if data is not None:
+        downloads = table.get("downloads")
+        if not _base_url(data) or not isinstance(downloads, list) or not downloads or not all(
+            _base_url(prefix) for prefix in downloads
+        ):
+            raise HostError(
+                f"the host `{key}` of {HOSTS} needs data and a list of downloads as https URLs that end in '/'"
+            )
+        retired = table.get("retired_keys", [])
+        if not isinstance(table.get("key"), str) or not isinstance(retired, list) or not all(
+            isinstance(value, str) for value in retired
+        ):
+            raise HostError(f"the host `{key}` of {HOSTS} needs a key, and retired_keys as a list of keys")
     types = table.get("types")
     limits = table.get("max_bytes", {})
     if not isinstance(types, list) or not isinstance(limits, dict) or not all(
