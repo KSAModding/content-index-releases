@@ -36,9 +36,17 @@ jobs:
           repository: KSAModding/content-index
           path: .authored
 
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: tools/requirements.txt
+      - run: |
+          pip install --only-binary=:all: -r tools/requirements.txt
+
       - env:
           CONTENT_INDEX: ${{ github.workspace }}/.authored
-        run: python3 -m unittest discover -s tools -t tools -v
+        run: python -m unittest discover -s tools -t tools -v
 
   examples:
     name: examples
