@@ -106,6 +106,9 @@ def observe(host, remembered):
     if host.kind == "github":
         return observe_github(host, remembered)
     if host.kind == "share":
+        # A host that serves its own files has no counts the index can trust (RFC 0104), so it is not asked.
+        if host.data is not None:
+            return {"total": None, "versions": {}}
         return observe_share(host)
     return observe_spacedock(host)
 

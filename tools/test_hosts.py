@@ -19,6 +19,7 @@ import types
 import unittest
 import urllib.error
 import urllib.parse
+import urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -32,9 +33,11 @@ from hosts import (
     HostRelease,
     Http,
     OversizeError,
+    RedirectError,
     Response,
     ShareHost,
     SpaceDockHost,
+    _Contained,
     _utc,
     _within,
     build,
@@ -1200,6 +1203,63 @@ class DataHosts(unittest.TestCase):
         for url, api, headers in http.asked:
             self.assertFalse(api, url)
             self.assertNotIn("Authorization", headers, url)
+
+
+class Moved(Answer):
+    """An Answer whose final URL, after its redirects, is `url`."""
+
+    def __init__(self, body, url):
+        super().__init__(body)
+        self.url = url
+
+    def geturl(self):
+        return self.url
+
+
+class Redirects(unittest.TestCase):
+    """Rule 28: a data host's archive follows a redirect only while it stays under `downloads`."""
+
+    INSIDE = f"{CDN}ExampleRover-1.0.0.zip"
+    OUTSIDE = "https://elsewhere.example.org/ExampleRover-1.0.0.zip"
+
+    def test_a_hop_outside_downloads_is_refused(self):
+        handler = _Contained([CDN])
+        request = urllib.request.Request(self.INSIDE)
+        moved = handler.redirect_request(request, None, 302, "Found", {}, f"{CDN}mirror/ExampleRover-1.0.0.zip")
+        self.assertEqual(moved.full_url, f"{CDN}mirror/ExampleRover-1.0.0.zip")
+        with self.assertRaises(RedirectError):
+            handler.redirect_request(request, None, 302, "Found", {}, self.OUTSIDE)
+
+    def test_a_final_url_outside_downloads_is_a_stamp_error_before_any_byte_is_read(self):
+        for final, refused in ((self.OUTSIDE, True), (self.INSIDE, False)):
+            answer = Moved(b"zip", final)
+            with patch("hosts.urllib.request.build_opener") as build_opener:
+                build_opener.return_value.open.side_effect = [answer]
+                if refused:
+                    with self.assertRaises(StampError) as caught:
+                        download(Http(), release(self.INSIDE), within=(CDN,))
+                    self.assertIn("redirects outside its downloads", str(caught.exception))
+                    self.assertEqual(answer.read_bytes, 0)
+                else:
+                    archive, _ = download(Http(), release(self.INSIDE), within=(CDN,))
+                    with archive:
+                        self.assertEqual(archive.size, 3)
+
+    def test_a_listed_copy_of_a_data_host_is_downloaded_without_containment(self):
+        class Archives(DataHost):
+            def archive(self, url, **options):
+                self.asked.append((url, options))
+                return Archive.of_bytes(b"zip"), {}
+
+        private, key = signing_key("content-index-releases mirror")
+        copy = "https://archive.org/download/x/ExampleRover-1.0.0.zip"
+        http = Archives([dict(data_entry(), mirrors=[copy])], private)
+        host = data_host(http, key)
+        [entry], _ = host.releases()
+        mirror, served = listed_mirrors(host, entry)[0]
+        archive, _ = mirror.download(served)
+        archive.close()
+        self.assertEqual(http.asked[-1], (copy, {"api": False, "limit": 8}))
 
 
 class LazyImport(unittest.TestCase):
