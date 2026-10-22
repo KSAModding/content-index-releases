@@ -113,6 +113,25 @@ MAX_SIGNATURE = 1024
 SPKI_BYTES = 44
 SIGNATURE_BYTES = 64
 
+# The point encodings of small order that libsodium refuses, each with the
+# sign bit clear and set. One fixed signature is valid for every body under
+# such a key, so signed refuses it. This list is a copy of SMALL_ORDER in
+# tools/signature.py of content-index, and the two must stay the same.
+_SMALL_ORDER_BASES = (
+    "0100000000000000000000000000000000000000000000000000000000000000",
+    "ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "0000000000000000000000000000000000000000000000000000000000000000",
+    "c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a",
+    "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+    "edffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+    "eeffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f",
+)
+SMALL_ORDER = frozenset(
+    bytes.fromhex(base[:-2]) + bytes([int(base[-2:], 16) | sign])
+    for base in _SMALL_ORDER_BASES
+    for sign in (0x00, 0x80)
+)
+
 # The `date` of a data-host entry is an RFC 3339 time in UTC (rule 21). It is
 # the only source of `release_date` for such a host, so a date without a time,
 # a time without an offset or a basic-format time is refused, not guessed.
@@ -547,6 +566,8 @@ def signed(body, signature_text, key):
     signature = _base64(signature_text.strip(ASCII_WHITESPACE))
     der = _base64(key)
     if signature is None or len(signature) != SIGNATURE_BYTES or der is None or len(der) != SPKI_BYTES:
+        return False
+    if der[12:] in SMALL_ORDER:
         return False
     try:
         public = load_der_public_key(der)
