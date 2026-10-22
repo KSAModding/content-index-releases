@@ -12,7 +12,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-from authored import FOLDERS, PACKS, host_key, id_holders, type_problem
+from authored import FOLDERS, HOSTS, PACKS, host_key, id_holders, type_problem
 from stamp_release import SEMVER, StampError, normalize_version, valid_id
 
 SNAPSHOT_VERSION = 1
@@ -695,6 +695,9 @@ def build_files(
     tags = authored / "tags.toml"
     if tags.is_file():
         main["tags"] = load_toml(tags)
+    hosts = authored / HOSTS
+    if hosts.is_file():
+        main["hosts"] = load_toml(hosts)
 
     # The fetched copies alone can miss a published file, for example on a stale 404
     # from the CDN, so the history counts too.
@@ -777,7 +780,8 @@ def parse_arguments(argv):
     parser.add_argument(
         "--authored", default=".authored", type=Path,
         help="a checkout of the authored repository, which holds listings/, packs/, "
-        "optional vehicles/ and saves/, index-status.toml and optional tags.toml",
+        "optional vehicles/ and saves/, index-status.toml, and optional tags.toml and "
+        "hosts.toml",
     )
     parser.add_argument("--releases", default="releases", type=Path)
     parser.add_argument("--game-versions", default="game-versions.json", type=Path)
