@@ -33,7 +33,7 @@ from check_amendment import check_document
 from check_release import DEFAULT_AUTHORED
 from hosts import HostError, HostRelease, Response
 from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize, stamp
-from test_hosts import ASSETS, STORAGE, Storage, rover, share_entry
+from test_hosts import ASSETS, CDN, STORAGE, DataHost, Storage, data_entry, rover, share_entry, signing_key
 from watch import (
     IMAGES_VERIFIED,
     REJECTION_HOURS,
@@ -4203,6 +4203,106 @@ downloads = ["https://cdn.example.org/archives/"]
 key = "MCowBQYDK2VwAyEA3+V7O/oWx/V+Qq8hQGpnhy11Ug7Fz/zMB/oLb4PNmlk="
 types = ["vehicle", "save"]
 """
+
+
+class DataFiles(DataHost):
+    """The data host of test_hosts with its archives, and what each archive URL answers to a status request."""
+
+    def __init__(self, entries, private, archives):
+        super().__init__(entries, private)
+        self.archives = archives
+        self.answers = {}
+        self.downloaded = []
+        self.requests = 0
+
+    def archive(self, url, api=False, limit=None, within=None):
+        self.downloaded.append((url, within))
+        return Archive.of_bytes(self.archives[url]), {"Content-Type": "application/zip"}
+
+    def status(self, url, api=False):
+        return self.answers[url]
+
+
+class DataHostListings(WatcherCase):
+    """RFC 0104: a listing on a share host that serves its own files is watched from its signed list."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.folder = Path(self.directory.name)
+        self.private, key = signing_key("content-index-releases data host")
+        self.url = f"{CDN}ExampleRover-1.0.0.zip"
+        self.http = DataFiles([data_entry()], self.private, {self.url: rover_zip()})
+        # The table of DATA_HOSTS_TOML with the public key of the test's own signing key.
+        text = "".join(
+            f'key = "{key}"\n' if line.startswith("key = ") else line
+            for line in DATA_HOSTS_TOML.splitlines(keepends=True)
+        )
+        authored = self.folder / ".authored"
+        (authored / "vehicles").mkdir(parents=True)
+        (authored / "hosts.toml").write_text(text, encoding="utf-8")
+        (authored / "vehicles" / "ExampleRover.toml").write_text(
+            share_listing("ExampleRover", key="example"), encoding="utf-8"
+        )
+
+    def tick(self, hours=0, argv=()):
+        watcher = self.watcher(self.folder, ["--no-sweep", *argv])
+        watcher.images = FakeImages()
+        watcher.issues = RecorderIssues()
+        watcher.http = self.http
+        watcher.history = FakeHistory(None)
+        watcher.commit = lambda path, message: None
+        with at(hours):
+            watcher.tick()
+        return watcher
+
+    def stamped(self, version="1.0.0"):
+        path = self.folder / "releases" / "ExampleRover" / f"{version}.json"
+        return json.loads(path.read_text()) if path.is_file() else None
+
+    def test_a_signed_list_stamps_the_release_from_its_url_and_date(self):
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        document = self.stamped()
+        self.assertEqual(document["release_date"], "2026-10-11T09:14:30Z")
+        # The download section holds what the entry and the archive give, and no count.
+        self.assertEqual(document["download"]["url"], self.url)
+        self.assertEqual(sorted(document["download"]), ["content_type", "sha256", "size", "url"])
+        self.assertEqual(self.http.downloaded, [(self.url, (CDN,))])
+
+    def test_a_wrong_signature_holds_the_listing_back_as_an_outage_does(self):
+        self.tick()
+        # The host lists a new release, and the signature beside the changed list is not by key.
+        other, _ = signing_key("another data host")
+        self.http.document["releases"].append(data_entry("1.1.0"))
+        self.http.signature = base64.b64encode(other.sign(b"{}"))
+        for count in (1, 2):
+            watcher = self.tick(argv=["--unreachable-ticks", "3"])
+            self.assertEqual(watcher.issues.reported, [])
+            self.assertEqual(watcher.cache.data["listings"]["ExampleRover"]["unreachable"], count)
+
+        watcher = self.tick(argv=["--unreachable-ticks", "3"])
+        [(listing_id, errors)] = watcher.issues.reported
+        self.assertEqual(listing_id, "ExampleRover")
+        self.assertIn("has no valid signature by key", errors[0])
+        self.assertIsNone(self.stamped("1.1.0"))
+        self.assertNotIn("unavailable_since", self.stamped()["download"])
+        self.assertEqual(watcher.cache.data["gone"], {})
+
+    def test_an_entry_the_host_removes_is_marked_gone_once_its_url_answers_410(self):
+        self.tick()
+        self.http.document["releases"] = []
+        self.http.answers[self.url] = 410
+        self.tick()
+        watcher = self.tick(watch.GONE_HOURS - 1)
+        self.assertEqual(watcher.marked, [])
+        self.assertNotIn("unavailable_since", self.stamped()["download"])
+
+        watcher = self.tick(watch.GONE_HOURS)
+        self.assertEqual(watcher.marked, ["ExampleRover 1.0.0"])
+        self.assertEqual(
+            self.stamped()["download"]["unavailable_since"], iso(START + timedelta(hours=watch.GONE_HOURS))
+        )
 
 
 class VehicleGoneFromTheHost(GoneCase):

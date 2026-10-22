@@ -53,6 +53,7 @@ Mods, mod loaders, vehicles and saves are counted, all of them in its `listings`
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
+A share host that serves its files itself (RFC 0104) has no counts, and no request is sent for them.
 A share host that left `hosts.toml`, or that the listing no longer names, keeps its last known count.
 
 Known limit: a deleted GitHub release without its own version entry, and an archive uploaded again, lower a count that the host did not lower.
@@ -107,6 +108,19 @@ Because a deleted GitHub release does not change the list, the list is read in f
 A key under `[releases]` that is neither `github`, `spacedock` nor a registered host is reported, and so is a listing of a type the host does not take.
 A `hosts.toml` that does not read holds the listings on a share host back as an outage does, and reaches their issues only after the same number of ticks.
 The same is true for a table whose name is not lowercase letters, digits and hyphens of 2 to 32 characters that start with a letter, because the snapshot keeps download counts only under such a key.
+
+A share host can also serve its files itself, without a GitHub repository ([RFC 0104](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0104-share-host-conformance.md)).
+Its table names `data`, `downloads` and `key` in place of `storage`, and can name `retired_keys`.
+The watcher reads the release list `releases/<type>/<id>.json` under `data` over plain HTTPS, conditionally against an ETag, and never sends its token there.
+The list counts only when the file beside it, at the same path with `.sig` appended, holds a valid Ed25519 signature of its exact bytes by `key`.
+`retired_keys` only lets a steward check a signature that was recorded before a key change, and it never makes a list valid, so after a key change the listings of the host wait until the host signs its files again with the new key.
+A list without a valid signature holds its listings back as an outage does, and the issue that opens after the same number of ticks says that the list has no valid signature by key.
+Each entry gives the archive in `url`, an https URL under a prefix in `downloads`, and the release date in `date`, an RFC 3339 time in UTC that is not in the future, and an entry that breaks one of these is reported in the listing's issue.
+The download of an archive follows a redirect only while it stays under `downloads`, and an archive that ends up anywhere else is reported.
+An entry that the host removes is marked as gone as any other release is, a day after the list drops it and once its `url` answers `410 Gone`.
+Such a host has no download counts.
+The watcher checks the signatures with the `cryptography` package that `tools/requirements.txt` pins, and when `hosts.toml` registers such a host and the package is not installed, the run exits with code 2 before it counts any listing.
+A key that is compromised is removed from `hosts.toml` and not moved to `retired_keys`, because a signature by it proves nothing any more.
 
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
