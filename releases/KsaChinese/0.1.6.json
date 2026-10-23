@@ -1,0 +1,55 @@
+{
+  "spec_version": 1,
+  "id": "KsaChinese",
+  "type": "mod",
+  "version": "0.1.6",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-23T12:51:37Z",
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
+  "game_max": "2026.10.19.5638",
+  "game_max_revision": 5638,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/kuxiaowo/KSA-CHINESE/releases/download/v0.1.6/KsaChinese-0.1.6.zip",
+    "sha256": "C35DE18C4833878B7CC4BA4DE8A57F1828029E7AEE28EA2EBF08F03F28AF8646",
+    "size": 581944,
+    "content_type": "application/zip"
+  },
+  "install_size": 1435049,
+  "install": {
+    "root": "KsaChinese",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "max": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/kuxiaowo/KSA-CHINESE/releases/tag/v0.1.6",
+  "changelog_text": "本版为 KSA **2026.10.19.5638 / Windows x64** 增加 StarMap / Borea 标准模组包，沿用 0.1.5 的部分汉化内容。\n\n## 选择下载包\n\n- **KsaChinese-0.1.6.zip**：已有 StarMap / Borea 时使用。ZIP 只有一个 KsaChinese 文件夹，安装到所选档案的 mods 目录；不附带加载器或启动器。需要单独安装 **StarMap 0.4.8** 和 **.NET 10 x64 Runtime**。\n- **KsaChinese-0.1.6-5638-Portable.zip**：需要随包启动器时使用。完整解压到含 KSA.exe 的游戏目录，运行 KsaChinese/KsaChineseLauncher.exe；保留既有 Profile 和 launcher-settings.json。\n\n两包的插件、词典、字体和兼容表一致。迁移到 Borea 前请备份旧 KsaChinese/Profile，并移走旧 Content/KsaChinese，避免同名副本优先加载。\n\n## 变化与验证\n\n- “语言 / Language”菜单的选择保存于当前档案 KsaChinese/settings.json，不同实例独立，更新模组不覆盖个人语言偏好。\n- 保留精确游戏版本与依赖哈希保护，缺译文回退原文。代码/译文 MIT，字体 OFL-1.1，完整署名和许可随包提供。\n- 1059 项无图形检查通过；Borea 0.5.1 原版源码组件的 33 项接入检查通过，6 次真实游戏运行退出 0，覆盖安装、实例隔离、重启语言恢复、保存/重载、禁用/启用、同版本替换与卸载。\n- 两包通过 CRC、全文件哈希和核心载荷一致性检查；无游戏 DLL、Core 资源、反编译源码、测试驱动或个人数据。\n\n[安装与迁移](https://github.com/kuxiaowo/KSA-CHINESE/blob/v0.1.6/README-%E7%94%9F%E6%80%81%E5%AE%89%E8%A3%85.md) · [详细验证报告](https://github.com/kuxiaowo/KSA-CHINESE/blob/v0.1.6/reports/0.1.6-%E7%94%9F%E6%80%81%E6%8E%A5%E5%85%A5%E4%B8%8E%E9%AA%8C%E8%AF%81.md)\n\n**社区目录状态：** 外部论坛帖子和 KSAModding/content-index PR 仍待维护者确认，公共 Borea 目录尚未收录。本版可以手动装入 Borea 实例；不能据此宣称已能从公共目录搜索安装。集成验证使用本机候选索引，未进行桌面 GUI 点击验收或跨版本标准包升级试验。\n\n这是正式 Release，但仍为部分汉化。旧版更新正文、原生工具库和异常文字、模型/贴图印字及完整 UI/场景遍历仍有未完成范围；正式状态不代表全游戏汉化完成。\n\nSHA-256：\n\n```text\nc35de18c4833878b7cc4ba4de8a57f1828029e7aee28ea2ebf08f03f28af8646  KsaChinese-0.1.6.zip\nb877e992daf6699a22efee39b97827a4b42a9133dd4943a81dbf840bd16fec9f  KsaChinese-0.1.6-5638-Portable.zip\n```",
+  "listing": {
+    "name": "KSA Chinese / 简体中文",
+    "authors": [
+      "kuxiaowo",
+      "KsaUiLanguages contributors"
+    ],
+    "abstract": "Partial Simplified Chinese UI, part names and tooltips for KSA build 5638, with English fallback.",
+    "description": "Simplified Chinese display-layer localization for **KSA 2026.10.19.5638 on Windows x64**.\n\n- Translates supported UI, part and substance captions, tooltips and selected version history.\n- Includes a renamed Noto Sans SC font subset and an English / 简体中文 menu.\n- Language preferences are saved per game profile, outside the mod files, so Borea instances remain independent.\n- Preserves technical identifiers, part/model numbers, units, placeholders and player names.\n- Refuses uninspected game/dependency hashes; untranslated text falls back to the original.\n\nThis is **partial localization**, not an official translation or a claim of complete coverage. Older version-history text, native library/error text, texture lettering and complete UI/visual coverage remain unfinished. Compatibility with other localization mods has not been established.\n\nRequires .NET 10 x64 Runtime and StarMap 0.4.8. Install through Borea, or extract the standard ZIP into the selected profile's `mods` folder and enable `KsaChinese`. Launch through StarMap/Borea.\n\nWhen migrating from the portable package, first back up its Profile and move the old `<game>/Content/KsaChinese` out of Content. Do not keep two copies with the same mod id. The standard mod ZIP does not bundle a loader or launcher.\n\nCode and translations: MIT, including portions derived from LiX-Works/KsaUiLanguages at b504774158cc03b582a0e75bfe94330cb841f11d. Font: Noto Sans SC subset, OFL-1.1. Original credits and license texts are included.\n",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksa-chinese-0-1-6-simplified-chinese-ui-for-ksa-5638.1440/",
+      "repository": "https://github.com/kuxiaowo/KSA-CHINESE",
+      "bugtracker": "https://github.com/kuxiaowo/KSA-CHINESE/issues",
+      "documentation": "https://github.com/kuxiaowo/KSA-CHINESE/blob/main/README-%E7%94%9F%E6%80%81%E5%AE%89%E8%A3%85.md"
+    }
+  }
+}
