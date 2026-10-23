@@ -468,6 +468,16 @@ class Vehicles(Fixture):
         outcome = self.check(self.stamped())
         self.assertEqual(outcome.outcome, check_release.COULD_NOT_EVALUATE, outcome.messages)
 
+    def test_an_archive_with_a_program_in_the_folder_is_rejected(self):
+        bad = archive({
+            "Example Rover/meta.toml": META,
+            "Example Rover/vehicle.xml": "<VehicleSaveData />",
+            "Example Rover/Setup.exe": "MZ",
+        })
+        messages = self.rejected(self.stamped(), path=ROVER_PATH, http=FakeHttp({ROVER_URL: bad}))
+        self.assertIn("does not stamp", messages)
+        self.assertIn("'Example Rover/Setup.exe' is a .exe file", messages)
+
     def test_a_watched_vehicle_listing_is_the_watchers(self):
         (self.root / "vehicles" / "ExampleRover.toml").write_text(
             VEHICLE + '\n[releases]\ngithub = "someone/shares"\n', encoding="utf-8"
