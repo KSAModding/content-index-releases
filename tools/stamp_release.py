@@ -95,12 +95,50 @@ META_TOML = "meta.toml"
 # ASCII digits only, because `\d` matches every Unicode digit.
 META_VERSION = re.compile(r"^v?([0-9]+)\.([0-9]+)\.([0-9]+)\.([0-9]+)$")
 
-# The declared size of a game file the stamper parses. A real save is under
-# 1 MiB, and the zip reader stops at the declared size, so this bounds the work
-# a crafted archive can cause.
+# The declared size of an XML file the stamper parses, and of all the XML files
+# of one game folder together. A real save is under 1 MiB, and the zip reader
+# stops at the declared size, so this bounds the work a crafted archive can cause.
 GAME_FILE_LIMIT = 256 * 1024 * 1024
 
 XML_CHUNK = 64 * 1024
+
+# The file types a vehicle or a save folder must not hold, compared without
+# case. The game reads only meta.toml and XML from these folders and runs
+# nothing from them, so a file here that a player can start with a double click,
+# that a process loads as code, or that Explorer reads when it shows the folder,
+# has no use and can only do harm. A save also holds the state of mods, which
+# can be of any type, so this is a deny list.
+# `.bin` is not here because it is a common name for plain data, and `.html`
+# and `.svg` are not here because a browser runs their scripts in a sandbox.
+EXECUTABLE_EXTENSIONS = frozenset(
+    {
+        # Windows programs, libraries and installers.
+        ".exe", ".com", ".scr", ".pif", ".cpl", ".dll", ".xll", ".msi", ".msp",
+        ".msix", ".msixbundle", ".appx", ".appxbundle", ".application", ".appref-ms",
+        ".diagcab", ".gadget",
+        # Windows scripts and the files that start a program or change the system.
+        ".bat", ".cmd", ".ps1", ".psm1", ".vb", ".vbs", ".vbe", ".js", ".jse",
+        ".wsf", ".wsh", ".wsc", ".sct", ".hta", ".msc", ".reg", ".lnk", ".url",
+        ".chm", ".settingcontent-ms",
+        # Windows files that Explorer reads when it shows the folder.
+        ".scf", ".library-ms", ".searchconnector-ms",
+        # Runtimes a player may have installed on any system.
+        ".jar", ".jnlp", ".py", ".pyc", ".pyw", ".pyz",
+        # Linux libraries, shell scripts, installers and launchers.
+        ".so", ".sh", ".bash", ".zsh", ".ksh", ".csh", ".run", ".appimage", ".desktop",
+        ".deb", ".rpm",
+        # macOS libraries, application bundles, scripts, installers and links.
+        ".dylib", ".app", ".command", ".tool", ".terminal", ".pkg", ".mpkg",
+        ".webloc", ".inetloc", ".fileloc",
+    }
+)
+
+# The types of EXECUTABLE_EXTENSIONS that macOS also runs as a folder, a bundle
+# that Finder shows as one file. Any other folder name is only a name, so a
+# mod's state can be in a folder such as `KSA.Tool`. `.framework`, `.bundle`,
+# `.plugin` and `.kext` are not here, because no double click starts them and
+# only a program that is given their path loads them.
+BUNDLE_EXTENSIONS = frozenset({".app", ".pkg", ".mpkg"})
 
 # How many file names one note names.
 NOTE_NAMES = 20
@@ -618,6 +656,11 @@ def _check_launch(names, root, launch, what):
 def game_folder(handle, root, content_type, notes=None):
     """The checks of RFC 0085 on the game folder at `root`, and its parsed meta.toml.
 
+    Every file under the folder is checked too, because the client installs the
+    folder as it is. A file of a type in EXECUTABLE_EXTENSIONS, a folder of a
+    type in BUNDLE_EXTENSIONS and a name with a ':' are refused, and every
+    `.xml` file has to pass `check_xml` as the game file does.
+
     For a vehicle, `notes` gets one note that names the files besides meta.toml
     and vehicle.xml, because the game writes only those two when it saves a
     vehicle (`UncompressedVehicleSave.Write`). In a save, another file is the
@@ -658,6 +701,7 @@ def game_folder(handle, root, content_type, notes=None):
             )
         raise StampError(f"the archive has no {entry}, so the game does not see the {content_type}")
     check_xml(handle, entry)
+    _check_folder_files(handle, root, content_type, entry)
 
     if content_type == "vehicle" and notes is not None:
         prefix = f"{root}/" if root else ""
@@ -677,13 +721,75 @@ def game_folder(handle, root, content_type, notes=None):
     return meta
 
 
+def _installed_name(filename):
+    """The entry name as the client matches it, with `/` and without leading `./`.
+
+    Borea's `ModArchive.Extract` changes a backslash to `/` and removes every
+    `./` at the start before it compares the name with the root, so
+    `./Rover/a.exe` lands in the folder `Rover`.
+    """
+    name = filename.replace("\\", "/")
+    while name.startswith("./"):
+        name = name[2:]
+    return name
+
+
+def _check_folder_files(handle, root, content_type, game_entry):
+    """Refuse an executable or script file under `root`, and XML that `check_xml` refuses.
+
+    The game file is already checked, so the entry with its exact name is left
+    out of the XML here, and every other entry that lands on it is checked. The
+    XML files count against GAME_FILE_LIMIT together as well, so many files
+    just below the limit cannot multiply the work.
+    """
+    prefix = f"{root}/" if root else ""
+    xml_entries = []
+    for info in handle.infolist():
+        name = _installed_name(info.filename)
+        if info.is_dir() or not name.startswith(prefix):
+            continue
+        relative = name[len(prefix):]
+        if ":" in relative:
+            raise StampError(
+                f"the archive's {info.filename!r} has a ':' in its name, which Windows "
+                "does not allow in a file name and reads as a stream of a file"
+            )
+        # Windows drops dots and spaces at the end of a name when it creates
+        # the file, so `Setup.exe.` lands on disk as `Setup.exe`.
+        parts = [part.rstrip(". ") for part in relative.split("/")]
+        for depth, part in enumerate(parts, start=1):
+            extension = posixpath.splitext(part)[1].lower()
+            kind = "file" if depth == len(parts) else "folder"
+            if extension in (EXECUTABLE_EXTENSIONS if kind == "file" else BUNDLE_EXTENSIONS):
+                path = prefix + "/".join(relative.split("/")[:depth])
+                raise StampError(
+                    f"the archive's {path!r} is a {extension} {kind}, a type that runs "
+                    f"as code, and the game never runs anything from a {content_type} folder"
+                )
+        if parts[-1].lower().endswith(".xml") and info.filename != game_entry:
+            xml_entries.append(info)
+
+    total = sum(info.file_size for info in xml_entries) + handle.getinfo(game_entry).file_size
+    if total > GAME_FILE_LIMIT:
+        raise StampError(
+            f"the XML files under the archive's {root or 'root'} are {total} bytes "
+            f"together, above the {GAME_FILE_LIMIT} byte limit"
+        )
+    for info in xml_entries:
+        check_xml(handle, info)
+
+
 def check_xml(handle, entry):
-    """Refuse a game file that is not well-formed XML, read as a stream.
+    """Refuse an XML file of a game folder that is not well-formed XML, read as a stream.
 
     `XmlSerializer` never writes a DOCTYPE, and a DOCTYPE is the way in for
-    entity expansion, so one is refused.
+    entity expansion, so one is refused, also in an XML file of a mod.
+
+    `entry` is a name or a ZipInfo. A ZipInfo picks one of several entries with
+    the same name, which `getinfo` cannot do.
     """
-    info = handle.getinfo(entry)
+    info = entry if isinstance(entry, zipfile.ZipInfo) else handle.getinfo(entry)
+    entry = info.filename
     if info.file_size > GAME_FILE_LIMIT:
         raise StampError(
             f"the archive's {entry} is {info.file_size} bytes, above the "
@@ -691,7 +797,10 @@ def check_xml(handle, entry):
         )
 
     def doctype(*details):
-        raise StampError(f"the archive's {entry} carries a DOCTYPE, which the game never writes")
+        raise StampError(
+            f"the archive's {entry} carries a DOCTYPE, which XmlSerializer never writes "
+            "and which is the way in for entity expansion"
+        )
 
     parser = xml.parsers.expat.ParserCreate()
     parser.StartDoctypeDeclHandler = doctype
