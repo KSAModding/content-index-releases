@@ -32,6 +32,7 @@ from check_amendment import check_document
 from check_release import DEFAULT_AUTHORED
 from hosts import HostError, HostRelease, Response
 from stamp_release import CHANGELOG_TEXT_LIMIT, Archive, StampError, normalize_version, serialize, stamp
+from test_hosts import ASSETS, STORAGE, Storage, rover, share_entry
 from watch import (
     IMAGES_VERIFIED,
     REJECTION_HOURS,
@@ -3914,6 +3915,253 @@ class VehiclesAndSaves(WatcherCase):
         self.assertEqual(errors, [])
         document = self.stamped("ExampleRover")
         self.assertEqual((document["game_min"], document["game_min_revision"]), ("2026.9.10.5438", 5438))
+
+
+HOSTS_TOML = """\
+[ksamods]
+kind = "share"
+name = "ksamods.gg"
+storage = "ksamods-content/share"
+bot = 98765432
+api = "https://ksamods.gg/api/share/v1/"
+types = ["vehicle", "save"]
+max_bytes = {{ vehicle = {vehicle}, save = 104857600 }}
+"""
+
+ROVER_ASSET = f"{ASSETS}/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+ARCHIVED = "https://archive.org/download/ksamods-vehicle-ExampleRover-1.0.0/ExampleRover-1.0.0.zip"
+
+
+def share_listing(listing_id, key="ksamods", value=None):
+    """A vehicle listing on the share host `key`, as RFC 0094 names it."""
+    text = vehicle_listing(listing_id).split("\n[releases]")[0]
+    return f'{text}\n[releases]\n{key} = "{value or listing_id}"\n'
+
+
+class StorageAndShares(Storage):
+    """The storage repository of a share host, and the GitHub repository of SharesHttp for every other URL."""
+
+    def __init__(self, entries, releases, archives, shares):
+        super().__init__(entries, releases, archives)
+        self.shares = shares
+        self.downloaded = []
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        if url.startswith(STORAGE):
+            return super().get(url, accept, etag, api, limit)
+        return self.shares.get(url, accept, etag, api, limit)
+
+    def archive(self, url, api=False, limit=None):
+        self.downloaded.append(url)
+        if url in self.archives:
+            return super().archive(url, api, limit)
+        return self.shares.archive(url, api, limit)
+
+
+class ShareHostListings(WatcherCase):
+    """RFC 0094: a listing on a share host is watched as a listing on GitHub is."""
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.folder = Path(self.directory.name)
+        archive = rover_zip()
+        self.http = StorageAndShares(
+            [share_entry("1.0.0")],
+            [rover(size=len(archive))],
+            {ROVER_ASSET: archive},
+            SharesHttp(
+                [share("vehicle", "OtherRover", "1.0.0")],
+                {f"{SHARES}/download/vehicle/OtherRover/1.0.0/OtherRover-1.0.0.zip": rover_zip("Other Rover")},
+            ),
+        )
+        self.hosts(10485760)
+        self.lines = []
+
+    def hosts(self, vehicle, text=None):
+        path = self.folder / ".authored" / "hosts.toml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text if text is not None else HOSTS_TOML.format(vehicle=vehicle), encoding="utf-8")
+
+    def listing(self, listing_id, text):
+        path = self.folder / ".authored" / "vehicles" / f"{listing_id}.toml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def tick(self, argv=()):
+        watcher = self.watcher(self.folder, ["--no-sweep", *argv])
+        watcher.images = FakeImages()
+        watcher.issues = RecorderIssues()
+        watcher.http = self.http
+        watcher.history = FakeHistory(None)
+        watcher.log = self.lines.append
+        watcher.commit = lambda path, message: None
+        watcher.tick()
+        return watcher
+
+    def listed(self, payload):
+        """The rover's release on the share host with one copy at the Internet Archive serving `payload`."""
+        self.http.document["releases"] = [share_entry("1.0.0", mirrors=[ARCHIVED])]
+        self.http.archives[ARCHIVED] = payload
+
+    def stamped(self, listing_id="ExampleRover", version="1.0.0"):
+        path = self.folder / "releases" / listing_id / f"{version}.json"
+        return json.loads(path.read_text()) if path.is_file() else None
+
+    def test_a_vehicle_on_a_share_host_is_stamped_as_a_vehicle_on_github_is(self):
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+
+        self.assertEqual(watcher.issues.reported, [])
+        document = self.stamped()
+        self.assertEqual(
+            document["install"], {"root": "Example Rover", "derived": True, "folder": "Example Rover"}
+        )
+        self.assertEqual((document["game_min"], document["game_min_revision"]), ("2026.9.22.5482", 5482))
+        self.assertEqual(
+            document["dependencies"], [{"id": "KittenExtensions", "kind": "required", "source": "authored"}]
+        )
+        self.assertEqual(document["release_status"], "stable")
+        self.assertEqual(document["release_date"], "2026-10-11T09:14:30Z")
+        self.assertEqual(document["download"]["url"], ROVER_ASSET)
+        self.assertNotIn("changelog", document)
+        self.assertEqual(self.http.limits, [10485760])
+
+        # The list did not change, so the next tick costs one request and downloads nothing.
+        before = self.http.requests
+        self.http.downloaded.clear()
+        watcher = self.tick()
+        self.assertEqual(self.http.requests - before, 1)
+        self.assertEqual(self.http.downloaded, [])
+        self.assertEqual(watcher.issues.reported, [])
+
+    def test_the_status_of_the_list_is_stamped(self):
+        self.http.document["releases"] = [share_entry("1.0.0", "dev")]
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        self.tick()
+        self.assertEqual(self.stamped()["release_status"], "dev")
+
+    def test_an_entry_without_its_github_release_is_reported(self):
+        self.http.releases.clear()
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        [(listing_id, errors)] = watcher.issues.reported
+        self.assertEqual(listing_id, "ExampleRover")
+        self.assertIn("no published GitHub release tagged `vehicle/ExampleRover/1.0.0`", errors[0])
+        self.assertIsNone(self.stamped())
+        self.assertEqual(self.http.downloaded, [])
+
+    def test_an_archive_above_the_limit_is_reported_and_stamped_once_a_steward_raises_it(self):
+        self.hosts(8)
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        [(_, errors)] = watcher.issues.reported
+        self.assertIn("above the", errors[0])
+        self.assertIsNone(self.stamped())
+
+        # The table is part of what the stored ETag stands for, so the list is read again at once.
+        self.hosts(10485760)
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped()["download"]["url"], ROVER_ASSET)
+
+    def test_a_key_hosts_toml_does_not_register_is_reported(self):
+        self.listing("ExampleRover", share_listing("ExampleRover", key="elsewhere"))
+        watcher = self.tick()
+        [(_, errors)] = watcher.issues.reported
+        self.assertIn("neither github nor spacedock nor a share host", errors[0])
+        self.assertEqual(self.http.requests, 0)
+
+    def test_a_type_the_host_does_not_take_is_reported(self):
+        self.hosts(0, HOSTS_TOML.format(vehicle=1).replace('["vehicle", "save"]', '["save"]'))
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        [(_, errors)] = watcher.issues.reported
+        self.assertIn("takes save, and this listing is a vehicle", errors[0])
+
+    def test_a_hosts_toml_that_does_not_read_holds_its_listings_back_and_no_other(self):
+        self.hosts(0, "[ksamods\n")
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        self.listing("OtherRover", vehicle_listing("OtherRover"))
+        watcher = self.tick()
+
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertIsNone(self.stamped())
+        self.assertEqual(watcher.cache.data["listings"]["ExampleRover"]["unreachable"], 1)
+        self.assertEqual(self.stamped("OtherRover")["install"]["folder"], "Other Rover")
+        # A listing that names no share host keeps the digest it had, so no stored ETag is dropped.
+        authored = tomllib.loads(vehicle_listing("OtherRover"))
+        self.assertEqual(watcher.poll_digest("OtherRover", authored), watcher.authored_digest(authored))
+
+    def test_a_listed_copy_with_the_same_bytes_is_a_mirror_of_the_stamp(self):
+        self.listed(self.http.archives[ROVER_ASSET])
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+        # In the stamp itself, not appended by a later pass.
+        self.assertEqual(watcher.mirrored, [])
+        self.assertEqual(self.http.downloaded, [ROVER_ASSET, ARCHIVED])
+        self.assertEqual(self.http.limits, [10485760, 10485760])
+
+    def test_a_listed_copy_with_other_bytes_is_dropped_and_downloaded_once(self):
+        self.listed(rover_zip(version="v2026.9.22.5483"))
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertNotIn("mirrors", self.stamped()["download"])
+        self.assertEqual(self.http.downloaded.count(ARCHIVED), 1)
+
+        # A changed list is read in full, and the copy is still not downloaded again.
+        self.http.document["releases"].append(share_entry("1.1.0"))
+        self.http.releases["vehicle/ExampleRover/1.1.0"] = rover("1.1.0")
+        self.http.archives[f"{ASSETS}/vehicle/ExampleRover/1.1.0/ExampleRover-1.1.0.zip"] = rover_zip()
+        self.tick()
+        self.assertIsNotNone(self.stamped(version="1.1.0"))
+        self.assertEqual(self.http.downloaded.count(ARCHIVED), 1)
+        self.assertNotIn("mirrors", self.stamped()["download"])
+
+    def test_a_copy_listed_after_the_stamp_is_appended_on_the_next_tick(self):
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        self.tick()
+        self.assertNotIn("mirrors", self.stamped()["download"])
+
+        self.listed(self.http.archives[ROVER_ASSET])
+        watcher = self.tick()
+        self.assertEqual(watcher.mirrored, ["ExampleRover 1.0.0"])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+
+    def test_a_listed_copy_does_not_stand_for_a_mirror_host_that_publishes_later(self):
+        self.listed(self.http.archives[ROVER_ASSET])
+        self.listing(
+            "ExampleRover",
+            share_listing("ExampleRover")
+            + 'github = "o/shares"\ntag_prefix = "vehicle/ExampleRover/"\nauthority = "ksamods"\n',
+        )
+        watcher = self.tick()
+        self.assertEqual(watcher.issues.reported, [])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+
+        published = f"{SHARES}/download/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+        self.http.shares.payloads.append(share("vehicle", "ExampleRover", "1.0.0"))
+        self.http.shares.archives[published] = self.http.archives[ROVER_ASSET]
+        watcher = self.tick()
+        self.assertEqual(watcher.mirrored, ["ExampleRover 1.0.0"])
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED, published])
+
+    def test_a_copy_the_budget_did_not_reach_keeps_the_list_unsettled(self):
+        self.listed(self.http.archives[ROVER_ASSET])
+        self.listing("ExampleRover", share_listing("ExampleRover"))
+        watcher = self.tick(["--mirror-budget", "0"])
+        self.assertNotIn("mirrors", self.stamped()["download"])
+        [state] = watcher.cache.data["hosts"].values()
+        self.assertNotIn("etag", state)
+
+        # The next tick reads the list in full and appends the copy.
+        watcher = self.tick()
+        self.assertEqual(self.stamped()["download"]["mirrors"], [ARCHIVED])
+        [state] = watcher.cache.data["hosts"].values()
+        self.assertIn("etag", state)
 
 
 class VehicleGoneFromTheHost(GoneCase):

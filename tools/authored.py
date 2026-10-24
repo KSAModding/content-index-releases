@@ -5,8 +5,10 @@
 A listing of a mod or a mod-loader is `listings/<id>.toml`, a vehicle is `vehicles/<id>.toml` and a save is `saves/<id>.toml` (RFC 0085).
 A pack is the folder `packs/<id>/` (RFC 0080).
 All of them share one namespace of ids, compared without case (RFC 0031).
+The share hosts the stewards registered are the tables of `hosts.toml` (RFC 0094).
 """
 
+import re
 from pathlib import Path
 
 # The folders of authored listing documents and the types each holds, in the
@@ -18,6 +20,25 @@ FOLDERS = {
 }
 
 PACKS = "packs"
+
+HOSTS = "hosts.toml"
+
+# The form of a table name in HOSTS, which is the key a listing names the host
+# with. The watcher, the counts and the snapshot read no table name of another
+# form, so a schema of hosts.toml in the authored repository must use this pattern.
+HOST_KEY = re.compile(r"[a-z][a-z0-9-]{1,31}")
+
+# The keys of `[releases]` that name no host.
+RELEASES_KEYS = ("authority", "since", "tag_prefix")
+
+
+def host_key(key):
+    """Whether `key` can name a share host: of the HOST_KEY form, and no other key of `[releases]`."""
+    return (
+        isinstance(key, str)
+        and HOST_KEY.fullmatch(key) is not None
+        and key not in ("github", "spacedock", *RELEASES_KEYS)
+    )
 
 
 def listing_files(root):

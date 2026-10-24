@@ -12,7 +12,7 @@ import sys
 import tomllib
 from pathlib import Path
 
-from authored import FOLDERS, PACKS, id_holders, type_problem
+from authored import FOLDERS, PACKS, host_key, id_holders, type_problem
 from stamp_release import SEMVER, StampError, normalize_version, valid_id
 
 SNAPSHOT_VERSION = 1
@@ -363,8 +363,12 @@ def check_counted(item, where, keys):
     if not isinstance(counts, dict) or not counts:
         raise SnapshotError(f"{where}: hosts has to be an object with at least one host")
     for host, value in counts.items():
-        if host not in DOWNLOAD_HOSTS:
-            raise SnapshotError(f"{where}: '{host}' is not a host RFC 0052 defines")
+        # A share host counts under its key in hosts.toml. Its form is checked and
+        # not the file, because a host that left hosts.toml keeps its last count.
+        if host not in DOWNLOAD_HOSTS and not host_key(host):
+            raise SnapshotError(
+                f"{where}: '{host}' is neither a host RFC 0052 defines nor the key of a share host (RFC 0094)"
+            )
         check_count(value, f"{where} hosts.{host}")
     check_count(item["total"], f"{where} total")
     if item["total"] != sum(counts.values()):

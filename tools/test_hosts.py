@@ -7,26 +7,38 @@ HTTPError that escapes either becomes an "unexpected" log line with no
 author-facing issue, which is exactly what the watcher must not do.
 """
 
+import dataclasses
 import hashlib
 import http.client
 import json
+import tempfile
+import types
 import unittest
 import urllib.error
+import urllib.parse
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 from hosts import (
     MAX_ARCHIVE_BYTES,
     MAX_RESPONSE_BYTES,
+    REFUSED_READ_HOURS,
     GitHubHost,
     HostError,
     HostRelease,
     Http,
     OversizeError,
     Response,
+    ShareHost,
     SpaceDockHost,
     _utc,
+    build,
     download,
+    listed_mirrors,
     named,
+    registered,
+    share_keys,
     stamped_dependencies,
 )
 from stamp_release import Archive, StampError
@@ -97,6 +109,13 @@ class Downloads(unittest.TestCase):
         ):
             download(http, release(url))
         self.assertEqual(http.flags, [False, False, False, True, True])
+
+    def test_a_release_with_only_the_fields_content_index_passes_is_read(self):
+        # content-index calls download with a plain object, not a HostRelease.
+        bare = types.SimpleNamespace(url=None, candidates=("a.zip",), size=None)
+        with self.assertRaises(StampError) as caught:
+            download(FakeHttp({}), bare)
+        self.assertIn("none of them is named after the listing", str(caught.exception))
 
     def test_a_gone_archive_is_a_stamp_error(self):
         # 404, 410 and 451 are facts about the release, reported to the author.
@@ -616,6 +635,342 @@ class TagPrefix(unittest.TestCase):
         with self.assertRaises(StampError) as caught:
             named({"spacedock": 1, "tag_prefix": "gatos-v"}, FakeHttp({}))
         self.assertIn("github", str(caught.exception))
+
+
+STORAGE = "https://api.github.com/repos/ksamods-content/share"
+ASSETS = "https://github.com/ksamods-content/share/releases/download"
+
+# The sizes are small, so a test of the limit needs no large archive.
+SHARE_TABLE = {
+    "kind": "share",
+    "name": "ksamods.gg",
+    "storage": "ksamods-content/share",
+    "bot": 98765432,
+    "api": "https://ksamods.gg/api/share/v1/",
+    "types": ["vehicle", "save"],
+    "max_bytes": {"vehicle": 8, "save": 64},
+}
+REGISTRY = {"ksamods": SHARE_TABLE}
+
+
+def share_entry(version, status="stable", mirrors=None):
+    entry = {"version": version, "status": status}
+    if mirrors is not None:
+        entry["mirrors"] = mirrors
+    return entry
+
+
+def share_release(tag, *names, size=4, count=3, draft=False, date="2026-10-11T09:14:30Z"):
+    """The GitHub release of a share host, with one uploaded asset per name."""
+    return {
+        "tag_name": tag,
+        "draft": draft,
+        "prerelease": False,
+        "published_at": date,
+        "assets": [
+            {
+                "state": "uploaded",
+                "name": name,
+                "content_type": "application/zip",
+                "size": size,
+                "download_count": count,
+                "browser_download_url": f"{ASSETS}/{tag}/{name}",
+            }
+            for name in names
+        ],
+    }
+
+
+class Storage:
+    """The storage repository of a share host.
+
+    It answers the release list with an ETag and a 304 on a match, and each
+    GitHub release by its tag. Any other API URL fails the test, so the host's
+    own service and its counter are never asked.
+    """
+
+    token = None
+
+    def __init__(self, entries, releases=(), archives=None, listing_id="ExampleRover", content_type="vehicle"):
+        self.document = {"id": listing_id, "type": content_type, "releases": entries}
+        self.releases = {payload["tag_name"]: payload for payload in releases}
+        self.archives = archives or {}
+        self.asked = []
+        self.limits = []
+        self.lines = []
+        self.requests = 0
+
+    def log(self, message):
+        self.lines.append(message)
+
+    def get(self, url, accept=None, etag=None, api=False, limit=None):
+        self.asked.append((url, etag))
+        self.requests += 1
+        if url.startswith(f"{STORAGE}/contents/"):
+            body = json.dumps(self.document).encode()
+            current = '"' + hashlib.sha256(body).hexdigest()[:16] + '"'
+            if etag == current:
+                return Response(304, {}, b"")
+            return Response(200, {"ETag": current}, body)
+        prefix = f"{STORAGE}/releases/tags/"
+        if url.startswith(prefix):
+            payload = self.releases.get(urllib.parse.unquote(url[len(prefix):]))
+            if payload is None:
+                raise http_error(404)
+            return Response(200, {}, json.dumps(payload).encode())
+        raise AssertionError(f"unexpected URL {url}")
+
+    def archive(self, url, api=False, limit=None):
+        self.limits.append(limit)
+        body = self.archives[url]
+        if limit is not None and len(body) > limit:
+            raise OversizeError("the archive is larger than the limit")
+        return Archive.of_bytes(body), {"Content-Type": "application/zip"}
+
+
+def rover(version="1.0.0", **extra):
+    tag = f"vehicle/ExampleRover/{version}"
+    return share_release(tag, f"ExampleRover-{version}.zip", **extra)
+
+
+def share_host(http, content_type="vehicle", listing_id="ExampleRover"):
+    return named({"ksamods": listing_id}, http, listing_id, content_type, REGISTRY)["ksamods"]
+
+
+class ShareHosts(unittest.TestCase):
+    """RFC 0094: a share host is read from its storage repository only."""
+
+    def test_the_release_list_and_each_github_release_make_the_releases(self):
+        http = Storage([share_entry("1.0.0"), share_entry("1.1.0-rc.1", "testing")], [rover(), rover("1.1.0-rc.1")])
+        releases, etag = share_host(http).releases()
+        first, second = releases
+        self.assertEqual((first.version, first.status, first.problem), ("1.0.0", "stable", None))
+        self.assertEqual(first.tag, "vehicle/ExampleRover/1.0.0")
+        self.assertEqual(first.rest, "1.0.0")
+        self.assertEqual(first.url, f"{ASSETS}/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip")
+        self.assertEqual((first.release_date, first.size, first.downloads), ("2026-10-11T09:14:30Z", 4, 3))
+        self.assertEqual(second.facts()["status"], "testing")
+        self.assertEqual(
+            [url for url, _ in http.asked],
+            [
+                f"{STORAGE}/contents/releases/vehicle/ExampleRover.json",
+                f"{STORAGE}/releases/tags/vehicle%2FExampleRover%2F1.0.0",
+                f"{STORAGE}/releases/tags/vehicle%2FExampleRover%2F1.1.0-rc.1",
+            ],
+        )
+        due, tag = etag.split(" ")
+        self.assertTrue(tag.startswith('"'))
+        self.assertGreater(_utc(due), _utc((datetime.now(timezone.utc) + timedelta(hours=23)).isoformat()))
+
+    def test_an_unchanged_release_list_costs_one_request(self):
+        http = Storage([share_entry("1.0.0")], [rover()])
+        host = share_host(http)
+        _, etag = host.releases()
+        http.asked.clear()
+        self.assertEqual(host.releases(etag), (None, etag))
+        self.assertEqual(len(http.asked), 1)
+        self.assertEqual(http.asked[0][1], etag.split(" ")[1])
+
+    def test_an_etag_whose_full_read_is_due_is_not_sent(self):
+        # A deleted GitHub release does not change the list, so the list is read in full once a day.
+        http = Storage([share_entry("1.0.0")], [rover()])
+        host = share_host(http)
+        _, etag = host.releases()
+        tag = etag.split(" ")[1]
+        for stored in (f"2020-01-01T00:00:00Z {tag}", tag, "garbage"):
+            http.asked.clear()
+            releases, _ = host.releases(stored)
+            self.assertIsNotNone(releases, stored)
+            self.assertIsNone(http.asked[0][1], stored)
+
+    def test_an_entry_without_its_github_release_is_refused_and_the_others_are_not(self):
+        http = Storage([share_entry("1.0.0"), share_entry("1.1.0")], [rover("1.1.0")])
+        (missing, present), etag = share_host(http).releases()
+        self.assertIsNone(missing.url)
+        self.assertIsNotNone(present.url)
+        with self.assertRaises(StampError) as caught:
+            share_host(http).download(missing)
+        self.assertIn("`vehicle/ExampleRover/1.0.0`", str(caught.exception))
+        self.assertEqual(http.limits, [])
+        # The list is read again within REFUSED_READ_HOURS, in case the release was on its way.
+        due = _utc(etag.split(" ")[0])
+        self.assertLess(due, _utc((datetime.now(timezone.utc) + timedelta(hours=REFUSED_READ_HOURS, minutes=1)).isoformat()))
+
+    def test_a_draft_is_no_github_release(self):
+        http = Storage([share_entry("1.0.0")], [rover(draft=True)])
+        [entry], _ = share_host(http).releases()
+        self.assertIn("no published GitHub release", entry.problem)
+
+    def test_a_release_with_another_asset_count_or_name_is_refused(self):
+        tag = "vehicle/ExampleRover/1.0.0"
+        for names in ((), ("ExampleRover-1.0.0.zip", "extra.zip"), ("examplerover-1.0.0.zip",), ("ExampleRover.zip",)):
+            http = Storage([share_entry("1.0.0")], [share_release(tag, *names)])
+            [entry], _ = share_host(http).releases()
+            self.assertIsNone(entry.url, names)
+            with self.assertRaises(StampError, msg=names) as caught:
+                share_host(http).download(entry)
+            self.assertIn("exactly one, named ExampleRover-1.0.0.zip", str(caught.exception))
+
+    def test_a_status_outside_the_three_is_refused(self):
+        for status in (None, "beta", "Stable", 1):
+            http = Storage([share_entry("1.0.0", status)], [rover()])
+            [entry], _ = share_host(http).releases()
+            self.assertIn("is not one of stable, testing, dev", entry.problem, status)
+            self.assertIsNone(entry.status)
+
+    def test_a_version_that_is_not_a_string_has_no_version(self):
+        http = Storage([{"status": "stable"}, share_entry("1.0.0")], [rover()])
+        (entry, _), _ = share_host(http).releases()
+        self.assertIsNone(entry.version)
+        self.assertEqual(len(http.asked), 2)
+
+    def test_an_asset_above_the_limit_of_its_type_is_refused(self):
+        url = f"{ASSETS}/vehicle/ExampleRover/1.0.0/ExampleRover-1.0.0.zip"
+        http = Storage([share_entry("1.0.0")], [rover(size=9)], {url: b"123456789"})
+        host = share_host(http)
+        [entry], _ = host.releases()
+        # By the size the host reports, before any request.
+        with self.assertRaises(StampError) as caught:
+            host.download(entry)
+        self.assertIn("above the", str(caught.exception))
+        self.assertEqual(http.limits, [])
+        # By the streamed size when the host reports none.
+        with self.assertRaises(StampError):
+            host.download(dataclasses.replace(entry, size=None))
+        self.assertEqual(http.limits, [8])
+        # A save of the same size fits the larger limit of saves.
+        save = Storage(
+            [share_entry("1.0.0")],
+            [share_release("save/MoonBase/1.0.0", "MoonBase-1.0.0.zip", size=9)],
+            {f"{ASSETS}/save/MoonBase/1.0.0/MoonBase-1.0.0.zip": b"123456789"},
+            listing_id="MoonBase", content_type="save",
+        )
+        host = share_host(save, "save", "MoonBase")
+        [entry], _ = host.releases()
+        archive, _ = host.download(entry)
+        archive.close()
+        self.assertEqual(save.limits, [64])
+
+    def test_a_limit_above_the_archive_limit_is_the_archive_limit(self):
+        table = {**SHARE_TABLE, "max_bytes": {"vehicle": MAX_ARCHIVE_BYTES * 2}}
+        host = named({"ksamods": "R"}, Storage([]), "R", "vehicle", {"ksamods": table})["ksamods"]
+        self.assertEqual(host.max_bytes, MAX_ARCHIVE_BYTES)
+        table = {**SHARE_TABLE, "max_bytes": {}}
+        host = named({"ksamods": "R"}, Storage([]), "R", "vehicle", {"ksamods": table})["ksamods"]
+        self.assertEqual(host.max_bytes, MAX_ARCHIVE_BYTES)
+
+    def test_the_key_names_the_host_the_type_and_the_id(self):
+        self.assertEqual(share_host(Storage([])).key, "share:ksamods/vehicle/examplerover")
+
+    def test_only_an_https_copy_at_the_internet_archive_is_a_listed_mirror(self):
+        kept = [
+            "https://archive.org/download/ksamods-vehicle-ExampleRover-1.0.0/ExampleRover-1.0.0.zip",
+            "https://ia800100.us.archive.org/1/items/x/ExampleRover-1.0.0.zip",
+        ]
+        dropped = ["http://archive.org/x.zip", "https://archive.org.example/x.zip", "https://notarchive.org/x.zip", 5]
+        http = Storage([share_entry("1.0.0", mirrors=kept + dropped)], [rover()])
+        [entry], _ = share_host(http).releases()
+        self.assertEqual(entry.mirrors, tuple(kept))
+        self.assertEqual(len(http.lines), len(dropped))
+        mirror, served = listed_mirrors(share_host(http), entry)[0]
+        self.assertEqual((served.url, served.size, served.archives), (kept[0], None, (kept[0],)))
+        self.assertNotEqual(mirror.key, listed_mirrors(share_host(http), entry)[1][0].key)
+
+    def test_a_missing_list_or_a_list_of_another_listing_is_a_stamp_error(self):
+        class NoList(Storage):
+            def get(self, url, **kwargs):
+                raise http_error(404)
+
+        with self.assertRaises(StampError) as caught:
+            share_host(NoList([])).releases()
+        self.assertIn("releases/vehicle/ExampleRover.json", str(caught.exception))
+        with self.assertRaises(StampError):
+            share_host(Storage([], listing_id="OtherRover")).releases()
+        with self.assertRaises(StampError):
+            share_host(Storage([], content_type="save")).releases()
+
+    def test_a_list_that_is_not_json_or_a_server_error_is_a_host_error(self):
+        class Broken(Storage):
+            def get(self, url, **kwargs):
+                return Response(200, {}, b"<html>")
+
+        with self.assertRaises(HostError):
+            share_host(Broken([])).releases()
+        with self.assertRaises(HostError):
+            share_host(FakeHttp({STORAGE: http_error(502)})).releases()
+
+    def test_a_list_past_the_scan_limit_reads_the_newest_entries_and_says_so(self):
+        entries = [share_entry(f"1.0.{patch}") for patch in range(4)]
+        http = Storage(entries, [rover(f"1.0.{patch}") for patch in range(4)])
+        host = ShareHost("ksamods", SHARE_TABLE, "ExampleRover", "vehicle", http, max_releases=2)
+        releases, _ = host.releases()
+        self.assertEqual([release.version for release in releases], ["1.0.2", "1.0.3"])
+        self.assertTrue(host.truncated)
+
+
+class NamedShareHosts(unittest.TestCase):
+    def test_a_key_hosts_toml_does_not_register_is_a_stamp_error(self):
+        for registry in (None, {}, {"other": SHARE_TABLE}):
+            with self.assertRaises(StampError, msg=registry) as caught:
+                named({"ksamods": "R"}, FakeHttp({}), "R", "vehicle", registry)
+            self.assertIn("neither github nor spacedock", str(caught.exception))
+        # The call of a caller that passes no registry refuses it too.
+        with self.assertRaises(StampError):
+            build({"ksamods": "R"}, FakeHttp({}), "R")
+
+    def test_a_type_the_host_does_not_take_is_a_stamp_error(self):
+        with self.assertRaises(StampError) as caught:
+            named({"ksamods": "R"}, FakeHttp({}), "R", "mod", REGISTRY)
+        self.assertIn("takes vehicle, save", str(caught.exception))
+
+    def test_a_value_that_is_not_the_listing_id_is_a_stamp_error(self):
+        for value in ("OtherRover", "r", 5):
+            with self.assertRaises(StampError, msg=value):
+                named({"ksamods": value}, FakeHttp({}), "R", "vehicle", REGISTRY)
+
+    def test_a_table_the_watcher_cannot_read_is_a_host_error(self):
+        for table in (
+            {**SHARE_TABLE, "kind": "mirror"},
+            {key: value for key, value in SHARE_TABLE.items() if key != "storage"},
+            {**SHARE_TABLE, "storage": "https://github.com/x/y"},
+            {**SHARE_TABLE, "types": "vehicle"},
+            {**SHARE_TABLE, "max_bytes": {"vehicle": "10 MiB"}},
+        ):
+            with self.assertRaises(HostError, msg=table):
+                named({"ksamods": "R"}, FakeHttp({}), "R", "vehicle", {"ksamods": table})
+
+    def test_a_table_name_the_snapshot_cannot_count_under_is_a_host_error(self):
+        # Counts under such a key would make the whole counts document fail its check.
+        for key in ("KSAmods", "k", "ksa_mods", "k" * 33):
+            with self.assertRaises(HostError, msg=key) as caught:
+                named({key: "R"}, FakeHttp({}), "R", "vehicle", {key: SHARE_TABLE})
+            self.assertIn("is not", str(caught.exception))
+
+    def test_a_share_host_can_be_the_authority_next_to_github(self):
+        section = {"ksamods": "R", "github": "o/shares", "tag_prefix": "vehicle/R/", "authority": "ksamods"}
+        authority, mirrors = build(section, FakeHttp({}), "R", "vehicle", REGISTRY)
+        self.assertIsInstance(authority, ShareHost)
+        self.assertEqual([mirror.kind for mirror in mirrors], ["github"])
+        authority, mirrors = build({**section, "authority": "github"}, FakeHttp({}), "R", "vehicle", REGISTRY)
+        self.assertEqual((authority.kind, [mirror.kind for mirror in mirrors]), ("github", ["share"]))
+        with self.assertRaises(StampError) as caught:
+            build({**section, "authority": None}, FakeHttp({}), "R", "vehicle", REGISTRY)
+        self.assertIn("github, ksamods", str(caught.exception))
+
+    def test_the_keys_that_name_no_host_are_no_share_host(self):
+        self.assertEqual(share_keys({"github": "o/r", "since": "1.0", "tag_prefix": "v", "authority": "github", "ksamods": "R"}), ["ksamods"])
+        self.assertEqual(share_keys(None), [])
+
+    def test_hosts_toml_is_read_from_the_authored_checkout(self):
+        with tempfile.TemporaryDirectory() as name:
+            root = Path(name)
+            self.assertEqual(registered(root), {})
+            (root / "hosts.toml").write_text('[ksamods]\nkind = "share"\nstorage = "o/r"\n', encoding="utf-8")
+            self.assertEqual(registered(root), {"ksamods": {"kind": "share", "storage": "o/r"}})
+            for text in ("[ksamods\n", 'ksamods = "share"\n'):
+                (root / "hosts.toml").write_text(text, encoding="utf-8")
+                with self.assertRaises(HostError, msg=text):
+                    registered(root)
 
 
 if __name__ == "__main__":

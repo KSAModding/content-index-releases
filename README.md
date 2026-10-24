@@ -52,6 +52,8 @@ That poll only ever sees the build that is current when it runs, so a build supe
 Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
+A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
+A share host that left `hosts.toml`, or that the listing no longer names, keeps its last known count.
 
 Known limit: a deleted GitHub release without its own version entry, and an archive uploaded again, lower a count that the host did not lower.
 
@@ -95,12 +97,23 @@ A `vehicle` or a `save` is stamped from the game folder in its archive: `meta.to
 A release whose `install.folder` another listing of the same type already holds, compared without case, is refused, and it is tried again once the release files of that listing change.
 A vehicle folder with files besides `meta.toml` and `vehicle.xml` is stamped with a note, which goes into the body of the stamp commit and not into the issue.
 
+A vehicle or a save can also be on a share host, which the stewards register as a table of `hosts.toml` in the authored half, and which the listing names with its id, for example `ksamods = "ExampleRover"` under `[releases]`.
+The rules follow [RFC 0094](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0094-share-host.md), and its names are in `tools/hosts.py` in one place.
+The watcher reads the release list `releases/<type>/<id>.json` from the host's `storage` repository through the GitHub API, conditionally against an ETag, and for each entry the GitHub release tagged `<type>/<id>/<version>`, which has to carry exactly one archive, named `<id>-<version>.zip`.
+The host's own service is never asked.
+The `status` of an entry becomes `release_status` together with the pre-release part of the version, and the less stable of the two wins.
+An entry without its GitHub release, with another archive, with an unknown `status`, or with an archive above the host's `max_bytes` for the type is reported in the listing's issue.
+Because a deleted GitHub release does not change the list, the list is read in full at least once a day, and once an hour while one of its entries is refused.
+A key under `[releases]` that is neither `github`, `spacedock` nor a registered host is reported, and so is a listing of a type the host does not take.
+A `hosts.toml` that does not read holds the listings on a share host back as an outage does, and reaches their issues only after the same number of ticks.
+The same is true for a table whose name is not lowercase letters, digits and hyphens of 2 to 32 characters that start with a letter, because the snapshot keeps download counts only under such a key.
+
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
 | Tool | What it does |
 |---|---|
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
-| `tools/hosts.py` | The release hosts, GitHub and SpaceDock, behind one interface. GitHub is polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
+| `tools/hosts.py` | The release hosts, GitHub, SpaceDock and the share hosts of `hosts.toml`, behind one interface. GitHub and a share host are polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
@@ -125,6 +138,9 @@ It is stamped from one of them only, the tag it was already stamped from or else
 
 The watcher may append to `download.mirrors` after publish, and only after downloading the other host's archive and finding it byte-identical.
 A mirror that serves different bytes is remembered in the derived cache by URL and size, and is not downloaded again until one of them changes.
+The mirrors of a share host's release list are candidates too (RFC 0094): each copy is downloaded once with the host's `max_bytes`, and appended at the stamp or on a later tick when its bytes are the same.
+A copy that is not an `https` URL on `archive.org` or one of its subdomains is left out and logged.
+When the mirror budget runs out before such a copy is checked, the tick keeps no ETag, so the next tick reads the list again.
 
 ### A release gone from its host
 
