@@ -154,6 +154,9 @@ class Index:
     def tags(self, text):
         self.write(self.authored / "tags.toml", text)
 
+    def hosts(self, text):
+        self.write(self.authored / "hosts.toml", text)
+
     def build(self, **kwargs):
         return build(
             self.authored,
@@ -300,6 +303,68 @@ meaning = "Code that other content depends on and that does nothing on its own."
     def test_invalid_utf8_in_curated_tags_names_tags_toml_in_the_error(self):
         (self.index.authored / "tags.toml").write_bytes(b"spec_version = \xff\n")
         with self.assertRaisesRegex(SnapshotError, "tags[.]toml"):
+            self.index.build()
+
+    def test_the_registered_hosts_are_embedded_verbatim_as_json(self):
+        self.index.tags("spec_version = 1\n")
+        self.index.hosts(
+            """\
+[example]
+kind = "share"
+storage = "example-content/share"
+types = ["vehicle", "save"]
+max_bytes = { vehicle = 10485760, save = 104857600 }
+
+[signed]
+kind = "share"
+data = "https://data.example.net/share/"
+downloads = ["https://files.example.net/"]
+key = "MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE="
+retired_keys = []
+"""
+        )
+        main = self.index.build()
+        self.assertEqual(list(main)[-2:], ["tags", "hosts"])
+        self.assertEqual(
+            main["hosts"],
+            {
+                "example": {
+                    "kind": "share",
+                    "storage": "example-content/share",
+                    "types": ["vehicle", "save"],
+                    "max_bytes": {"vehicle": 10485760, "save": 104857600},
+                },
+                "signed": {
+                    "kind": "share",
+                    "data": "https://data.example.net/share/",
+                    "downloads": ["https://files.example.net/"],
+                    "key": "MCowBQYDK2VwAyEAGb9ECWmEzf6FQbrBZ9w7lshQhqowtrbLDFw4rXAxZuE=",
+                    "retired_keys": [],
+                },
+            },
+        )
+        self.assertEqual(list(main["hosts"]), ["example", "signed"])
+        self.assertEqual(
+            list(main["hosts"]["signed"]), ["kind", "data", "downloads", "key", "retired_keys"]
+        )
+        self.assertIs(type(main["hosts"]["example"]["max_bytes"]["vehicle"]), int)
+
+    def test_the_registered_hosts_are_absent_without_hosts_toml_and_never_in_a_type_file(self):
+        self.index.vehicle("ExampleRover")
+        without = self.index.build_files()
+        self.assertNotIn("hosts", without[MAIN_FILE])
+        self.index.hosts('[example]\nkind = "share"\n')
+        files = self.index.build_files()
+        self.assertEqual(files[MAIN_FILE]["hosts"], {"example": {"kind": "share"}})
+        self.assertNotIn("hosts", files[TYPE_FILES["vehicles"]])
+        (self.index.authored / "hosts.toml").unlink()
+        self.assertEqual(
+            serialize(self.index.build_files()[MAIN_FILE]), serialize(without[MAIN_FILE])
+        )
+
+    def test_invalid_registered_hosts_name_hosts_toml_in_the_error(self):
+        self.index.hosts("[example\n")
+        with self.assertRaisesRegex(SnapshotError, "hosts[.]toml"):
             self.index.build()
 
     def test_a_game_release_list_that_is_missing_is_an_error(self):
