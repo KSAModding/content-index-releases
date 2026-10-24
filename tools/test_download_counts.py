@@ -11,6 +11,7 @@ import unittest
 import urllib.error
 from pathlib import Path
 
+from authored import holder
 from build_snapshot import SnapshotError, check_download_counts, serialize
 from download_counts import main, refresh
 from hosts import HostError, Response
@@ -129,7 +130,9 @@ class Fixture(unittest.TestCase):
             f'spec_version = 1\nid = "{identifier}"\ntype = "{content_type}"\n'
             f'name = "{identifier}"\n\n{releases}'
         )
-        (self.authored / "listings" / f"{identifier}.toml").write_text(text, encoding="utf-8")
+        path = self.authored / (holder(content_type) or "listings") / f"{identifier}.toml"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(text, encoding="utf-8")
 
     def delist(self, identifier):
         (self.authored / "index-status.toml").write_text(
@@ -623,6 +626,46 @@ class TagPrefixCounts(Fixture):
         entry = self.only(self.refresh(http, stored))
         self.assertEqual(entry["hosts"], {"github": 55})
         self.assertEqual([release["version"] for release in entry["releases"]], ["2026.10.0", "1.2.0"])
+
+
+class VehiclesAndSaves(Fixture):
+    """Vehicles and saves are counted as mods are, from their own folders (RFC 0085)."""
+
+    def test_a_vehicle_on_a_shared_repository_counts_only_its_own_releases(self):
+        self.listing("ExampleRover", releases=PREFIXED, content_type="vehicle")
+        self.assertTrue((self.authored / "vehicles" / "ExampleRover.toml").is_file())
+        entry = self.only(self.refresh(FakeHttp({GITHUB: TagPrefixCounts.answer(self)})))
+        self.assertEqual(entry["id"], "ExampleRover")
+        self.assertEqual(entry["hosts"], {"github": 12})
+
+    def test_a_save_is_counted(self):
+        self.listing("ExampleSave", releases=SPACEDOCK_ONLY, content_type="save")
+        http = FakeHttp({SPACEDOCK: spacedock(30, ("1.0.0", 30))})
+        self.assertEqual(self.only(self.refresh(http))["hosts"], {"spacedock": 30})
+
+    def test_a_vehicle_without_releases_has_no_entry_and_asks_nothing(self):
+        self.listing("ExampleRover", releases="", content_type="vehicle")
+        http = FakeHttp({})
+        self.assertEqual(self.refresh(http)["listings"], [])
+        self.assertEqual(http.asked, [])
+
+    def test_a_deleted_vehicle_loses_its_entry_and_a_listed_one_keeps_it(self):
+        self.listing("OtherRover", releases=GITHUB_ONLY, content_type="vehicle")
+        stored = document(
+            counted("ExampleRover", {"github": 9}, ("1.0.0", {"github": 9})),
+            counted("OtherRover", {"github": 1}, ("1.0.0", {"github": 1})),
+        )
+        result = refresh(
+            self.authored, check_download_counts(stored, "test"), FakeHttp({}), {},
+            log=self.notes.append, note=self.notes.append, ask=False,
+        )
+        self.assertEqual([entry["id"] for entry in result["listings"]], ["OtherRover"])
+
+    def test_an_id_under_listings_and_vehicles_fails_the_refresh(self):
+        self.listing("Shared", releases=GITHUB_ONLY)
+        self.listing("Shared", releases=GITHUB_ONLY, content_type="vehicle")
+        with self.assertRaisesRegex(SnapshotError, "listings/Shared.toml and vehicles/Shared.toml"):
+            self.refresh(FakeHttp({}))
 
 
 class Cache(Fixture):

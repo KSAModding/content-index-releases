@@ -635,6 +635,9 @@ def stamped_dependencies(http, document):
     A mirror stands in for a download URL that is gone, because the bytes are the same.
     HostError says a later run may succeed, and StampError that no URL serves the stamped archive.
     """
+    if document.get("type") != "mod":
+        # Only the archive of a mod has a mod.toml that a loader acts on.
+        return []
     download_section = document.get("download") or {}
     problem = None
     for url in [download_section.get("url"), *(download_section.get("mirrors") or [])]:
