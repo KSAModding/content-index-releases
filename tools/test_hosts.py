@@ -27,6 +27,7 @@ from hosts import (
     _utc,
     download,
     named,
+    stamped_dependencies,
 )
 from stamp_release import Archive, StampError
 
@@ -118,6 +119,24 @@ class Downloads(unittest.TestCase):
         http = FakeHttp({"https://github.com/": OversizeError("too large")})
         with self.assertRaises(StampError):
             download(http, release("https://github.com/o/r/x.zip"))
+
+
+class StampedDependencies(unittest.TestCase):
+    DOCUMENT = {
+        "version": "1.0.0",
+        "download": {"url": "https://example.invalid/a.zip", "sha256": "AB"},
+        "install": {"root": "Example Rover", "derived": True, "folder": "Example Rover"},
+    }
+
+    def test_a_vehicle_or_a_save_makes_no_request(self):
+        for content_type in ("vehicle", "save", "mod-loader"):
+            with self.subTest(content_type):
+                document = dict(self.DOCUMENT, type=content_type)
+                self.assertEqual(stamped_dependencies(FakeHttp({}), document), [])
+
+    def test_a_mod_downloads_its_archive(self):
+        with self.assertRaisesRegex(AssertionError, "unexpected URL"):
+            stamped_dependencies(FakeHttp({}), dict(self.DOCUMENT, type="mod"))
 
 
 class Answer:

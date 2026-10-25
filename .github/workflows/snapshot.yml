@@ -1,5 +1,6 @@
-# Merge both halves of the index into the one document clients fetch, and publish
-# it at /v1/index.json, the fetch contract of RFC 0033.
+# Merge both halves of the index into the documents clients fetch, and publish
+# them under /v1/: index.json, the fetch contract of RFC 0033, and next to it the
+# file of each type that is not in it, which tools/build_snapshot.py names.
 name: snapshot
 
 on:
@@ -10,6 +11,7 @@ on:
       - game-versions.json
       - download-counts.json
       - tools/build_snapshot.py
+      - tools/authored.py
       - tools/stamp_release.py
       - .github/workflows/snapshot.yml
   repository_dispatch:
@@ -26,7 +28,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  PUBLISHED: https://ksamodding.github.io/content-index-releases/v1/index.json
+  PUBLISHED: https://ksamodding.github.io/content-index-releases/v1
 
 jobs:
   build:
@@ -48,18 +50,31 @@ jobs:
           # listed_at (RFC 0092) is read from the full first-parent history of main.
           fetch-depth: 0
 
+      # A file that answers 404 is not published. Any other failure leaves open
+      # whether it is, and a type file left out of a deployment would go away, so
+      # the run stops and the next one tries again.
       - name: Fetch the published snapshot
         run: |
           set -euo pipefail
-          curl -fsS --max-time 30 -H 'Cache-Control: no-cache' \
-            "$PUBLISHED" -o published.json || rm -f published.json
+          mkdir -p published/v1
+          names=$(python3 tools/build_snapshot.py --published-files)
+          for name in $names; do
+            code=$(curl -sS --max-time 30 --retry 3 -H 'Cache-Control: no-cache' -w '%{http_code}' \
+              "$PUBLISHED/$name" -o "published/v1/$name") || code=000
+            if [ "$code" = 404 ]; then
+              rm -f "published/v1/$name"
+            elif [ "$code" != 200 ]; then
+              echo "::error::$PUBLISHED/$name answered $code, so it is not known whether it is published"
+              exit 1
+            fi
+          done
 
       - name: Build
         run: |
           set -euo pipefail
           python3 tools/build_snapshot.py \
             --authored .authored \
-            --previous published.json \
+            --previous published/v1/index.json \
             --out _site/v1/index.json \
             --authored-repo "${{ github.repository_owner }}/content-index" \
             --authored-commit "$(git -C .authored rev-parse HEAD)" \
@@ -70,7 +85,8 @@ jobs:
         id: compare
         run: |
           set -euo pipefail
-          if [ -f published.json ] && cmp -s published.json _site/v1/index.json; then
+          # A deployment replaces the whole site, so one changed file deploys every file.
+          if diff -rq published/v1 _site/v1; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
             echo "the published snapshot is already current, so nothing is deployed"
           else

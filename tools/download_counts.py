@@ -14,18 +14,19 @@ from build_snapshot import (
     DOWNLOAD_HOSTS,
     SnapshotError,
     check_download_counts,
+    check_ids_unique,
     info,
     load_json,
     newest_first,
+    read_all_listings,
     read_index_status,
-    read_listings,
     serialize,
     warn,
 )
 from hosts import HostError
 from stamp_release import StampError
 
-COUNTED_TYPES = ("mod", "mod-loader")
+COUNTED_TYPES = ("mod", "mod-loader", "vehicle", "save")
 
 # Bump it when the cache layout changes. A cold cache only costs conditional requests.
 CACHE_VERSION = 1
@@ -160,8 +161,14 @@ def named_hosts(document, http, identifier, log):
 
 
 def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
-    """The refreshed document. With `ask` false it only drops the entries of deleted listings."""
-    listings = read_listings(authored)
+    """The refreshed document. With `ask` false it only drops the entries of deleted listings.
+
+    A listing here is a document of any folder of FOLDERS: a mod or mod loader, a vehicle or a save.
+    """
+    check_ids_unique(authored)
+    listings = {
+        key: document for group in read_all_listings(authored).values() for key, document in group.items()
+    }
     whole, _, _ = read_index_status(authored)
     current = current or {}
 

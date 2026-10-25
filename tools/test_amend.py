@@ -61,6 +61,15 @@ def release(version, listing="AdvancedFlightComputer", **changes):
     return document
 
 
+def vehicle(version, listing="ExampleRover"):
+    """A vehicle release: no loader, and the install data names its folder."""
+    document = release(version, listing, type="vehicle", game_min="2026.8.3.5117", game_min_revision=5117)
+    del document["loader"]
+    document["install"] = {"root": "Example Rover", "derived": True, "folder": "Example Rover"}
+    document["dependencies"] = [{"id": "Wheels", "kind": "required", "source": "authored"}]
+    return document
+
+
 class Tree(unittest.TestCase):
     """A releases tree on disk, which is what the tool reads and writes."""
 
@@ -69,12 +78,12 @@ class Tree(unittest.TestCase):
         self.addCleanup(self.directory.cleanup)
         self.root = Path(self.directory.name) / "releases"
 
-    def write(self, listing, *versions):
+    def write(self, listing, *versions, factory=release):
         folder = self.root / listing
         folder.mkdir(parents=True, exist_ok=True)
         for version in versions:
             (folder / f"{version}.json").write_text(
-                json.dumps(release(version, listing), indent=2) + "\n", encoding="utf-8"
+                json.dumps(factory(version, listing), indent=2) + "\n", encoding="utf-8"
             )
 
     def read(self, listing, version):
@@ -346,6 +355,31 @@ class Bounds(Tree):
         del document["loader"]
         (folder / "1.0.0.json").write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
         self.assertEqual(self.run_tool("--listing", "Asset", "--all", "--loader-min", "0.4.6"), 1)
+
+
+class VehicleRelease(Tree):
+    def test_a_game_max_bounds_it_and_the_install_data_stays(self):
+        self.write("ExampleRover", "1.0.0", factory=vehicle)
+        path = self.root / "ExampleRover" / "1.0.0.json"
+        install = json.dumps(json.loads(path.read_text(encoding="utf-8"))["install"], indent=2)
+        self.assertEqual(
+            self.run_tool("--listing", "ExampleRover", "--all", "--game-max", "2026.8.22.5348"), 0
+        )
+        document = self.read("ExampleRover", "1.0.0")
+        keys = list(document)
+        self.assertEqual(keys[keys.index("game_min_revision") + 1], "game_max")
+        self.assertEqual(document["game_max_revision"], 5348)
+        self.assertEqual(json.dumps(document["install"], indent=2), install)
+
+    def test_a_steward_narrows_a_dependency_with_a_max(self):
+        self.write("ExampleRover", "1.0.0", factory=vehicle)
+        self.assertEqual(
+            self.run_tool("--listing", "ExampleRover", "--all", "--dependency-max", "Wheels=2.0.0"), 0
+        )
+        self.assertEqual(
+            self.read("ExampleRover", "1.0.0")["dependencies"],
+            [{"id": "Wheels", "kind": "required", "max": "2.0.0", "source": "authored"}],
+        )
 
 
 class Refusals(Tree):

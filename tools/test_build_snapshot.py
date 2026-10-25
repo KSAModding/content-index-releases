@@ -17,11 +17,16 @@ import unittest.mock
 from pathlib import Path
 
 from build_snapshot import (
+    MAIN_FILE,
+    TYPE_FILES,
     SnapshotError,
     body,
     build,
+    build_files,
     carry_forward,
     entry_dates,
+    history_key,
+    main,
     precedence,
     read_listings,
     read_previous,
@@ -103,6 +108,14 @@ class Index:
         )
         self.write(self.authored / "listings" / f"{identifier}.toml", text)
 
+    def vehicle(self, identifier):
+        text = LISTING.format(identifier=identifier, content_type="vehicle", extra="")
+        self.write(self.authored / "vehicles" / f"{identifier}.toml", text)
+
+    def save(self, identifier):
+        text = LISTING.format(identifier=identifier, content_type="save", extra="")
+        self.write(self.authored / "saves" / f"{identifier}.toml", text)
+
     def pack(self, identifier, version, body=None):
         text = body if body is not None else PACK.format(
             identifier=identifier, version=version
@@ -150,6 +163,15 @@ class Index:
             **kwargs,
         )
 
+    def build_files(self, **kwargs):
+        return build_files(
+            self.authored,
+            self.releases,
+            self.game_versions,
+            log=self.notes.append,
+            **kwargs,
+        )
+
 
 class Fixture(unittest.TestCase):
     def setUp(self):
@@ -162,6 +184,13 @@ class Fixture(unittest.TestCase):
             if item["id"] == identifier:
                 return item
         self.fail(f"no entry for '{identifier}'")
+
+    def typed(self, files, folder, identifier):
+        """The entry of `identifier` in the file of the type that `folder` holds."""
+        for item in files[TYPE_FILES[folder]][folder]:
+            if item["id"] == identifier:
+                return item
+        self.fail(f"no entry for '{identifier}' in {TYPE_FILES[folder]}")
 
 
 class Precedence(unittest.TestCase):
@@ -401,6 +430,199 @@ class Packs(Fixture):
         self.index.pack("Shared", "1.0.0")
         with self.assertRaises(SnapshotError):
             self.index.build()
+
+
+class AcrossFolders(Fixture):
+    """Vehicles and saves share the checks of listings and packs."""
+
+    def test_an_id_held_in_two_folders_is_an_error_that_names_both(self):
+        cases = (
+            ("listing", "vehicle", "listings/Shared.toml and vehicles/Shared.toml"),
+            ("vehicle", "save", "vehicles/Shared.toml and saves/Shared.toml"),
+            ("save", "pack", "saves/Shared.toml and packs/Shared/"),
+        )
+        for first, second, named in cases:
+            with self.subTest(f"{first} and {second}"):
+                self.setUp()
+                for kind in (first, second):
+                    if kind == "pack":
+                        self.index.pack("Shared", "1.0.0")
+                    else:
+                        getattr(self.index, kind)("Shared")
+                with self.assertRaisesRegex(SnapshotError, named):
+                    self.index.build()
+
+    def test_a_state_for_a_save_or_a_vehicle_resolves(self):
+        self.index.save("ExampleSave")
+        self.index.vehicle("ExampleRover")
+        self.index.status(
+            {"id": "ExampleSave", "state": "disputed"}, {"id": "examplerover", "state": "delisted"}
+        )
+        self.index.build()
+
+    def test_a_retracted_state_on_a_vehicle_is_an_error(self):
+        self.index.vehicle("ExampleRover")
+        self.index.status({"id": "ExampleRover", "state": "retracted", "version": "1.0.0"})
+        with self.assertRaisesRegex(SnapshotError, "only a pack version can be retracted"):
+            self.index.build()
+
+    def test_a_count_for_a_vehicle_or_a_save_joins_its_entry(self):
+        self.index.vehicle("ExampleRover")
+        self.index.save("ExampleSave")
+        path = self.index.root / "download-counts.json"
+        entries = [counts_entry("examplerover"), counts_entry("ExampleSave", total=3)]
+        self.index.write(path, json.dumps({"spec_version": 1, "listings": entries}) + "\n")
+        files = self.index.build_files(download_counts=path)
+        self.assertEqual(self.typed(files, "vehicles", "ExampleRover")["downloads"]["total"], 12)
+        self.assertEqual(self.typed(files, "saves", "ExampleSave")["downloads"]["total"], 3)
+
+    def test_the_release_folder_of_a_vehicle_belongs_to_it(self):
+        self.index.vehicle("ExampleRover")
+        self.index.release("ExampleRover", "1.0.0", type="vehicle")
+        self.index.release("Orphan", "1.0.0")
+        self.index.build()
+        orphans = [note for note in self.index.notes if "belongs to no listing" in note]
+        self.assertEqual(len(orphans), 1)
+        self.assertIn("Orphan", orphans[0])
+
+    def test_the_history_knows_every_folder(self):
+        self.assertEqual(history_key("vehicles/ExampleRover.toml"), ("vehicles", "examplerover"))
+        self.assertEqual(history_key("saves/ExampleSave.toml"), ("saves", "examplesave"))
+        self.assertEqual(history_key("listings/AutoStage.toml"), ("listings", "autostage"))
+        self.assertEqual(history_key("packs/Pack/1.0.0.toml"), ("packs", "pack"))
+        self.assertIsNone(history_key("vehicles/nested/ExampleRover.toml"))
+
+
+class TypeFiles(Fixture):
+    """Vehicles and saves are published in files of their own, next to the main document."""
+
+    def rover(self):
+        self.index.vehicle("ExampleRover")
+        install = {"root": "Example Rover", "derived": True, "folder": "Example Rover"}
+        for version in ("1.0.0", "1.1.0"):
+            self.index.release("ExampleRover", version, type="vehicle", install=install)
+
+    def test_a_tree_without_vehicles_and_saves_builds_the_main_document_alone(self):
+        self.index.listing("AutoStage")
+        self.index.release("AutoStage", "0.4.3")
+        self.index.pack("Pack", "1.0.0")
+        files = self.index.build_files()
+        self.assertEqual(list(files), [MAIN_FILE])
+        self.assertEqual(list(files[MAIN_FILE]), ["snapshot_version", "listings", "packs", "game_versions"])
+        self.assertEqual(serialize(files[MAIN_FILE]), serialize(self.index.build()))
+
+    def test_a_vehicle_is_in_its_own_file_and_not_in_listings(self):
+        self.index.listing("AutoStage")
+        self.rover()
+        files = self.index.build_files(sources=SOURCES)
+        self.assertEqual(list(files), [MAIN_FILE, TYPE_FILES["vehicles"]])
+        self.assertEqual([entry["id"] for entry in files[MAIN_FILE]["listings"]], ["AutoStage"])
+        vehicles = files[TYPE_FILES["vehicles"]]
+        self.assertEqual(list(vehicles), ["snapshot_version", "sources", "vehicles"])
+        self.assertEqual(vehicles["snapshot_version"], 1)
+        self.assertEqual(vehicles["sources"], SOURCES)
+        entry = self.typed(files, "vehicles", "ExampleRover")
+        self.assertEqual(entry["authored"]["type"], "vehicle")
+        self.assertEqual([release["version"] for release in entry["releases"]], ["1.1.0", "1.0.0"])
+        for release in entry["releases"]:
+            self.assertEqual(release["install"]["folder"], "Example Rover")
+
+    def test_a_delisted_vehicle_is_a_tombstone_in_a_file_of_its_own(self):
+        self.rover()
+        self.index.status({"id": "ExampleRover", "state": "delisted"})
+        files = self.index.build_files()
+        self.assertEqual(
+            files[TYPE_FILES["vehicles"]]["vehicles"],
+            [{"id": "ExampleRover", "index_status": {"state": "delisted"}}],
+        )
+
+    def test_a_save_lands_in_the_save_file_and_no_vehicle_file_is_built(self):
+        self.index.save("ExampleSave")
+        self.index.release("ExampleSave", "1.0.0", type="save")
+        files = self.index.build_files()
+        self.assertEqual(list(files), [MAIN_FILE, TYPE_FILES["saves"]])
+        self.assertEqual(list(files[TYPE_FILES["saves"]]), ["snapshot_version", "saves"])
+        self.assertEqual(len(self.typed(files, "saves", "ExampleSave")["releases"]), 1)
+
+    def test_entries_are_ascending_by_lowercased_id(self):
+        for identifier in ("bravo", "Alpha", "charlie"):
+            self.index.vehicle(identifier)
+        files = self.index.build_files()
+        self.assertEqual(
+            [entry["id"] for entry in files[TYPE_FILES["vehicles"]]["vehicles"]],
+            ["Alpha", "bravo", "charlie"],
+        )
+
+    def test_a_published_type_file_stays_with_an_empty_array(self):
+        files = self.index.build_files(published=[TYPE_FILES["vehicles"]])
+        self.assertEqual(files[TYPE_FILES["vehicles"]], {"snapshot_version": 1, "vehicles": []})
+        self.assertNotIn(TYPE_FILES["saves"], files)
+
+
+class Main(Fixture):
+    """The command line, which writes the type files next to the main document."""
+
+    def run_main(self, out, *extra):
+        arguments = [
+            "--authored", str(self.index.authored),
+            "--releases", str(self.index.releases),
+            "--game-versions", str(self.index.game_versions),
+            "--download-counts", str(self.index.root / "no-counts.json"),
+            "--out", str(out),
+            *extra,
+        ]
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(main(arguments), 0)
+
+    def sources(self, block):
+        return [
+            "--authored-repo", block["authored"]["repository"],
+            "--authored-commit", block["authored"]["commit"],
+            "--generated-repo", block["generated"]["repository"],
+            "--generated-commit", block["generated"]["commit"],
+        ]
+
+    def test_the_names_of_the_published_files_are_printed(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            self.assertEqual(main(["--published-files"]), 0)
+        self.assertEqual(output.getvalue().split(), [MAIN_FILE, *TYPE_FILES.values()])
+
+    def test_the_type_files_are_written_next_to_the_main_document(self):
+        self.index.listing("AutoStage")
+        self.index.vehicle("ExampleRover")
+        out = self.index.root / "site" / "v1" / MAIN_FILE
+        self.run_main(out)
+        self.assertEqual(
+            sorted(path.name for path in out.parent.iterdir()),
+            sorted([MAIN_FILE, TYPE_FILES["vehicles"]]),
+        )
+        vehicles = json.loads((out.parent / TYPE_FILES["vehicles"]).read_text(encoding="utf-8"))
+        self.assertEqual([entry["id"] for entry in vehicles["vehicles"]], ["ExampleRover"])
+
+    def test_an_unchanged_type_file_keeps_its_published_bytes(self):
+        self.index.listing("AutoStage")
+        self.index.vehicle("ExampleRover")
+        published = self.index.root / "published" / MAIN_FILE
+        self.run_main(published, *self.sources(SOURCES))
+        self.index.listing("DeltaVMap")
+        out = self.index.root / "site" / MAIN_FILE
+        self.run_main(out, "--previous", str(published), *self.sources(LATER))
+        name = TYPE_FILES["vehicles"]
+        self.assertEqual(
+            (out.parent / name).read_bytes(), (published.parent / name).read_bytes()
+        )
+        self.assertEqual(json.loads(out.read_text(encoding="utf-8"))["sources"], LATER)
+
+    def test_a_published_type_file_is_written_after_its_last_document_goes(self):
+        self.index.vehicle("ExampleRover")
+        published = self.index.root / "published" / MAIN_FILE
+        self.run_main(published)
+        (self.index.authored / "vehicles" / "ExampleRover.toml").unlink()
+        out = self.index.root / "site" / MAIN_FILE
+        self.run_main(out, "--previous", str(published))
+        vehicles = json.loads((out.parent / TYPE_FILES["vehicles"]).read_text(encoding="utf-8"))
+        self.assertEqual(vehicles["vehicles"], [])
 
 
 class IndexStatus(Fixture):
@@ -1201,6 +1423,28 @@ class ListedAt(Fixture):
         self.assertEqual(
             self.entry(self.index.build(), "AutoStage")["listed_at"], "2026-09-01T10:00:00Z"
         )
+
+    def test_a_vehicle_lists_at_the_commit_that_added_its_document(self):
+        self.index.listing("AutoStage")
+        self.commit("2026-09-01T10:00:00Z")
+        self.index.vehicle("ExampleRover")
+        self.commit("2026-09-02T10:00:00Z")
+        files = self.index.build_files()
+        self.assertEqual(self.entry(files[MAIN_FILE], "AutoStage")["listed_at"], "2026-09-01T10:00:00Z")
+        self.assertEqual(
+            self.typed(files, "vehicles", "ExampleRover")["listed_at"], "2026-09-02T10:00:00Z"
+        )
+        self.assertEqual(self.index.notes, [])
+
+    def test_a_type_file_stays_when_the_history_held_its_last_document(self):
+        self.index.listing("AutoStage")
+        self.index.vehicle("ExampleRover")
+        self.commit("2026-09-01T10:00:00Z")
+        self.remove("vehicles/ExampleRover.toml")
+        self.commit("2026-09-02T10:00:00Z")
+        files = self.index.build_files()
+        self.assertEqual(files[TYPE_FILES["vehicles"]], {"snapshot_version": 1, "vehicles": []})
+        self.assertNotIn(TYPE_FILES["saves"], files)
 
     def test_a_tombstone_has_no_listed_at(self):
         self.index.listing("Gone")
