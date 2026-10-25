@@ -152,6 +152,16 @@ class Versions(unittest.TestCase):
         self.assertEqual(release_status("1.0.0-rc.1", False), "testing")
         self.assertEqual(release_status("1.0.0-nightly.20260810", False), "dev")
 
+    def test_the_status_of_a_share_host_counts_with_the_version(self):
+        # RFC 0094: the publisher's status becomes release_status together with
+        # the pre-release part of the version, so the less stable one wins.
+        self.assertEqual(release_status("1.0.0", False, "stable"), "stable")
+        self.assertEqual(release_status("1.0.0", False, "testing"), "testing")
+        self.assertEqual(release_status("1.0.0", False, "dev"), "dev")
+        self.assertEqual(release_status("1.0.0-rc.1", False, "stable"), "testing")
+        self.assertEqual(release_status("1.0.0-rc.1", False, "dev"), "dev")
+        self.assertEqual(release_status("1.0.0-nightly.1", False, "testing"), "dev")
+
 
 class Bounds(unittest.TestCase):
     def test_a_full_version_carries_its_own_revision(self):
@@ -278,6 +288,12 @@ class Stamp(unittest.TestCase):
         self.assertEqual(
             [entry["id"] for entry in document["dependencies"]],
             ["KittenExtensions", "MeasureTools"],
+        )
+
+    def test_a_status_the_host_names_is_stamped_and_none_changes_nothing(self):
+        self.assertEqual(self.stamp(release={**RELEASE, "status": "dev"})["release_status"], "dev")
+        self.assertEqual(
+            serialize(self.stamp(release={**RELEASE, "status": None})), serialize(self.stamp())
         )
 
     def test_a_short_tag_stamps_its_filled_version(self):

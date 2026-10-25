@@ -12,7 +12,10 @@ HostError means this tick could not evaluate the host and the next one rescans,
 StampError means the release itself is wrong and the author has to act.
 
 GitHub is polled conditionally against a stored ETag; SpaceDock serves no
-validator, so a SpaceDock authority costs one request per tick.
+validator, so a SpaceDock authority costs one request per tick. A share host
+(RFC 0094) is a host that `hosts.toml` of the authored repository registers. Its
+release list and its archives are in a GitHub repository, its `storage`, and
+the list is polled conditionally too.
 """
 
 import dataclasses
@@ -22,11 +25,14 @@ import json
 import re
 import tempfile
 import time
+import tomllib
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+from authored import HOST_KEY, HOSTS, RELEASES_KEYS, host_key
 from stamp_release import (
     Archive,
     StampError,
@@ -70,6 +76,25 @@ TAG_PREFIX = re.compile(r"[!-~]+")
 # The answers that say an archive is gone, a fact about the release and not a bad moment of the host.
 GONE = (404, 410, 451)
 
+# The files of a share host in its storage repository, by RFC 0094. Its names
+# are here and nowhere else.
+SHARE_LIST = "releases/{type}/{id}.json"
+SHARE_TAG = "{type}/{id}/{version}"
+SHARE_ASSET = "{id}-{version}.zip"
+SHARE_STATUSES = ("stable", "testing", "dev")
+
+# Where a copy that a share host lists may be: the Internet Archive or one of its subdomains.
+LISTED_MIRROR_HOSTS = ("archive.org",)
+
+# A deleted GitHub release does not change the ETag of the release list, so the
+# list is read in full at least this often. While a release of the list is
+# refused, it is read sooner, because a host can write its list a moment before
+# the GitHub release is complete.
+FULL_READ_HOURS = 24
+REFUSED_READ_HOURS = 1
+
+REPOSITORY = re.compile(r"[A-Za-z0-9-]+/[A-Za-z0-9._-]+")
+
 
 class HostError(Exception):
     """The host could not be evaluated this tick. Transient by assumption."""
@@ -107,6 +132,12 @@ class HostRelease:
     archives: tuple = ()
     # The `tag_prefix` of the listing, which the tag starts with (RFC 0096).
     tag_prefix: str = ""
+    # The release status the publisher chose on a share host (RFC 0094).
+    status: str | None = None
+    # Why the release cannot be stamped, when the host lists it but cannot serve it as it should.
+    problem: str | None = None
+    # The copies of the archive the host lists besides its own (RFC 0094).
+    mirrors: tuple = ()
 
     @property
     def rest(self):
@@ -121,6 +152,7 @@ class HostRelease:
             "url": self.url,
             "content_type": self.content_type,
             "prerelease": self.prerelease,
+            "status": self.status,
             "changelog": self.changelog,
             "changelog_text": self.changelog_text,
         }
@@ -587,12 +619,214 @@ class SpaceDockHost(Host):
         return download(self.http, release)
 
 
-def download(http, release):
+class ShareHost(Host):
+    """The releases of one listing on a share host, read from its storage repository (RFC 0094).
+
+    The release list in `storage` names the versions, and the GitHub release of
+    each version gives the archive, the date and the download count. The host's
+    own service is never asked. The stored ETag carries the time of the next
+    full read, see FULL_READ_HOURS.
+    """
+
+    kind = "share"
+
+    def __init__(self, name, table, listing_id, content_type, http, max_releases=500):
+        self.name = name
+        self.storage = table["storage"]
+        self.listing_id = listing_id
+        self.content_type = content_type
+        self.http = http
+        self.max_releases = max_releases
+        limits = table.get("max_bytes") or {}
+        self.max_bytes = min(limits.get(content_type, MAX_ARCHIVE_BYTES), MAX_ARCHIVE_BYTES)
+        # True when the list holds more than max_releases entries, of which only the last are read.
+        self.truncated = False
+
+    @property
+    def key(self):
+        return f"share:{self.name}/{self.content_type}/{self.listing_id}".lower()
+
+    def releases(self, etag=None):
+        self.truncated = False
+        path = SHARE_LIST.format(type=self.content_type, id=self.listing_id)
+        url = f"{GITHUB_API}/repos/{self.storage}/contents/{urllib.parse.quote(path)}"
+        try:
+            answer = self.http.get(
+                url, accept="application/vnd.github.raw+json", etag=_current(etag), api=True
+            )
+        except urllib.error.HTTPError as error:
+            if error.code in (404, 451):
+                raise StampError(
+                    f"the share host `{self.name}` has no release list for this listing: "
+                    f"{self.storage} holds no {path}"
+                ) from error
+            raise HostError(f"{url}: HTTP {error.code}") from error
+        if answer.status == 304:
+            return None, etag
+
+        payload = _parse_json(url, answer.body)
+        if not isinstance(payload, dict):
+            raise HostError(f"{url}: the release list is not an object")
+        if (payload.get("id"), payload.get("type")) != (self.listing_id, self.content_type):
+            raise StampError(
+                f"the release list {path} of `{self.name}` names the {payload.get('type')} "
+                f"`{payload.get('id')}`, not this listing"
+            )
+        entries = _objects(url, payload.get("releases") or [], "the releases of the list")
+        if len(entries) > self.max_releases:
+            self.truncated = True
+            self.http.log(
+                f"{self.key}: more than {self.max_releases} releases, the older ones are not read"
+            )
+            entries = entries[-self.max_releases:]
+
+        releases = [self._release(entry) for entry in entries]
+        tag = answer.headers.get("ETag")
+        if not tag:
+            return releases, None
+        hours = REFUSED_READ_HOURS if any(item.problem for item in releases) else FULL_READ_HOURS
+        due = datetime.now(timezone.utc) + timedelta(hours=hours)
+        return releases, f"{due.strftime('%Y-%m-%dT%H:%M:%SZ')} {tag}"
+
+    def _release(self, entry):
+        version = entry.get("version")
+        prefix = SHARE_TAG.format(type=self.content_type, id=self.listing_id, version="")
+        tag = prefix + ("" if version is None else str(version))
+        if not isinstance(version, str):
+            return HostRelease(
+                host=self.kind, tag=tag, tag_prefix=prefix, version=None,
+                release_date=None, url=None,
+            )
+
+        problem = None
+        payload = self._github_release(tag)
+        if payload is None:
+            payload = {}
+            problem = f"{self.storage} has no published GitHub release tagged `{tag}`"
+        listed = _objects(self.storage, payload.get("assets") or [], f"the assets of '{tag}'")
+        uploaded = [asset for asset in listed if asset.get("state") == "uploaded"]
+        wanted = SHARE_ASSET.format(id=self.listing_id, version=version)
+        names = [asset.get("name", "") for asset in uploaded]
+        if problem is None and names != [wanted]:
+            problem = (
+                f"the GitHub release `{tag}` carries {len(names)} archive(s) "
+                f"({', '.join(names) or 'none'}) and has to carry exactly one, named {wanted}"
+            )
+        status = entry.get("status")
+        if problem is None and status not in SHARE_STATUSES:
+            problem = f"the status {status!r} is not one of {', '.join(SHARE_STATUSES)}"
+
+        asset = {} if problem else uploaded[0]
+        return HostRelease(
+            host=self.kind,
+            tag=tag,
+            tag_prefix=prefix,
+            version=_version_of(version),
+            release_date=_utc(payload.get("published_at")),
+            url=asset.get("browser_download_url"),
+            content_type=asset.get("content_type") or "application/zip",
+            size=asset.get("size"),
+            asset_name=asset.get("name"),
+            downloads=_count(asset.get("download_count")),
+            archives=tuple(item["browser_download_url"] for item in uploaded if item.get("browser_download_url")),
+            status=status if status in SHARE_STATUSES else None,
+            problem=problem,
+            mirrors=self._mirrors(tag, entry.get("mirrors")),
+        )
+
+    def _github_release(self, tag):
+        """The published GitHub release tagged `tag` in storage, or None."""
+        url = f"{GITHUB_API}/repos/{self.storage}/releases/tags/{urllib.parse.quote(tag, safe='')}"
+        try:
+            answer = self.http.get(url, accept="application/vnd.github+json", api=True)
+        except urllib.error.HTTPError as error:
+            if error.code in (404, 451):
+                return None
+            raise HostError(f"{url}: HTTP {error.code}") from error
+        payload = _parse_json(url, answer.body)
+        if not isinstance(payload, dict):
+            raise HostError(f"{url}: the release is not an object")
+        return None if payload.get("draft") else payload
+
+    def _mirrors(self, tag, value):
+        """The copies an entry lists that are where RFC 0094 puts them. Any other is logged and left out."""
+        kept = []
+        for url in value if isinstance(value, list) else []:
+            if listed_mirror_url(url):
+                kept.append(url)
+            else:
+                self.http.log(f"{self.key}: the mirror {url!r} of `{tag}` is not an https URL on the Internet Archive")
+        return tuple(kept)
+
+    def download(self, release):
+        if release.problem:
+            raise StampError(release.problem)
+        return download(self.http, release, self.max_bytes)
+
+
+class ListedMirror(Host):
+    """A copy of one release that the release list of a share host names (RFC 0094).
+
+    It is downloaded with the limit of that host, and its key holds the URL, so
+    two copies of one release are remembered apart.
+    """
+
+    kind = "listed"
+
+    def __init__(self, host, url):
+        self.host = host
+        self.url = url
+
+    @property
+    def key(self):
+        return f"{self.host.key} {self.url}"
+
+    def served(self, release):
+        """`release` as this copy serves it."""
+        return dataclasses.replace(
+            release, url=self.url, size=None, archives=(self.url,), candidates=(), problem=None
+        )
+
+    def download(self, release):
+        return self.host.download(release)
+
+
+def listed_mirror_url(url):
+    """Whether `url` is where a share host may list a copy: https on the Internet Archive."""
+    parts = urllib.parse.urlsplit(url) if isinstance(url, str) else None
+    host = (parts.hostname or "") if parts else ""
+    return bool(parts) and parts.scheme == "https" and any(
+        host == allowed or host.endswith("." + allowed) for allowed in LISTED_MIRROR_HOSTS
+    )
+
+
+def listed_mirrors(host, release):
+    """Every copy the host lists for `release`, as (ListedMirror, the release it serves)."""
+    pairs = []
+    for url in release.mirrors:
+        mirror = ListedMirror(host, url)
+        pairs.append((mirror, mirror.served(release)))
+    return pairs
+
+
+def _current(etag):
+    """The ETag of a share host's stored `<due> <ETag>`, or None once its full read is due."""
+    due, _, tag = (etag or "").partition(" ")
+    try:
+        moment = datetime.strptime(due, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    return tag if tag and datetime.now(timezone.utc) < moment else None
+
+
+def download(http, release, limit=None):
     """The archive of `release`, as (Archive, content type). The caller closes the Archive.
 
+    `limit` is the largest archive the host takes, MAX_ARCHIVE_BYTES when it names none.
     Shared with the release pull request check, which downloads from the URL a
     submission names rather than from a host it polled.
     """
+    limit = min(limit or MAX_ARCHIVE_BYTES, MAX_ARCHIVE_BYTES)
     if not release.url:
         if release.candidates:
             raise StampError(
@@ -602,13 +836,13 @@ def download(http, release):
                 "should verify against"
             )
         raise StampError("the release carries no archive to download")
-    if release.size and release.size > MAX_ARCHIVE_BYTES:
+    if release.size and release.size > limit:
         raise StampError(
-            f"the archive is {_mib(release.size)}, above the {_mib(MAX_ARCHIVE_BYTES)} limit"
+            f"the archive is {_mib(release.size)}, above the {_mib(limit)} limit"
         )
     api = urllib.parse.urlsplit(release.url).hostname == GITHUB_API_HOST
     try:
-        archive, headers = http.archive(release.url, api=api)
+        archive, headers = http.archive(release.url, api=api, limit=limit)
     except OversizeError as error:
         # Permanent, unlike the transient failures HostError stands for: the
         # release stays too large next tick too, so the author hears about it
@@ -702,8 +936,69 @@ def tag_prefix(releases_section):
     return value
 
 
-def named(releases_section, http, listing_id=None):
-    """Every host a `[releases]` section names, keyed by kind."""
+def registered(root):
+    """The tables of `hosts.toml` in the authored checkout at `root`, by host key (RFC 0094).
+
+    No file registers no host. A file that does not read is a fault of the
+    stewards and not of a listing, so it is a HostError, and the listings on a
+    share host wait without an issue.
+    """
+    path = Path(root) / HOSTS
+    if not path.is_file():
+        return {}
+    try:
+        with path.open("rb") as handle:
+            document = tomllib.load(handle)
+    except (OSError, tomllib.TOMLDecodeError) as error:
+        raise HostError(f"{HOSTS} of the authored repository does not read: {error}") from error
+    strays = sorted(key for key, table in document.items() if not isinstance(table, dict))
+    if strays:
+        raise HostError(f"{HOSTS} of the authored repository holds {', '.join(strays)}, which are not host tables")
+    return document
+
+
+def share_keys(releases_section):
+    """The keys of a `[releases]` section that name a share host."""
+    if not isinstance(releases_section, dict):
+        return []
+    return [
+        key for key in releases_section
+        if key not in ("github", "spacedock", *RELEASES_KEYS)
+    ]
+
+
+def _share_table(key, table):
+    """The registered table of `key`, or HostError when the watcher cannot read a host from it."""
+    if not host_key(key):
+        raise HostError(
+            f"the host `{key}` of {HOSTS} has a name that is not {HOST_KEY.pattern}, "
+            "so its download counts could not go into the snapshot"
+        )
+    if table.get("kind") != "share":
+        raise HostError(f"the host `{key}` of {HOSTS} is of kind {table.get('kind')!r}, and only share is read")
+    storage = table.get("storage")
+    if not isinstance(storage, str) or not REPOSITORY.fullmatch(storage):
+        raise HostError(
+            f"the host `{key}` of {HOSTS} names no storage repository as owner/repo, "
+            "and a host that serves its files itself is not read yet"
+        )
+    types = table.get("types")
+    limits = table.get("max_bytes", {})
+    if not isinstance(types, list) or not isinstance(limits, dict) or not all(
+        isinstance(value, int) and not isinstance(value, bool) and value > 0
+        for value in limits.values()
+    ):
+        raise HostError(f"the host `{key}` of {HOSTS} has no list of types or a max_bytes that is not a table of sizes")
+    return table
+
+
+def named(releases_section, http, listing_id=None, content_type=None, registry=None):
+    """Every host a `[releases]` section names, keyed by its key there.
+
+    A key besides github and spacedock names a share host, which `registry`,
+    the tables of hosts.toml, has to hold. Its value is the id of the listing,
+    and the host has to take the type of the listing (RFC 0094).
+    """
     section = releases_section or {}
     prefix = tag_prefix(section)
     found = {}
@@ -711,19 +1006,40 @@ def named(releases_section, http, listing_id=None):
         found["github"] = GitHubHost(section["github"], http, listing_id, tag_prefix=prefix)
     if section.get("spacedock"):
         found["spacedock"] = SpaceDockHost(section["spacedock"], http)
+    for key in share_keys(section):
+        table = (registry or {}).get(key)
+        if table is None:
+            raise StampError(
+                f"[releases] names `{key}`, which is neither github nor spacedock nor a "
+                f"share host that {HOSTS} of the authored repository registers"
+            )
+        table = _share_table(key, table)
+        if content_type not in table["types"]:
+            raise StampError(
+                f"the share host `{key}` takes {', '.join(map(str, table['types'])) or 'no type'}, "
+                f"and this listing is a {content_type}"
+            )
+        if section[key] != listing_id:
+            raise StampError(
+                f"`{key}` under [releases] names {section[key]!r}, and a share host is named "
+                f"with the id of the listing, `{listing_id}`"
+            )
+        found[key] = ShareHost(key, table, listing_id, content_type, http)
     return found
 
 
-def build(releases_section, http, listing_id=None):
+def build(releases_section, http, listing_id=None, content_type=None, registry=None):
     """The hosts of one listing, and its authority.
 
     Returns (authority, mirrors). With one host key that host is the authority;
     with several, `authority` names which one, and the rest are mirror
     candidates. No `[releases]` section at all means the listing does not enter
-    the index through the watcher, and this returns (None, []).
+    the index through the watcher, and this returns (None, []). A share host
+    needs the type of the listing and the registry, see `named`, and a registered
+    table the watcher cannot read is a HostError.
     """
     section = releases_section or {}
-    named_hosts = named(section, http, listing_id)
+    named_hosts = named(section, http, listing_id, content_type, registry)
 
     if not named_hosts:
         return None, []

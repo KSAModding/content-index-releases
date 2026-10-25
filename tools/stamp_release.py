@@ -299,17 +299,18 @@ def prerelease_identifiers(version):
     return [identifier.lower() for identifier in part.split(".")] if part else []
 
 
-def release_status(version, host_prerelease):
-    """`stable`, `testing`, or `dev`, from the host's flag and the version.
+def release_status(version, host_prerelease, host_status=None):
+    """`stable`, `testing`, or `dev`, from the host's flag or status and the version.
 
     A pre-release identifier that names a development stream wins over the
     host's flag, because a nightly marked as a normal release is still a
-    nightly.
+    nightly. A share host names the status its publisher chose, which counts
+    together with the version (RFC 0094), so the less stable of the two wins.
     """
     identifiers = prerelease_identifiers(version)
-    if DEV_IDENTIFIERS.intersection(identifiers):
+    if DEV_IDENTIFIERS.intersection(identifiers) or host_status == "dev":
         return "dev"
-    if identifiers or host_prerelease:
+    if identifiers or host_prerelease or host_status == "testing":
         return "testing"
     return "stable"
 
@@ -1052,6 +1053,7 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes
         url             direct download URL of the archive, required
         content_type    the archive format, defaults to application/zip
         prerelease      the host's pre-release flag, defaults to false
+        status          the release status a share host names, optional
         changelog       URL of the release's changelog, optional
         changelog_text  the release notes as the host reports them, optional
 
@@ -1127,7 +1129,9 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes
         "type": content_type,
         "version": version,
         "version_scheme": "semver",
-        "release_status": release_status(version, release.get("prerelease", False)),
+        "release_status": release_status(
+            version, release.get("prerelease", False), release.get("status")
+        ),
         "release_date": release["release_date"],
         "game_min": game_min,
         "game_min_revision": game_min_revision,
@@ -1189,7 +1193,7 @@ def main(argv=None):
         required=True,
         type=Path,
         help="JSON of the release facts read off the host: tag, release_date, url, "
-        "content_type, prerelease, changelog, changelog_text",
+        "content_type, prerelease, status, changelog, changelog_text",
     )
     parser.add_argument(
         "--game-versions", type=Path, default=Path("game-versions.json"),

@@ -73,9 +73,10 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.app-token.outputs.token }}
 
-      # The authored documents the tick reads, tools/images.py, the image fetch
-      # rules the checks there use, and tools/ownership.py, which names the
-      # owner an issue mentions. A checkout costs one clone instead of one API
+      # The authored documents the tick reads, the share hosts of hosts.toml,
+      # tools/images.py, the image fetch rules the checks there use, and
+      # tools/ownership.py, which names the owner an issue mentions. A
+      # checkout costs one clone instead of one API
       # request per listing. The whole history, because a listing edit reads
       # each listing as it stood when its most recent release was stamped.
       - uses: actions/checkout@v7
