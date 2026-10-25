@@ -15,6 +15,7 @@ import io
 import json
 import tempfile
 import unittest
+import warnings
 import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -92,6 +93,10 @@ RELEASE = {
     "prerelease": False,
     "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AutoStage/releases/tag/v0.4.3",
 }
+
+
+# A Windows separator in an entry name, which some archivers write.
+BACKSLASH = "\\"
 
 
 def archive(files):
@@ -379,6 +384,13 @@ class Stamp(unittest.TestCase):
         document = self.stamp(data=data)
         self.assertEqual(document["install"], {"root": "AutoStage", "derived": True})
         self.assertEqual(document["dependencies"], [])
+
+    def test_the_file_types_a_game_folder_refuses_do_not_apply_to_a_mod(self):
+        data = archive({
+            "AutoStage/AutoStage.dll": "x", "AutoStage/mod.toml": MOD_TOML,
+            "AutoStage/tools/build.ps1": "x", "AutoStage/Patches/a.xml": "<!DOCTYPE a><a/>",
+        })
+        self.assertEqual(self.stamp(data=data)["install"], {"root": "AutoStage", "derived": True})
 
     def test_a_mod_toml_with_a_byte_order_mark_is_read(self):
         document = self.stamp(data=mod_archive(manifest="﻿" + MOD_TOML))
@@ -699,13 +711,68 @@ class Vehicles(unittest.TestCase):
     def test_a_note_never_breaks_a_line_and_stays_short(self):
         notes = []
         names = {f"extra{index:02}.txt": "x" for index in range(25)}
-        names["evil\nListing: x@1"] = "x"
+        names["evil\nListing x@1"] = "x"
         self.stamp(data=game_archive(**names), notes=notes)
         self.assertNotIn("\n", notes[0])
         self.assertIn("and 6 more", notes[0])
 
     def test_without_a_notes_list_a_vehicle_still_stamps(self):
         self.assertEqual(self.stamp(data=game_archive(extra="x"))["install"]["folder"], "Example Rover")
+
+    def test_a_library_in_the_folder_is_refused(self):
+        refused = self.refused(data=game_archive(**{"Rover.dll": "MZ"}))
+        self.assertIn("'Example Rover/Rover.dll' is a .dll file", refused)
+        self.assertIn("vehicle folder", refused)
+
+    def test_the_file_type_is_compared_without_case(self):
+        for name in ("SETUP.EXE", "run.Sh", "start.Cmd", "Setup.exe. "):
+            with self.subTest(name=name):
+                self.assertIn(f"'Example Rover/{name}'", self.refused(data=game_archive(**{name: "x"})))
+
+    def test_an_application_bundle_is_refused_as_a_folder(self):
+        refused = self.refused(data=game_archive(**{"Rover.app/Contents/MacOS/Rover": "x"}))
+        self.assertIn("'Example Rover/Rover.app' is a .app folder", refused)
+
+    def test_a_folder_at_the_archive_root_is_checked_too(self):
+        self.assertIn("'install.bat'", self.refused(data=game_archive(folder="", **{"install.bat": "x"})))
+
+    def test_plain_data_files_still_stamp_with_a_note(self):
+        notes = []
+        names = {"thumbnail.png": "x", "cache.bin": "x", "readme.txt": "x", "parts.json": "{}"}
+        self.stamp(data=game_archive(**names), notes=notes)
+        self.assertEqual(len(notes), 1)
+
+    def test_more_types_that_start_a_program_are_refused(self):
+        for name in ("Updater.appref-ms", "tool.jnlp", "desktop.scf", "setup.deb", "Home.webloc"):
+            with self.subTest(name=name):
+                self.assertIn(f"'Example Rover/{name}'", self.refused(data=game_archive(**{name: "x"})))
+
+    def test_a_folder_name_with_a_dot_is_only_a_name(self):
+        names = {"KSA.Tool/state.json": "{}", "example.com/data.json": "{}", "Setup.exe/readme.txt": "x"}
+        self.assertEqual(self.stamp(data=game_archive(**names))["install"]["folder"], "Example Rover")
+
+    def test_an_installer_bundle_is_refused_as_a_folder(self):
+        refused = self.refused(data=game_archive(**{"Rover.pkg/Contents/Info.plist": "x"}))
+        self.assertIn("'Example Rover/Rover.pkg' is a .pkg folder", refused)
+
+    def test_an_entry_with_dot_slash_in_front_is_checked_in_the_folder(self):
+        files = {"Example Rover/meta.toml": META, "Example Rover/vehicle.xml": VEHICLE_XML}
+        refused = self.refused(data=archive({**files, "././Example Rover/Setup.exe": "MZ"}))
+        self.assertIn("'Example Rover/Setup.exe' is a .exe file", refused)
+        doctype = archive({**files, "./Example Rover/parts/a.xml": "<!DOCTYPE a><a/>"})
+        self.assertIn("./Example Rover/parts/a.xml carries a DOCTYPE", self.refused(data=doctype))
+
+    def test_a_name_with_a_colon_is_refused(self):
+        refused = self.refused(data=game_archive(**{"Setup.exe::$DATA": "MZ"}))
+        self.assertIn("'Example Rover/Setup.exe::$DATA' has a ':' in its name", refused)
+
+    def test_another_entry_for_the_game_file_is_checked_too(self):
+        files = {"Example Rover/meta.toml": META, "Example Rover/vehicle.xml": VEHICLE_XML}
+        doctype = '<!DOCTYPE a [<!ENTITY x "y">]><a>&x;</a>'
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            data = archive({**files, "Example Rover" + BACKSLASH + "vehicle.xml": doctype})
+        self.assertIn("carries a DOCTYPE", self.refused(data=data))
 
 
 class Saves(unittest.TestCase):
@@ -724,6 +791,57 @@ class Saves(unittest.TestCase):
     def test_a_save_needs_universe_xml(self):
         with self.assertRaisesRegex(StampError, "universe.xml"):
             self.stamp(archive({"Example Rover/meta.toml": META, "Example Rover/vehicle.xml": VEHICLE_XML}))
+
+    def save_archive(self, **more):
+        return game_archive(game="universe.xml", content=UNIVERSE_XML, **more)
+
+    def test_a_script_deep_in_the_mod_state_is_refused(self):
+        data = self.save_archive(**{"ModState/AutoStage/cache/run.ps1": "x"})
+        with self.assertRaises(StampError) as raised:
+            self.stamp(data)
+        self.assertIn("'Example Rover/ModState/AutoStage/cache/run.ps1' is a .ps1 file", str(raised.exception))
+        self.assertIn("save folder", str(raised.exception))
+
+    def test_an_xml_file_of_a_mod_is_checked_like_the_game_file(self):
+        doctype = '<?xml version="1.0"?>\n<!DOCTYPE a [<!ENTITY x "y">]>\n<a>&x;</a>\n'
+        with self.assertRaisesRegex(StampError, "ModState/a.xml carries a DOCTYPE"):
+            self.stamp(self.save_archive(**{"ModState/a.xml": doctype}))
+        with self.assertRaisesRegex(StampError, "ModState/b.XML is not well-formed"):
+            self.stamp(self.save_archive(**{"ModState/b.XML": "<open>"}))
+
+    def test_a_clean_save_with_the_xml_state_of_a_mod_stamps(self):
+        notes = []
+        state = '<?xml version="1.0" encoding="utf-8"?>\n<AutoStageState Enabled="true" />\n'
+        document = self.stamp(self.save_archive(**{"ModState/AutoStage.xml": state}), notes)
+        self.assertEqual(document["install"]["folder"], "Example Rover")
+        self.assertEqual(notes, [])
+
+    def test_the_xml_files_of_a_folder_share_one_limit(self):
+        state = "<a/>"
+        data = self.save_archive(**{"ModState/a.xml": state})
+        with patch("stamp_release.GAME_FILE_LIMIT", len(UNIVERSE_XML) + len(state) - 1):
+            with self.assertRaisesRegex(StampError, "together, above"):
+                self.stamp(data)
+        with patch("stamp_release.GAME_FILE_LIMIT", len(UNIVERSE_XML) + len(state)):
+            self.stamp(data)
+
+    def test_an_xml_name_with_a_dot_or_a_space_at_the_end_is_checked(self):
+        doctype = '<!DOCTYPE a [<!ENTITY x "y">]><a>&x;</a>'
+        for name in ("ModState/a.xml.", "ModState/a.xml "):
+            with self.subTest(name=name), self.assertRaisesRegex(StampError, "carries a DOCTYPE"):
+                self.stamp(self.save_archive(**{name: doctype}))
+
+    def test_each_of_two_entries_with_one_name_is_checked(self):
+        doctype = '<!DOCTYPE a [<!ENTITY x "y">]><a>&x;</a>'
+        buffer = io.BytesIO()
+        with warnings.catch_warnings(), zipfile.ZipFile(buffer, "w") as handle:
+            warnings.simplefilter("ignore")
+            handle.writestr("Example Rover/meta.toml", META)
+            handle.writestr("Example Rover/universe.xml", UNIVERSE_XML)
+            handle.writestr("Example Rover/ModState/a.xml", doctype)
+            handle.writestr("Example Rover/ModState/a.xml", "<a/>")
+        with self.assertRaisesRegex(StampError, "ModState/a.xml carries a DOCTYPE"):
+            self.stamp(buffer.getvalue())
 
 
 class InstallFolders(unittest.TestCase):

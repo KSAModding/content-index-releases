@@ -88,6 +88,8 @@ The key is valid only next to a `github` key, and SpaceDock ignores it.
 The listings are the documents under `listings/`, `vehicles/` and `saves/` of the authored half (RFC 0085), and `tools/authored.py` names the folders and the types each holds.
 A document whose type its folder does not hold is reported in its issue, and so is an id that another document under these folders or under `packs/` also holds, compared without case.
 A `vehicle` or a `save` is stamped from the game folder in its archive: `meta.toml` has to parse, `name` has to follow the name rule of `SaveName.Sanitize`, the folder has to be named `name`, and `vehicle.xml` or `universe.xml` has to be well-formed XML of at most 256 MiB without a DOCTYPE.
+Every other `.xml` file in the folder, such as the state of a mod in a save, is held to the same rule, and all XML files of the folder together to the same 256 MiB.
+A folder that holds an executable or a script file, such as a `.dll`, `.exe`, `.ps1` or `.sh`, a macOS bundle folder such as `.app`, or a name with a `:` is refused, because the game runs nothing from these folders. `EXECUTABLE_EXTENSIONS` and `BUNDLE_EXTENSIONS` in `tools/stamp_release.py` list the types.
 `game_min` comes from `version` in `meta.toml` when the listing authors none.
 A release whose `install.folder` another listing of the same type already holds, compared without case, is refused, and it is tried again once the release files of that listing change.
 A vehicle folder with files besides `meta.toml` and `vehicle.xml` is stamped with a note, which goes into the body of the stamp commit and not into the issue.
