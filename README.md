@@ -72,6 +72,7 @@ A new release on a listing that did not change still waits for the schedule.
 Each tick asks every listing's authority host for its releases and stamps every release that appeared after the newest one already stamped, so a patch for an older line, tagged after a newer version exists, is stamped too.
 
 A listing's first tick stamps its newest release only, and its back catalogue stays unstamped.
+A release that the listing's issue names is tried again until a newer release is stamped, so an archive its author fixes is still stamped, and after that only `since` stamps it.
 
 A listing that names `since` under `[releases]` opts into its back catalogue (RFC 0079).
 The watcher then also stamps every release of the authority host whose version is at least `since` and that has no release file yet, with the same checks as every stamp.
