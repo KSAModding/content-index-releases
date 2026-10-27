@@ -45,5 +45,7 @@
       "repository": "https://github.com/Restricted117/KSA-CompactHUD",
       "bugtracker": "https://github.com/Restricted117/KSA-CompactHUD/issues"
     }
-  }
+  },
+  "yanked": true,
+  "yanked_reason": "The archive was replaced after this version was stamped, so its download fails the hash check, and 0.1.2 replaces it."
 }
