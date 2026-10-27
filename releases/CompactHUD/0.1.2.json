@@ -1,0 +1,49 @@
+{
+  "spec_version": 1,
+  "id": "CompactHUD",
+  "type": "mod",
+  "version": "0.1.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-27T07:25:12Z",
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
+  "game_max": "2026.10.19.5638",
+  "game_max_revision": 5638,
+  "download": {
+    "url": "https://github.com/Restricted117/KSA-CompactHUD/releases/download/v0.1.2/CompactHUD.zip",
+    "sha256": "F817825DD30EF313B1625820ACEABD6A06C2A885C9E26E3B0EBE3BE428498EFF",
+    "size": 13841,
+    "content_type": "application/x-zip-compressed"
+  },
+  "install_size": 30090,
+  "install": {
+    "root": "CompactHUD",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Restricted117/KSA-CompactHUD/releases/tag/v0.1.2",
+  "changelog_text": "**KSA version 2026.10.19**\nremoved debug logging to the console",
+  "listing": {
+    "name": "KSA-CompactHUD",
+    "authors": [
+      "russtm"
+    ],
+    "abstract": "Compacted UI for Kitten Space Agency",
+    "description": "CompactHUD is a Kitten Space Agency mod that condenses the information from all the UI windows into 2 small ones. This mod doesn't modify/change the existing UI only adds the two windows that automatically save their position data. Due to the nature of the game and the mod features the existing windows will lose functionality when the mod is enabled but can be disabled during the game. This mod conflicts with mods that control your vehicle but, disabling the mod in the tab on the menu bar should let them work.",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksa-compacthud-0-1-0.1448/",
+      "repository": "https://github.com/Restricted117/KSA-CompactHUD",
+      "bugtracker": "https://github.com/Restricted117/KSA-CompactHUD/issues"
+    }
+  }
+}
