@@ -1,0 +1,46 @@
+{
+  "spec_version": 1,
+  "id": "KSP-Characters",
+  "type": "mod",
+  "version": "0.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-27T11:34:52Z",
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
+  "download": {
+    "url": "https://github.com/paulo-santana/KSA-KSP-Characters/releases/download/v0.1.0/KSP-Characters-v0.1.0.zip",
+    "sha256": "1BDD1D3C618123A41809D56DCCA58AC987FC75759D2A7DCACB031541D73D8918",
+    "size": 13770615,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4753/KSP%20Characters/download/0.1.0"
+    ]
+  },
+  "install_size": 20310298,
+  "install": {
+    "root": "KSP-Characters",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/paulo-santana/KSA-KSP-Characters/releases/tag/v0.1.0",
+  "changelog_text": "First release: the Kerbal from Kerbal Space Program as a crew character in Kitten Space Agency, with its body, helmet, visor, jetpack and KSP's own animations. The jetpack is from KSA\n\n## Install\n\n1. Download **KSP-Characters-v0.1.0.zip** below. The \"Source code\" archives will unpack under the wrong folder name.\n2. Unzip it into `Documents/My Games/Kitten Space Agency/mods/`, so you get `mods/KSP-Characters/`.\n3. Start the game. It detects the mod by itself.\n\nKerbals join the pool the game draws crew from, so new crew members are a random mix of kittens and Kerbals. Existing saves keep the characters they already have. So far to figure out which one are kerbals, i'd create a ship with 10 Gemini capsules so I can fill them with the entire initial character roster\n\n## Known limitations\n\n- The face has no expressions.\n- The seated pose doesn't move yet.\n- Kerbals get random kitten names.\n- I removed the \"look at the camera\" eye animation as they are very cursed for kerbals.\n- The walk plays faster than in KSP, because KSA moves crew faster. It has been slowed down as far as it can be without a code mod.\n\n## Legal\n\nThe Kerbal's models, textures and animations come from Kerbal Space Program and belong to its rights holders. The jetpack belongs to Kitten Space Agency. This is a fan port, not affiliated with or endorsed by either. Only the XML and docs are MIT licensed; see `LICENSE`.",
+  "listing": {
+    "name": "KSP Characters",
+    "authors": [
+      "paulo-santana"
+    ],
+    "abstract": "Adds the Kerbal from Kerbal Space Program as a crew character, with KSP's own models, textures and animations.",
+    "description": "Adds the Kerbal from Kerbal Space Program as a playable crew character: body, helmet, visor, the game's own jetpack, and KSP's own animations.\n\nKerbals join the pool the game draws crew from, so new crew members are a random mix of kittens and Kerbals. Saves that already exist keep the characters they have.\n\nIt is a data mod: no code and no mod loader.\n\n## Known limitations\n\n- The jetpack keeps one floating pose whatever the thrust, as in KSP.\n- The face has no expressions or blinking, and the eyes play KSP's own animation instead of following the camera.\n- The seated pose doesn't move.\n- Kerbals get kitten names.\n- The walk plays faster than in KSP, because KSA moves crew faster. It is slowed down as far as data alone allows.\n\n## Credits and legal\n\nThe Kerbal's models, textures and animations come from Kerbal Space Program and belong to its rights holders. The jetpack and its textures are Kitten Space Agency's. This is a fan port, not affiliated with or endorsed by either. Only the XML definitions and the documentation are MIT licensed; see LICENSE.\n",
+    "license": "MIT AND LicenseRef-KSP-Assets AND LicenseRef-KSA-Assets",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksp-characters.1474/",
+      "repository": "https://github.com/paulo-santana/KSA-KSP-Characters",
+      "spacedock": "https://spacedock.info/mod/4753/KSP%20Characters",
+      "bugtracker": "https://github.com/paulo-santana/KSA-KSP-Characters/issues"
+    }
+  }
+}
