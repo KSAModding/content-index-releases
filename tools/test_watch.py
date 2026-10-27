@@ -926,6 +926,31 @@ class SwapsAndMirrors(WatcherCase):
             self.assertEqual(len(errors), 1)
             self.assertIn("stamped exactly", errors[0])
 
+    def test_a_yanked_release_with_other_bytes_is_not_reported(self):
+        # The yank is the way forward the swap report names, so the watcher
+        # issue can close. The file is not touched and nothing is downloaded.
+        with tempfile.TemporaryDirectory() as name:
+            folder = Path(name)
+            watcher = self.watcher(folder, ["--no-commit"])
+            path = folder / "releases" / "S"
+            path.mkdir(parents=True)
+            file = path / "1.0.0.json"
+            file.write_text(json.dumps({
+                "id": "S", "version": "1.0.0",
+                "download": {"url": "old", "sha256": "AA", "size": 5},
+                "yanked": True,
+            }))
+            before = file.read_text()
+            authority = FakeAuthority(b"other")
+            errors = []
+            settled = watcher.check_for_a_swap(
+                "S", authority, release("1.0.0", "new", size=999), file, errors
+            )
+            self.assertTrue(settled)
+            self.assertEqual(errors, [])
+            self.assertEqual(authority.downloads, 0)
+            self.assertEqual(file.read_text(), before)
+
     def test_a_corrupt_stamped_file_is_reported_not_thrown(self):
         # The repository is the state, so a stamped file that does not parse
         # has to reach a human instead of the broad catch.
@@ -3127,6 +3152,21 @@ class GoneFromTheHost(GoneCase):
         unchanged.listed = None
         _, errors = self.gone(1, unchanged)
         self.assertEqual(len(errors), 1)
+
+    def test_other_bytes_listed_again_on_a_yanked_release_keep_the_mark_silently(self):
+        path = gone_file(self.folder, unavailable_since="2026-09-01T00:00:00Z")
+        document = self.document()
+        document["yanked"] = True
+        path.write_text(serialize(document))
+        host = ListingHost([release("1.0.0", GONE_URL, size=5)], payload=b"other")
+        _, errors = self.gone(0, host)
+        self.assertEqual(errors, [])
+        self.assertEqual(self.document()["download"]["unavailable_since"], "2026-09-01T00:00:00Z")
+
+        unchanged = ListingHost()
+        unchanged.listed = None
+        _, errors = self.gone(1, unchanged)
+        self.assertEqual(errors, [])
 
     def test_bytes_that_could_not_be_checked_refetch_the_list_until_they_are(self):
         class EtagHost(ListingHost):

@@ -134,7 +134,7 @@ A tag is read as a version by [RFC 0072](https://github.com/KSAModding/content-m
 A missing component is filled with `0`, so the tag `0.5` is stamped as `0.5.0` and `v1` as `1.0.0`, and the stored `version` is always the full form.
 A tag with four components, a leading zero, or no version in it is refused.
 
-A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue.
+A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue until the release is yanked.
 Two tags that fill to the same version, such as `0.5` and `0.5.0`, are one version.
 It is stamped from one of them only, the tag it was already stamped from or else the older one, and the other tag is refused with both tags named in that issue.
 

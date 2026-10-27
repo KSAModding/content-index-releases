@@ -1775,6 +1775,11 @@ class Watcher:
         same_url = (release.url or download.get("url")) == download.get("url")
         if same_size and same_url:
             return True
+        # A yank is the way forward the swap report names, so a yanked release
+        # is not reported again. Its file stays as it is and gets no mirror,
+        # and the archive is not downloaded.
+        if document.get("yanked") is True:
+            return True
 
         # A rejection is permanent, so re-downloading the swapped archive every
         # tick would spend the tick on an answer that is already known. The
@@ -2535,11 +2540,15 @@ class Watcher:
         return True
 
     def report_swap(self, listing_id, document, errors):
-        """Report the other bytes a marked release was last found with, which keeps its mark."""
+        """Report the other bytes a marked release was last found with, which keeps its mark.
+
+        A yanked release is not reported, because the yank is the way forward
+        the report names.
+        """
         version = document.get("version")
         swap = self.cache.data["gone"].get(f"{listing_id}/{version}", {}).get("swap")
         download = document.get("download") or {}
-        if swap and "unavailable_since" in download:
+        if swap and "unavailable_since" in download and document.get("yanked") is not True:
             errors.append(
                 self.swap_error(version, (download.get("sha256") or "").upper(), swap["digest"])
             )
