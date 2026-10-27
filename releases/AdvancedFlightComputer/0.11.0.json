@@ -29,9 +29,17 @@
   },
   "dependencies": [
     {
-      "id": "KittenExtensions",
-      "kind": "optional",
-      "source": "derived"
+      "any_of": [
+        {
+          "id": "KittenExtensions"
+        },
+        {
+          "id": "KittenExtensionsContinued",
+          "min": "0.5.3"
+        }
+      ],
+      "kind": "recommends",
+      "source": "authored"
     }
   ],
   "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/tag/v0.11.0",
