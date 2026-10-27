@@ -1,0 +1,49 @@
+{
+  "spec_version": 1,
+  "id": "KSAero",
+  "type": "mod",
+  "version": "0.1.1-nightly.20261027",
+  "version_scheme": "semver",
+  "release_status": "dev",
+  "release_date": "2026-10-27T21:32:53Z",
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
+  "download": {
+    "url": "https://github.com/cairn5/KSAero/releases/download/v0.1.1-nightly.20261027/KSAero-0.1.1-nightly.20261027.zip",
+    "sha256": "40EA3D8A99C4B2A55ED5C8C9305E2C98572BCA27B47348B728928A1288D657AB",
+    "size": 9253,
+    "content_type": "application/zip"
+  },
+  "install_size": 17464,
+  "install": {
+    "root": "KSAero",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.7",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/cairn5/KSAero/releases/tag/v0.1.1-nightly.20261027",
+  "changelog_text": "Nightly build of `master` at 477b10380c82b9db131650102bf13392024a7306, for testing. It has not been flown as a release, so it can break things that the latest stable release does not.\n\nBorea offers nightlies only on its `dev` channel, and SpaceDock never gets them.\n\n**Full Changelog**: https://github.com/cairn5/KSAero/compare/v0.1.0...v0.1.1-nightly.20261027\n\n## Compatibility\nValidated against KSA build version **2026.10.19.5638**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\`, so that the files end up in `mods\\KSAero\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).\n\nYou can also download and install it with the mod manager **Borea**: https://ksamodding.github.io/Borea/\n\n## Downloads\n\n| File | SHA-256 |\n| --- | --- |\n| KSAero-0.1.1-nightly.20261027.zip | `40ea3d8a99c4b2a55ed5c8c9305e2c98572bca27b47348b728928a1288d657ab` |\n\n## Provenance\nThe zip was built by the nightly workflow of this repository. A promoted stable release carries the same bytes as the nightly it was promoted from, so the same attestation covers it. To check a download:\n\n```\ngh attestation verify <file> --repo cairn5/KSAero \\\n  --signer-workflow cairn5/KSAero/.github/workflows/nightly.yml\n```",
+  "listing": {
+    "name": "KSAero",
+    "authors": [
+      "cairn5"
+    ],
+    "abstract": "Better Aerodynamics for Kitten Space Agency",
+    "description": "A deliberately simple aerodynamics mod for Kitten Space Agency, to stand in until the game has real aero. It replaces stock's atmospheric drag with a body-of-revolution model that has angle-of-attack drag, lift with a stall, and a transonic drag rise. Rotational dynamics are left exactly as stock.\n\n![Airflow around a cylinder](ksa-image:aeroflow)\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "aerodynamics"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksaero.1353/",
+      "repository": "https://github.com/cairn5/KSAero",
+      "spacedock": "https://spacedock.info/mod/4647/KSAero",
+      "bugtracker": "https://github.com/cairn5/KSAero/issues"
+    }
+  }
+}
