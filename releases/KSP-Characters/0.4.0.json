@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "KSP-Characters",
+  "type": "mod",
+  "version": "0.4.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-28T16:31:20Z",
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
+  "download": {
+    "url": "https://spacedock.info/mod/4753/KSP%20Characters/download/0.4.0",
+    "sha256": "6D234075B63BE15DD907E41DAE6C9FE49E38D9D0BA8582224E46A8C8E608A625",
+    "size": 21737805,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://github.com/paulo-santana/KSA-KSP-Characters/releases/download/v0.4.0/KSP-Characters-v0.4.0.zip"
+    ]
+  },
+  "install_size": 35174331,
+  "install": {
+    "root": "KSP-Characters",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "CharacterManager",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://spacedock.info/mod/4753/KSP%20Characters",
+  "changelog_text": "The **male Kerbals have KSP's current model and suits**, as the female Kerbal already had.\n\n- The male Kerbal is now KSP's current EVA Kerbal (`maleEVA`) instead of the legacy model. The suit textures are twice the resolution (2048 px).\n- The **orange suit** is KSP's own orange suit, not a recolor of the white one, with a matching helmet.\n- Male and female Kerbals share the same suit textures, so the download is smaller (about 22 MB instead of 25) even with the sharper suits.\n- Saves that already exist keep their crew; Kerbals in them now show the new model.\n\nThe known limitations of 0.3.0 still apply.",
+  "listing": {
+    "name": "KSP Characters",
+    "authors": [
+      "paulo-santana"
+    ],
+    "abstract": "Adds the Kerbals from Kerbal Space Program as crew characters, with KSP's own models, textures and animations.",
+    "description": "Adds the Kerbals from Kerbal Space Program as playable crew characters: body, helmet, visor, the game's own jetpack, and KSP's own animations. There are four characters: a male and a female Kerbal, each in KSP's white EVA suit and in an orange one.\n\nKerbals join the pool the game draws crew from, so new crew members are a random mix of kittens and Kerbals. Saves that already exist keep the characters they have.\n\nIt is a data mod: no code and no mod loader. With the optional Character Manager, Kerbals get Kerbal names, and you can choose to recruit only Kerbals.\n\n## Known limitations\n\n- The jetpack keeps one floating pose whatever the thrust, as in KSP.\n- The face has no expressions or blinking, and the eyes play KSP's own animation instead of following the camera.\n- The seated pose doesn't move.\n- Without Character Manager, Kerbals get kitten names.\n- The female Kerbal's hair bun clips through the helmet a little while walking.\n- The walk plays faster than in KSP, because KSA moves crew faster. It is slowed down as far as data alone allows.\n\n## Credits and legal\n\nThe Kerbals' models, textures, animations and name lists come from Kerbal Space Program and belong to its rights holders. The jetpack and its textures are Kitten Space Agency's. This is a fan port, not affiliated with or endorsed by either. Only the XML definitions and the documentation are MIT licensed; see LICENSE.\n",
+    "license": "MIT AND LicenseRef-KSP-Assets AND LicenseRef-KSA-Assets",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksp-characters.1474/",
+      "repository": "https://github.com/paulo-santana/KSA-KSP-Characters",
+      "spacedock": "https://spacedock.info/mod/4753/KSP%20Characters",
+      "bugtracker": "https://github.com/paulo-santana/KSA-KSP-Characters/issues"
+    }
+  }
+}
