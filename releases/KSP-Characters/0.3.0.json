@@ -22,7 +22,13 @@
     "root": "KSP-Characters",
     "derived": true
   },
-  "dependencies": [],
+  "dependencies": [
+    {
+      "id": "CharacterManager",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
   "changelog": "https://spacedock.info/mod/4753/KSP%20Characters",
   "changelog_text": "New characters: the **female Kerbal**, in the white suit (`KerbalFemale`) and the orange suit (`KerbalFemaleOrange`).\n\n- She is KSP's female Kerbal, with her own body, head and hair and her own set of KSP's animations.\n- New crew members are now a random mix of kittens and male and female Kerbals, each in a white or orange suit.\n- Saves that already exist keep the characters they have.\n\nAlso new: `characters.toml` and `names/`, with KSP's Kerbal name lists. The game ignores them; they are there for the optional Character Manager mod, which can give Kerbals Kerbal names. Without it nothing changes.\n\nThe known limitations of 0.2.0 still apply. Her hair bun clips through the helmet a little while walking.",
   "listing": {
