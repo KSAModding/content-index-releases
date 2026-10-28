@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "KSP-Characters",
+  "type": "mod",
+  "version": "0.5.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-28T23:06:42Z",
+  "game_min": "2026.10.19.5638",
+  "game_min_revision": 5638,
+  "download": {
+    "url": "https://spacedock.info/mod/4753/KSP%20Characters/download/0.5.0",
+    "sha256": "A35302F8C1A946BABA4E2BB5EEB8E52861B4CF2FCEE58086679ECC1A1F0EE503",
+    "size": 21737898,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://github.com/paulo-santana/KSA-KSP-Characters/releases/download/v0.5.0/KSP-Characters-v0.5.0.zip"
+    ]
+  },
+  "install_size": 35174690,
+  "install": {
+    "root": "KSP-Characters",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "CharacterManager",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://spacedock.info/mod/4753/KSP%20Characters",
+  "changelog_text": "**Jebediah, Bill, Bob and Valentina Kerman** join every new game, in KSP's orange suit, the way they start every career in KSP.\n\n- This needs the optional [Character Manager](https://github.com/paulo-santana/KSA-Character-Manager) 0.2.0 or later. On its own, KSP Characters can't add crew, and nothing changes.\n- They join right after the game's own Hunter, Banjo and Polaris. In a Testing start, Jeb and Bill start seated in the starting vehicles.\n- Saves that already exist are not changed: the four only join new games.",
+  "listing": {
+    "name": "KSP Characters",
+    "authors": [
+      "paulo-santana"
+    ],
+    "abstract": "Adds the Kerbals from Kerbal Space Program as crew characters, with KSP's own models, textures and animations.",
+    "description": "Adds the Kerbals from Kerbal Space Program as crew characters in KSA, with KSP's own models, textures and animations: male and female, in KSP's white and orange suits. New crew are a random mix of kittens and Kerbals.\n\nIt is a data mod: no code and no mod loader. With the optional Character Manager, Kerbals get Kerbal names, and Jeb, Bill, Bob and Val join every new game.\n\nWhat it includes and its known limitations are in the [README](https://github.com/paulo-santana/KSA-KSP-Characters#readme).\n\n## Credits and legal\n\nThe Kerbals' models, textures, animations and name lists come from Kerbal Space Program and belong to its rights holders. The jetpack and its textures are Kitten Space Agency's. This is a fan port, not affiliated with or endorsed by either. Only the XML definitions and the documentation are MIT licensed; see LICENSE.\n",
+    "license": "MIT AND LicenseRef-KSP-Assets AND LicenseRef-KSA-Assets",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksp-characters.1474/",
+      "repository": "https://github.com/paulo-santana/KSA-KSP-Characters",
+      "spacedock": "https://spacedock.info/mod/4753/KSP%20Characters",
+      "bugtracker": "https://github.com/paulo-santana/KSA-KSP-Characters/issues"
+    }
+  }
+}
