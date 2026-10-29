@@ -1,0 +1,57 @@
+{
+  "spec_version": 1,
+  "id": "KSArmory",
+  "type": "mod",
+  "version": "0.10.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-29T10:55:26Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSArmory/releases/download/v0.10.0/KSArmory-0.10.0.zip",
+    "sha256": "9807FCA019D860CB17DBCEB23E9D86F8941C381A003BED50B560EFB429D99953",
+    "size": 20268224,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4460/KSArmory/download/0.10.0"
+    ]
+  },
+  "install_size": 29558434,
+  "install": {
+    "root": "KSArmory",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSArmory/releases/tag/v0.10.0",
+  "changelog_text": "## [0.10.0](https://github.com/LaurensDeV/KSArmory/compare/v0.9.9...v0.10.0) (2026-10-29)\n\n### Features\n\n* **damage:** break parts by fragments and size, not by a radius ([cc01811](https://github.com/LaurensDeV/KSArmory/commit/cc01811919f2bf81253a9bade53027c1a98bc3cc))\n* **damage:** carry a conventional blast by the air it went off in ([2774d8a](https://github.com/LaurensDeV/KSArmory/commit/2774d8a6f3ab7b37069df408bcb465eb0c9af80f))\n* **damage:** hurt engines lose thrust, and hit tanks can catch fire ([81aef29](https://github.com/LaurensDeV/KSArmory/commit/81aef2909b71cf6a0c430b3a7fbcbc47ace95658))\n* **damage:** let a burst hurt the craft that fired it and the one flown ([8b594f8](https://github.com/LaurensDeV/KSArmory/commit/8b594f8d7b1e89929085818f1bf2fe45f96d7695))\n* **guns:** fire a tungsten dart from the Phalanx and HEI from the M197 ([4b3315b](https://github.com/LaurensDeV/KSArmory/commit/4b3315beb944db26380dbb9cb829deae332485c2))\n* **leaks:** burn a burning tank's leak, boil a cryogen's, spray it out ([047ea11](https://github.com/LaurensDeV/KSArmory/commit/047ea1166b5e1cfeb9bd6fe9b953d1d486aabdbd))\n* **leaks:** merge close holes into one leak, pour cryogens as liquid ([dc54da0](https://github.com/LaurensDeV/KSArmory/commit/dc54da0fdcc4bb9b6ae585fb77fa73b2e3437f74))\n* **leaks:** vent a holed gas tank by its own pressure ([ce55d70](https://github.com/LaurensDeV/KSArmory/commit/ce55d70bcd8300a57e653a39000f8bbfa26aaa36))\n* **model:** rebuild the LITENING pod and hang it on the ejector ([3e977dd](https://github.com/LaurensDeV/KSArmory/commit/3e977dd98216462590c4300b5caeed1bb4b411f9))\n* **optic:** tuck a parked pod's windows into its nose ([ca0e78c](https://github.com/LaurensDeV/KSArmory/commit/ca0e78c4d017016edbcb5684ae6aa02f3fd76aca))\n* **paintball:** mark hits with paint and harm nothing ([3300740](https://github.com/LaurensDeV/KSArmory/commit/3300740577e86a4b5e19cc6454a02fc9d5983ae7))\n* **ui:** tidy the panel, the settings and the Teams window ([1c1c5ba](https://github.com/LaurensDeV/KSArmory/commit/1c1c5ba03021372e2c9b5be35d2beaff835f0319))\n\n### Fixes\n\n* **paintball:** paint only what a splat's spray actually reaches ([6d23898](https://github.com/LaurensDeV/KSArmory/commit/6d238989eeed70cbd2ee1032f132cf6cf962d616))\n* **radiation:** fill a burst's belt with electrons and clear crew caches ([766f7b9](https://github.com/LaurensDeV/KSArmory/commit/766f7b9e484e09609f970483141b58bdd578e3a1))\n* **radiation:** storm-scale a body's own outer belt, not a burst's ([233129c](https://github.com/LaurensDeV/KSArmory/commit/233129c83554264abb9ee8b6fcf9d967f008fc82))\n* **rounds:** a round that hits something before its fuze arms is a dud ([877bd65](https://github.com/LaurensDeV/KSArmory/commit/877bd65d9198720e8bdcdcdd9d95430524e818e2))\n* **visuals:** draw a burst's aurora in its body's own colours ([4322fd4](https://github.com/LaurensDeV/KSArmory/commit/4322fd4efb7c30c326e90b3e6bfdcf7fe5e5e89c))\n* **visuals:** stop a fireball lighting the ground twice past 3 km ([66acef2](https://github.com/LaurensDeV/KSArmory/commit/66acef210ffbe0ba86542360d4f069a91a7226a5))\n* **warp:** keep rounds in the air when something else lowers the speed ([e4a2f10](https://github.com/LaurensDeV/KSArmory/commit/e4a2f1072903f343f213b0e20e2d383bc43b1afe))\n\n### Build and packaging\n\n* **ksa:** retarget 2026.10.25.5707 ([8e754ad](https://github.com/LaurensDeV/KSArmory/commit/8e754ad270359d31144d36bdd812fd6b823df8be))\n* **package:** copy asset folders whole, subfolders included ([8a11d35](https://github.com/LaurensDeV/KSArmory/commit/8a11d35f0e5039b81acc8566d89961f6d0bb51e5))\n\n\n---\n\nDrop the `KSArmory` folder into your KSA user directory's `mods/`, register it in\n`manifest.toml`, and launch through StarMap. See the README for the full guide.\n\nWorks on Windows and Linux — the mod is a portable .NET assembly.\n\nRelease build: no debug symbols, log starts at INFO. Tick **Verbose log** in the\npanel if you are reporting a bug.",
+  "listing": {
+    "name": "KSArmory",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "Weapon systems for Kitten Space Agency: point defence, guided and unguided munitions, targeting sights and a ballistic computer.",
+    "description": "![KSArmory: weapon systems for Kitten Space Agency](ksa-image:banner)\n\nAdds working weapon systems to Kitten Space Agency. Every launcher searches, tracks, decides and shoots on its own. The mod simulates the rounds itself instead of using the vehicle physics, so guidance and fuzes run at sub-frame accuracy and cannot corrupt a save.\n\nEvery part has a page with a 3D model you can turn around on **[ksarmory.com](https://ksarmory.com)**, along with the install guide and how to use it.\n\n**Requires [StarMap](https://github.com/StarMapLoader/StarMap/releases) 0.4.8 or newer.** Older StarMap versions do not start on current KSA builds.\n\n### Air defence\n\n![The Pantsir-S1 point defence system](ksa-image:card-pantsir)\n\nThe **Pantsir-S1** is a complete air-defence vehicle on an 8x8 chassis: a spinning search radar, twelve command-guided missiles in two pods of six, twin 30 mm cannon, and an electro-optical director on the turret roof that you can look through. The turret traverses and the pods elevate. It has its own command module, so the Pantsir alone is a craft you can build and launch.\n\n### Guns\n\n![The Mk 15 Phalanx CIWS, the 5\"/54 Mk 42 mount and the M197 chin turret](ksa-image:sheet-guns)\n\n- **Mk 15 Phalanx CIWS**: a six-barrel 20 mm rotary cannon with its own radar, 4,500 rounds a minute. Stacks on any 3 m node.\n- **5\"/54 Mk 42**: a five-inch naval gun, 40 rounds a minute out to 15.7 km. Its shells burst on a timed fuze at the predicted meeting point, so they do not have to hit.\n- **M197 chin turret**: a three-barrel 20 mm cannon that hangs under a nose and traverses 110 degrees either way.\n\n### Missiles\n\n![The AIM-9J Sidewinder, AIM-120C AMRAAM and AGM-88 HARM](ksa-image:sheet-missiles)\n\nAttach a missile to a wing, a hull or the empty Weapon Mount and it brings its own launch rail. It slides off under its own motor.\n\n- **AIM-9J Sidewinder**: infrared-guided, 400 m to 14 km. Keeps guiding after launch on its own seeker.\n- **AIM-120C AMRAAM**: radar-guided, about Mach 4, out to 105 km.\n- **AGM-88 HARM**: homes on radar transmissions, out to 148 km. It can only engage a craft whose radar is switched on, and if that radar goes quiet, a missile already in the air flies on to where the signal was last heard.\n\n### Rocket pods\n\n![The LAU-10 Zuni pod and the six-round Zuni pod](ksa-image:sheet-rockets)\n\nThe **LAU-10** carries four unguided Zuni 5-inch rockets, and the **six-round pod** carries six. No lock is needed: each press fires one rocket, and a sight draws where it will land. Models and textures by **Mallikas**, who also made the Mk 42 and the M197.\n\n### Sights and sensors\n\n![The EO director, the LITENING targeting pod and the infrared search and track sensor](ksa-image:sheet-sensors)\n\n- **EO Director**: an electro-optical sight on a mast. Watch through it in a camera window or the main view. It needs no weapon on the craft, so a hull with one director on it is an observation post.\n- **Rafael LITENING pod**: the whole nose rolls about the pod's axis while the sensor ball nods inside it. It has TV and thermal modes, zooms to a 1 degree field of view, and carries a laser designator.\n- **IRST**: a passive heat sensor. It sends nothing out, so it cannot be detected or homed on, and it finds targets for the sights.\n\n### Directed energy\n\n![The YAL-1 nose turret](ksa-image:card-yal1)\n\nThe **YAL-1 nose turret** is the Airborne Laser's 1.5 m telescope in a rotating nose. It stacks on a 3 m node, tracks a target and holds a 1 MW beam on whichever part it is aimed at. At 100 km a part burns through in a few seconds.\n\n### Nuclear weapons\n\n![The B61 bomb and the Heavy MIRV Bus](ksa-image:sheet-nuclear)\n\n- **B61**: a guided nuclear bomb on the ejector rack it brings. Designate a point inside the reach ring the sight draws and it steers onto it as it falls. Yield from 0.3 kt to 340 kt.\n- **Heavy MIRV Bus**: the top stage of a ballistic missile, carrying seven reentry vehicles. Click your targets on the map and the ballistic computer flies the whole rocket: ascent, guided cutoff, post-boost trim, and the release of each warhead. It picks up from wherever the vehicle already is, on the pad, mid-ascent or in orbit.\n\n![A nuclear fireball over open ground, its shock front bending the sky around it](ksa-image:nuclear-burst)\n\nA burst behaves differently at every altitude, from a surface burst's mushroom cloud to the aurora and glowing debris of one above the atmosphere, with blast, heat, fallout and radiation that KSA's own dose gauge reads.\n\n### Countermeasures\n\nTwo **AN/ALE-47** dispensers, one of flares and one of chaff. They attach to any surface and throw decoys to pull a missile's seeker off the craft carrying them. Fire them by hand or let them fire automatically when a missile comes for you.\n\n### Fire control and damage\n\n- Threats are judged by closest point of approach, so targets flying past can be engaged, not only ones flying straight at you.\n- Teams with their own rules of engagement, so two sites can be on opposite sides.\n- A radar can go silent, but a silent radar cannot see either.\n- Rounds in the air can be shot down.\n- Damage is per part: fragments, blast and impacts wear each part's health down, tanks leak from the holes, and parts catch fire.\n- A paintball mode marks hits with each team's paint instead of breaking anything.\n\n### Weapon packs\n\nYou can add weapons without writing code. A weapon pack is an ordinary KSA mod with a folder of definition files, and KSArmory's own weapons are defined the same way. Any built-in family can be switched off. See [the pack guide](https://ksarmory.com/modding/weapon-packs/).\n",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "user-interface",
+      "audio",
+      "weapons",
+      "physics"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kessler-systems-armory-ksarmory.1131/",
+      "homepage": "https://ksarmory.com",
+      "repository": "https://github.com/LaurensDeV/KSArmory",
+      "spacedock": "https://spacedock.info/mod/4460/KSArmory",
+      "bugtracker": "https://github.com/LaurensDeV/KSArmory/issues"
+    }
+  }
+}
