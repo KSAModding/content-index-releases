@@ -123,7 +123,6 @@ The download of an archive follows a redirect only while it stays under `downloa
 An entry that the host removes is marked as gone as any other release is, a day after the list drops it and once its `url` answers `410 Gone`.
 Such a host has no download counts.
 The watcher checks the signatures with the `cryptography` package that `tools/requirements.txt` pins, and when `hosts.toml` registers such a host and the package is not installed, the run exits with code 2 before it counts any listing.
-A key that is compromised is removed from `hosts.toml` and not moved to `retired_keys`, because a signature by it proves nothing any more.
 
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
 
