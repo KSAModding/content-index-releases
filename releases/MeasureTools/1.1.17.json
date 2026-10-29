@@ -6,8 +6,8 @@
   "version_scheme": "semver",
   "release_status": "stable",
   "release_date": "2026-10-29T22:06:33Z",
-  "game_min": "2026.10.19.5638",
-  "game_min_revision": 5638,
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/download/v1.1.17/MeasureTools.zip",
     "sha256": "26F6C1A53743E4810D803EA34069DB4492AC3A5DA92507CE944C950F6333BA6E",
