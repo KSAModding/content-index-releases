@@ -1467,10 +1467,15 @@ class Watcher:
             # stays, so an issue that could not be rewritten this tick does
             # not bring the release back.
             dropped = f"{listing_id}/{release.version}" in self.cache.data["rejected"]
+            # A release the open issue names stays in scope while no newer
+            # release is stamped, so an archive its author fixes is still
+            # stamped. A newer stamp makes it history like any other, because
+            # it would otherwise be reported on every tick, and `since` is the
+            # way to stamp it after all.
             if (
                 older
                 and not from_since
-                and (release.version not in attempted or dropped)
+                and (release.version not in attempted or dropped or frontier is not None)
             ):
                 history += 1
                 continue

@@ -1370,20 +1370,26 @@ class TheStampedFrontier(WatcherCase):
             )
             self.assertEqual(picked, ["1.2.0", "1.3.0"])
 
-    def test_a_version_the_open_issue_names_stays_in_scope(self):
-        with tempfile.TemporaryDirectory() as name:
-            folder = Path(name)
-            watcher, picked = self.setup(folder)
-            watcher.stamp_pass(
-                "M", {}, None, [],
-                [
-                    release("1.0.0", "http://a", date="2026-01-01T00:00:00Z"),
-                    release("1.1.0", "http://b", date="2026-02-01T00:00:00Z"),
-                ],
-                [],
-                attempted={"1.0.0"},
-            )
-            self.assertEqual(picked, ["1.0.0", "1.1.0"])
+    def test_a_version_the_open_issue_names_stays_in_scope_until_a_newer_one_is_stamped(self):
+        # Once the newer release is stamped, the refused one is history, so
+        # the issue that names it can close.
+        newer = ("1.1.0", "2026-02-01T00:00:00Z", "http://b")
+        for stamped, expected in (((), ["1.0.0", "1.1.0"]), ((newer,), [])):
+            with self.subTest(stamped=stamped), tempfile.TemporaryDirectory() as name:
+                watcher, picked = self.setup(Path(name), stamped=stamped)
+                errors = []
+                settled = watcher.stamp_pass(
+                    "M", {}, None, [],
+                    [
+                        release("1.0.0", "http://a", date="2026-01-01T00:00:00Z"),
+                        release("1.1.0", "http://b", date="2026-02-01T00:00:00Z"),
+                    ],
+                    errors,
+                    attempted={"1.0.0"},
+                )
+                self.assertEqual(picked, expected)
+                self.assertEqual(errors, [])
+                self.assertTrue(settled)
 
     def test_a_frontier_that_could_not_be_read_stamps_nothing(self):
         with tempfile.TemporaryDirectory() as name:
@@ -1778,15 +1784,15 @@ class OlderReleasesFromSince(WatcherCase):
         # is how a rejection goes away, even while the issue still names it.
         for raised in (since("0.6"), {"id": "M"}):
             with tempfile.TemporaryDirectory() as name:
-                watcher, picked = self.setup(Path(name), stamped=["0.6.0"], rejects={"0.5.0"})
+                watcher, picked = self.setup(Path(name), rejects={"0.5.0"})
                 watcher.stamp_pass("M", since("0.5"), None, [], catalogue(), [])
-                self.assertEqual(picked, ["0.5.0"])
+                self.assertEqual(picked, ["0.5.0", "0.6.0"])
 
                 errors = []
                 settled = watcher.stamp_pass(
                     "M", raised, None, [], catalogue(), errors, attempted={"0.5.0"}
                 )
-                self.assertEqual(picked, ["0.5.0"])
+                self.assertEqual(picked, ["0.5.0", "0.6.0", "0.6.0"])
                 self.assertEqual(errors, [])
                 self.assertTrue(settled)
 
