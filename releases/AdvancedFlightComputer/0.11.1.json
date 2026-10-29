@@ -31,16 +31,9 @@
   },
   "dependencies": [
     {
-      "any_of": [
-        {
-          "id": "KittenExtensions"
-        },
-        {
-          "id": "KittenExtensionsContinued",
-          "min": "0.5.3"
-        }
-      ],
+      "id": "KittenExtensionsContinued",
       "kind": "recommends",
+      "min": "0.5.3",
       "source": "authored"
     }
   ],
