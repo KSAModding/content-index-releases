@@ -392,6 +392,11 @@ class ReadVerdict(unittest.TestCase):
         self.assertEqual(problem, "")
 
 
+APP_SLUG = "ksamodding-index"
+APP_BOT = {"login": f"{APP_SLUG}[bot]", "type": "Bot"}
+STRANGER = {"login": "someone", "type": "User"}
+
+
 class FakeApi:
     """Records what would be sent, and answers what the test set up."""
 
@@ -427,7 +432,9 @@ class FakeApi:
     def send(self, method, path, payload, token=None):
         self.sent.append((method, path, payload))
         if method == "POST" and path.endswith("/comments"):
-            self.comments.append({"id": len(self.comments) + 1, "body": payload["body"]})
+            self.comments.append(
+                {"id": len(self.comments) + 1, "body": payload["body"], "user": APP_BOT}
+            )
         elif method == "PATCH" and path.startswith("/issues/comments/"):
             comment_id = int(path.rsplit("/", 1)[1])
             for comment in self.comments:
@@ -453,6 +460,77 @@ class MissingLabelApi(FakeApi):
             self.missing = None
             raise urllib.error.HTTPError(path, 404, "Not Found", None, None)
         return super().send(method, path, payload, token)
+
+
+class Comment(unittest.TestCase):
+    def test_the_first_run_creates_one(self):
+        api = FakeApi()
+        decide.upsert_comment(api, 5, "Something to say", APP_SLUG)
+        self.assertEqual(
+            api.sent,
+            [("POST", "/issues/5/comments", {"body": f"{decide.COMMENT_MARKER}\nSomething to say"})],
+        )
+
+    def test_a_comment_with_the_marker_by_someone_else_is_ignored(self):
+        """The App can not edit it, so an edit would fail with 403."""
+        other_bot = {"login": "ksadata[bot]", "type": "Bot"}
+        api = FakeApi(
+            comments=[
+                {"id": 1, "body": f"{decide.COMMENT_MARKER}\nfake", "user": STRANGER},
+                {"id": 2, "body": f"{decide.COMMENT_MARKER}\nfake", "user": other_bot},
+            ]
+        )
+        decide.upsert_comment(api, 5, "mine", APP_SLUG)
+        self.assertEqual(
+            api.sent,
+            [("POST", "/issues/5/comments", {"body": f"{decide.COMMENT_MARKER}\nmine"})],
+        )
+
+    def test_a_second_run_edits_the_comment_that_the_first_run_posted(self):
+        api = FakeApi(
+            comments=[{"id": 1, "body": f"{decide.COMMENT_MARKER}\nfake", "user": STRANGER}]
+        )
+        decide.upsert_comment(api, 5, "first", APP_SLUG)
+        api.sent.clear()
+        decide.upsert_comment(api, 5, "second", APP_SLUG)
+        self.assertEqual(
+            api.sent,
+            [("PATCH", "/issues/comments/2", {"body": f"{decide.COMMENT_MARKER}\nsecond"})],
+        )
+
+    def test_nothing_to_say_resolves_only_the_comment_of_the_app(self):
+        api = FakeApi(
+            comments=[
+                {"id": 1, "body": f"{decide.COMMENT_MARKER}\nfake", "user": STRANGER},
+                {"id": 2, "body": f"{decide.COMMENT_MARKER}\nrejected", "user": APP_BOT},
+            ]
+        )
+        decide.upsert_comment(api, 5, None, APP_SLUG)
+        self.assertEqual(
+            api.sent,
+            [("PATCH", "/issues/comments/2",
+              {"body": f"{decide.COMMENT_MARKER}\nValidated and ownership verified."})],
+        )
+
+    def test_without_an_app_slug_no_comment_counts(self):
+        api = FakeApi(
+            comments=[{"id": 1, "body": f"{decide.COMMENT_MARKER}\nold", "user": APP_BOT}]
+        )
+        decide.upsert_comment(api, 5, "new", "")
+        self.assertEqual(
+            api.sent,
+            [("POST", "/issues/5/comments", {"body": f"{decide.COMMENT_MARKER}\nnew"})],
+        )
+
+
+class OwnershipWorkflow(unittest.TestCase):
+    def step(self):
+        path = Path(__file__).resolve().parents[1] / ".github" / "workflows" / "ownership.yml"
+        return path.read_text(encoding="utf-8")
+
+    def test_the_app_slug_comes_from_the_token_that_posts_the_comment(self):
+        self.assertIn("APP_SLUG: ${{ steps.app-token.outputs.app-slug }}", self.step())
+        self.assertIn('--app-slug "$APP_SLUG"', self.step())
 
 
 class Label(unittest.TestCase):
@@ -565,6 +643,7 @@ class Act(Ownership):
             "head_sha": "abc",
             "repository": "KSAModding/content-index-releases",
             "run_url": "https://example.invalid/run",
+            "app_slug": APP_SLUG,
             "dry_run": False,
         }
         fields.update(changes)
@@ -703,7 +782,7 @@ class Act(Ownership):
         self.write_verdict(pull_request=99)
         api = self.api()
         api.comments = [
-            {"id": 1, "body": f"{decide.COMMENT_MARKER}\nValidation passed."}
+            {"id": 1, "body": f"{decide.COMMENT_MARKER}\nValidation passed.", "user": APP_BOT}
         ]
         # A race, but the status has to say so or the pull request sits pending.
         self.assertEqual(decide.act(api, self.ownership, self.arguments()), 0)

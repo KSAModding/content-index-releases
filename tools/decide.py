@@ -478,11 +478,31 @@ def post_status(api, sha, decision, run_url):
     )
 
 
-def upsert_comment(api, number, body):
-    """One comment per pull request, edited in place, never a second one."""
+def _posted_by_app(comment, app_slug):
+    """Whether the bot account of the App with this slug posted the comment.
+
+    The login decides, because only the installation token of the App posts as `<slug>[bot]`.
+    `performed_via_github_app` alone does not, because a person who authorizes the App also posts through it under their own account.
+    """
+    if not app_slug:
+        return False
+    user = comment.get("user") or {}
+    login = (user.get("login") or "").casefold()
+    return user.get("type") == "Bot" and login == f"{app_slug}[bot]".casefold()
+
+
+def upsert_comment(api, number, body, app_slug):
+    """One comment per pull request, edited in place, never a second one.
+
+    Only a comment by the App of this check, named by `app_slug`, counts.
+    Anyone else can post the marker first, and the App can not edit that comment.
+    Without `app_slug` no comment counts and a new one is posted.
+    Only the first 100 comments are looked at, so on a longer pull request a
+    new comment can be posted on a later run. This loses nothing.
+    """
     existing = None
     for comment in api.get(f"/issues/{number}/comments", per_page=100) or []:
-        if COMMENT_MARKER in (comment.get("body") or ""):
+        if COMMENT_MARKER in (comment.get("body") or "") and _posted_by_app(comment, app_slug):
             existing = comment
             break
 
@@ -664,6 +684,9 @@ def parse_arguments(argv):
     )
     parser.add_argument("--repository", default=os.environ.get("GITHUB_REPOSITORY"))
     parser.add_argument("--run-url", default="")
+    parser.add_argument(
+        "--app-slug", default="", help="the App whose token posts the comment, from create-github-app-token"
+    )
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args(argv)
 
@@ -747,6 +770,7 @@ def act(api, ownership, arguments):
                     "Push a fix to run the checks again.",
                     run_url=arguments.run_url,
                 ),
+                arguments.app_slug,
             )
             return 0
 
@@ -796,7 +820,7 @@ def act(api, ownership, arguments):
             )
 
     post_status(api, arguments.head_sha, decision, arguments.run_url)
-    upsert_comment(api, number, decision.comment)
+    upsert_comment(api, number, decision.comment, arguments.app_slug)
     sync_document_labels(api, number, check_scope.kinds(changes))
 
     if decision.needs_steward:
