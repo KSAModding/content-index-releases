@@ -6,8 +6,8 @@
   "version_scheme": "semver",
   "release_status": "stable",
   "release_date": "2026-10-29T22:15:06Z",
-  "game_min": "2026.10.19.5638",
-  "game_min_revision": 5638,
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer/releases/download/v0.11.2/AdvancedFlightComputer-0.11.2.zip",
     "sha256": "702C890F9C990CF31C438B284D94355CC839B1D92F98662A2E3E7735ECB14ADD",
