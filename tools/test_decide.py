@@ -1001,5 +1001,26 @@ class ChangedPaths(unittest.TestCase):
         self.assertEqual(decide.changed_paths(api, 7)[0].status, "modified")
 
 
+class DecideArguments(unittest.TestCase):
+    """The job that holds the App key reads the verdict artifact."""
+
+    def test_the_verdict_artifact_can_not_replace_the_tools(self):
+        """A pull request can change checks.yml and so put any file into the
+        artifact, so it lands outside the checkout and after the install."""
+        workflow = Path(__file__).resolve().parent.parent / ".github" / "workflows" / "ownership.yml"
+        text = workflow.read_text(encoding="utf-8")
+        lines = text.splitlines()
+        install = next(i for i, line in enumerate(lines) if "pip install" in line)
+        download = next(i for i, line in enumerate(lines) if "actions/download-artifact" in line)
+        self.assertLess(install, download, "the install must run before the download")
+        step = []
+        for line in lines[download + 1 :]:
+            if line.strip().startswith("- ") or not line.strip():
+                break
+            step.append(line.strip())
+        self.assertIn("path: ${{ runner.temp }}/verdict", step)
+        self.assertIn('--verdict "$RUNNER_TEMP/verdict/verdict.json"', text)
+
+
 if __name__ == "__main__":
     unittest.main()

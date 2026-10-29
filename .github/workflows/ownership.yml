@@ -50,8 +50,10 @@ jobs:
       - run: |
           pip install --only-binary=:all: -r tools/requirements.txt
 
-      # The artifact goes outside the checkout, so it never replaces a file that
-      # this job runs.
+      # A pull request can change checks.yml and so put any file into this
+      # artifact. It goes outside the checkout, so it can not replace the tools
+      # or the authored half, and after the install, so it can not change what
+      # pip installs.
       - uses: actions/download-artifact@v8
         id: verdict
         continue-on-error: true
