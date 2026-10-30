@@ -8,8 +8,6 @@
   "release_date": "2026-10-27T07:25:12Z",
   "game_min": "2026.10.19.5638",
   "game_min_revision": 5638,
-  "game_max": "2026.10.19.5638",
-  "game_max_revision": 5638,
   "download": {
     "url": "https://github.com/Restricted117/KSA-CompactHUD/releases/download/v0.1.2/CompactHUD.zip",
     "sha256": "F817825DD30EF313B1625820ACEABD6A06C2A885C9E26E3B0EBE3BE428498EFF",
