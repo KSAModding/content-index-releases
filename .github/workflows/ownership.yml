@@ -73,6 +73,8 @@ jobs:
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           REPOSITORY: ${{ github.repository }}
           RUN_URL: ${{ github.event.workflow_run.html_url }}
+          # Only the comment of this App counts as the validation comment.
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
           set -euo pipefail
           python3 tools/decide.py \
@@ -83,7 +85,8 @@ jobs:
             --head-branch "$HEAD_BRANCH" \
             --head-sha "$HEAD_SHA" \
             --repository "$REPOSITORY" \
-            --run-url "$RUN_URL"
+            --run-url "$RUN_URL" \
+            --app-slug "$APP_SLUG"
 
       - name: Say so when the job failed before it decided
         if: failure() && steps.decide.outcome != 'failure'
