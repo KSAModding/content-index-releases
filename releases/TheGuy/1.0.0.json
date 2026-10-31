@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/TheGuy/1.0.0",
     "sha256": "8643C51DD1D13BD8C116968EA26514B09C4A573F1F05D3784518958E24A063B6",
     "size": 12899,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-theguy-1_0_0-2d107298/TheGuy-1.0.0.zip"
+    ]
   },
   "install_size": 194262,
   "install": {
