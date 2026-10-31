@@ -2769,6 +2769,20 @@ def main(argv=None):
             file=sys.stderr,
         )
     watcher = Watcher(options)
+    # Without cryptography, every listing on a data host would count as unreachable
+    # and in time open an issue, so the run fails before any listing is counted. A
+    # hosts.toml that does not read is left to the listings, which wait as in an outage.
+    try:
+        tables = watcher.registry()
+    except HostError:
+        tables = {}
+    if any(table.get("data") is not None for table in tables.values()) and not hosts.signature_ready():
+        print(
+            "cryptography is not installed, so data hosts cannot be verified; "
+            "this is a setup error of the run",
+            file=sys.stderr,
+        )
+        return 2
     watcher.tick()
     return 1 if options.fail_on_error and watcher.failed else 0
 

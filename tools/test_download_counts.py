@@ -740,6 +740,22 @@ class ShareHostCounts(Fixture):
         self.assertEqual(entry["hosts"], {"github": 3, "ksamods": 9})
         self.assertEqual(entry["releases"][0]["hosts"], {"github": 3, "ksamods": 9})
 
+    def test_a_host_that_serves_its_own_files_is_not_asked(self):
+        # RFC 0104: such a host has no counts, so the refresh sends it no request.
+        (self.authored / "hosts.toml").write_text(
+            HOSTS_TOML.replace('storage = "ksamods-content/share"', DATA_HOST), encoding="utf-8"
+        )
+        http = FakeHttp({})
+        self.assertEqual(self.refresh(http)["listings"], [])
+        self.assertEqual(http.asked, [])
+
+
+DATA_HOST = """\
+data = "https://data.example.org/share/"
+downloads = ["https://cdn.example.org/archives/"]
+key = "MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="\
+"""
+
 
 class Cache(Fixture):
     SLOT = "mod/github:o/r"
