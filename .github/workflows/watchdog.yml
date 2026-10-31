@@ -1,6 +1,7 @@
 # Report when GitHub has not started the watcher for a long time. A dropped
 # scheduled run is otherwise silent, because nothing fails and only the run list
-# shows it.
+# shows it. The same check reports a master server that has not answered several
+# game versions polls in a row, which is silent too because that poll stays green.
 name: watchdog
 
 on:
@@ -14,6 +15,10 @@ on:
         description: "Report when the watcher last started a successful scheduled run longer ago than this."
         required: false
         default: "45"
+      unanswered_polls:
+        description: "Report when this many polls of the master server in a row got no answer."
+        required: false
+        default: "3"
       dry_run:
         description: "Read everything, open and close nothing."
         type: boolean
@@ -60,6 +65,32 @@ jobs:
           arguments=(
             --repository "$REPOSITORY"
             --stale-minutes "$STALE_MINUTES"
+          )
+          if [ "$DRY_RUN" = "true" ]; then
+            arguments+=(--dry-run)
+          fi
+
+          python3 tools/watchdog.py "${arguments[@]}"
+
+      # An unanswered poll of the game versions workflow ends green, so this
+      # reads which of its runs got an answer. A poll fails now and then, so only
+      # several in a row are reported. This counts polls and not time, because
+      # GitHub starts that schedule hours apart.
+      - name: Check when the master server last answered a poll
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+          UNANSWERED_POLLS: ${{ inputs.unanswered_polls || '3' }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          arguments=(
+            --repository "$REPOSITORY"
+            --workflow game-versions.yml
+            --unanswered-step "Master server did not answer"
+            --unanswered-polls "$UNANSWERED_POLLS"
           )
           if [ "$DRY_RUN" = "true" ]; then
             arguments+=(--dry-run)

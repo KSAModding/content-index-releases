@@ -6,6 +6,8 @@ The API is a stub that answers the run list and records what the watchdog would
 send, which is what makes "one issue, kept current" testable at all.
 """
 
+import contextlib
+import io
 import re
 import unittest
 import urllib.error
@@ -14,7 +16,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import watchdog
-from watchdog import MARKER, Watchdog, parse_arguments
+from watchdog import MARKER, PollWatchdog, Watchdog, parse_arguments
 
 NOW = datetime(2026, 9, 19, 12, 0, 0, tzinfo=timezone.utc)
 
@@ -126,6 +128,18 @@ class AGapIsReported(unittest.TestCase):
         opened = api.writes("POST", "/issues")
         self.assertIn("no successful scheduled run", opened[0][2]["body"])
 
+    def test_the_log_compares_a_gap_only_when_a_run_exists(self):
+        options = parse_arguments([])
+        lines = []
+        with patch.object(watchdog, "now", lambda: NOW):
+            api = StubApi({"/actions/workflows": {"workflow_runs": []}, "/issues": []})
+            Watchdog(api, options, log=lines.append).run()
+            self.assertNotIn("past the", lines[0])
+            lines.clear()
+            api = StubApi({"/actions/workflows": run_list(240), "/issues": []})
+            Watchdog(api, options, log=lines.append).run()
+            self.assertIn("past the 45", lines[0])
+
     def test_a_gap_that_is_already_reported_is_edited(self):
         api = StubApi(
             {
@@ -204,6 +218,7 @@ class OnlyTheScheduleCounts(unittest.TestCase):
         check(api)
         runs = [query for path, query in api.read if path.startswith("/actions/workflows")]
         self.assertEqual(runs[0].get("event"), "schedule")
+        self.assertEqual(runs[0].get("status"), "success")
 
     def test_a_hand_dispatch_between_two_dropped_ticks_is_not_a_tick(self):
         api = EventAware(scheduled=run_list(240), dispatched=run_list(5))
@@ -215,6 +230,358 @@ class OnlyTheScheduleCounts(unittest.TestCase):
     def test_an_empty_event_counts_every_run(self):
         api = EventAware(scheduled=run_list(240), dispatched=run_list(5))
         self.assertFalse(check(api, ["--event", ""]))
+
+
+STEP = "Master server did not answer"
+
+POLL_BODY = MARKER.format(workflow="game-versions.yml")
+
+
+def poll_runs(*minutes_ago):
+    """Runs of the poll workflow, newest first, with the ids 1, 2, 3 and so on."""
+    runs = []
+    for number, minutes in enumerate(minutes_ago, start=1):
+        started = watchdog.iso(NOW - timedelta(minutes=minutes))
+        runs.append(
+            {
+                "id": number,
+                "run_started_at": started,
+                "created_at": started,
+                "html_url": f"https://github.com/KSAModding/content-index-releases/actions/runs/{number}",
+            }
+        )
+    return {"workflow_runs": runs}
+
+
+def job_with(conclusion):
+    """The jobs of a run whose marker step ended as `conclusion`."""
+    steps = [{"name": "Poll the master server", "conclusion": "success"}]
+    if conclusion is not None:
+        steps.append({"name": STEP, "conclusion": conclusion})
+    return {"jobs": [{"steps": steps}]}
+
+
+class PollApi(StubApi):
+    """Answers the poll runs and, per run id, the jobs of that run."""
+
+    def __init__(self, runs, jobs, issues=None):
+        super().__init__({"/actions/workflows": runs, "/issues": issues or []})
+        self.jobs = jobs
+
+    def get(self, path, **query):
+        if path.startswith("/actions/runs/"):
+            self.read.append((path, query))
+            return self.jobs[int(path.split("/")[3])]
+        return super().get(path, **query)
+
+
+def check_poll(api, argv=None, log=None):
+    options = parse_arguments(
+        ["--workflow", "game-versions.yml", "--unanswered-step", STEP] + (argv or [])
+    )
+    with patch.object(watchdog, "now", lambda: NOW):
+        return PollWatchdog(api, options, log=log or (lambda _: None)).run()
+
+
+def jobs_read(api):
+    return [path for path, _ in api.read if path.startswith("/actions/runs/")]
+
+
+class AnUnansweredServerIsReported(unittest.TestCase):
+    def test_a_poll_the_server_answered_reports_nothing(self):
+        api = PollApi(poll_runs(30), {1: job_with("skipped")})
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_one_unanswered_poll_after_an_older_answer_reports_nothing(self):
+        # The answer is far older than the failed poll, which is how the real
+        # schedule spaces its runs.
+        api = PollApi(poll_runs(30, 430), {1: job_with("success"), 2: job_with("skipped")})
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_two_unanswered_polls_after_an_answer_report_nothing(self):
+        api = PollApi(
+            poll_runs(30, 330, 630),
+            {1: job_with("success"), 2: job_with("success"), 3: job_with("skipped")},
+        )
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_three_unanswered_polls_in_a_row_open_one_issue(self):
+        runs = poll_runs(30, 330, 630)
+        api = PollApi(runs, {number: job_with("success") for number in range(1, 4)})
+        self.assertTrue(check_poll(api))
+        opened = api.writes("POST", "/issues")
+        self.assertEqual(len(opened), 1)
+        self.assertEqual(opened[0][2]["title"], watchdog.POLL_TITLE)
+        self.assertIn(POLL_BODY, opened[0][2]["body"])
+        self.assertIn("newest 3 scheduled poll(s)", opened[0][2]["body"])
+
+    def test_the_count_is_an_option(self):
+        api = PollApi(poll_runs(30, 330), {1: job_with("success"), 2: job_with("success")})
+        self.assertTrue(check_poll(api, ["--unanswered-polls", "2"]))
+        self.assertEqual(len(api.writes("POST", "/issues")), 1)
+
+    def test_an_old_answer_with_no_poll_since_is_not_an_outage(self):
+        # A dropped schedule is not a silent server, so the age of the newest
+        # poll decides nothing here.
+        api = PollApi(poll_runs(6000), {1: job_with("skipped")})
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_a_long_gap_between_unanswered_polls_still_counts_them(self):
+        api = PollApi(
+            poll_runs(30, 600, 6000),
+            {number: job_with("success") for number in range(1, 4)},
+        )
+        self.assertTrue(check_poll(api))
+
+    def test_too_few_listed_polls_neither_open_nor_close(self):
+        api = PollApi(
+            poll_runs(30, 330),
+            {1: job_with("success"), 2: job_with("success")},
+            issues=[{"number": 7, "body": POLL_BODY}],
+        )
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_an_empty_run_list_neither_opens_nor_closes(self):
+        api = PollApi({"workflow_runs": []}, {}, issues=[{"number": 7, "body": POLL_BODY}])
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_the_newest_answer_ends_the_walk(self):
+        api = PollApi(
+            poll_runs(30, 90, 150),
+            {1: job_with("skipped"), 2: job_with("success"), 3: job_with("success")},
+        )
+        check_poll(api)
+        self.assertEqual(jobs_read(api), ["/actions/runs/1/jobs"])
+
+    def test_runs_from_before_the_marker_count_as_answered(self):
+        api = PollApi(poll_runs(30, 330, 630), {number: job_with(None) for number in range(1, 4)})
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_the_first_unanswered_poll_after_the_change_reports_nothing(self):
+        api = PollApi(
+            poll_runs(30, 330, 630),
+            {1: job_with("success"), 2: job_with(None), 3: job_with(None)},
+        )
+        self.assertFalse(check_poll(api))
+        self.assertEqual(api.sent, [])
+
+    def test_an_outage_that_is_already_reported_is_edited(self):
+        api = PollApi(
+            poll_runs(30, 330, 630),
+            {number: job_with("success") for number in range(1, 4)},
+            issues=[{"number": 7, "body": POLL_BODY}],
+        )
+        self.assertTrue(check_poll(api))
+        self.assertEqual(api.writes("POST", "/issues"), [])
+        self.assertEqual(len(api.writes("PATCH", "/issues/7")), 1)
+
+    def test_the_watcher_issue_is_not_the_poll_issue(self):
+        api = PollApi(
+            poll_runs(30, 330, 630),
+            {number: job_with("success") for number in range(1, 4)},
+            issues=[{"number": 7, "body": BODY}],
+        )
+        check_poll(api)
+        self.assertEqual(len(api.writes("POST", "/issues")), 1)
+        self.assertEqual(api.writes("PATCH", "/issues/7"), [])
+
+    def test_the_run_list_is_asked_for_successful_scheduled_runs(self):
+        # A red run proves nothing about the server, and a hand dispatch does
+        # not close the issue, which is what the advice in its body promises.
+        api = PollApi(poll_runs(30), {1: job_with("skipped")})
+        check_poll(api)
+        query = [query for path, query in api.read if path.startswith("/actions/workflows")][0]
+        self.assertEqual(query.get("status"), "success")
+        self.assertEqual(query.get("event"), "schedule")
+        self.assertEqual(query.get("per_page"), watchdog.LISTED_POLLS)
+
+
+class TheIssueSaysWhenTheServerLastAnswered(unittest.TestCase):
+    def body_of(self, runs, jobs):
+        api = PollApi(runs, jobs)
+        self.assertTrue(check_poll(api))
+        return api, api.writes("POST", "/issues")[0][2]["body"]
+
+    def test_it_names_the_newest_answer_past_the_count(self):
+        runs = poll_runs(30, 330, 630, 930, 1230)
+        jobs = {number: job_with("success") for number in range(1, 4)}
+        jobs[4] = job_with("skipped")
+        jobs[5] = job_with("skipped")
+        api, body = self.body_of(runs, jobs)
+        self.assertIn(f"It last answered a poll {watchdog.iso(NOW - timedelta(minutes=930))}", body)
+        self.assertIn("930 minute(s) ago", body)
+        self.assertIn("Last poll the server answered: https://github.com/", body)
+        self.assertIn("/actions/runs/4", body)
+        self.assertNotIn("/actions/runs/5/jobs", jobs_read(api))
+
+    def test_it_says_so_when_no_listed_run_shows_an_answer(self):
+        runs = poll_runs(30, 330, 630)
+        _, body = self.body_of(runs, {number: job_with("success") for number in range(1, 4)})
+        self.assertIn("do not show when it last answered", body)
+        self.assertNotIn("Last poll the server answered", body)
+
+    def test_a_run_from_before_the_marker_is_not_named_as_the_answer(self):
+        # Nothing shows whether the server answered that run, so the issue must
+        # not claim it did, and older runs cannot say anything either.
+        runs = poll_runs(30, 330, 630, 930, 1230)
+        jobs = {number: job_with("success") for number in range(1, 4)}
+        jobs[4] = job_with(None)
+        jobs[5] = job_with("skipped")
+        api, body = self.body_of(runs, jobs)
+        self.assertIn("do not show when it last answered", body)
+        self.assertNotIn("Last poll the server answered", body)
+        self.assertNotIn("/actions/runs/5/jobs", jobs_read(api))
+
+    def test_the_log_says_the_same(self):
+        lines = []
+        runs = poll_runs(30, 330, 630)
+        api = PollApi(runs, {number: job_with("success") for number in range(1, 4)})
+        check_poll(api, log=lines.append)
+        self.assertIn("got no answer from the master server", lines[0])
+        self.assertNotIn("past the", lines[0])
+
+
+class TheIssueClosesWhenTheServerAnswers(unittest.TestCase):
+    def test_an_answered_poll_closes_the_open_issue(self):
+        api = PollApi(
+            poll_runs(5),
+            {1: job_with("skipped")},
+            issues=[{"number": 7, "body": POLL_BODY}],
+        )
+        self.assertFalse(check_poll(api))
+        self.assertEqual(
+            api.writes("PATCH", "/issues/7"), [("PATCH", "/issues/7", {"state": "closed"})]
+        )
+        comments = api.writes("POST", "/issues/7/comments")
+        self.assertEqual(len(comments), 1)
+        self.assertIn("master server answers again", comments[0][2]["body"])
+
+    def test_the_watcher_issue_is_left_open(self):
+        api = PollApi(
+            poll_runs(5),
+            {1: job_with("skipped")},
+            issues=[{"number": 7, "body": BODY}],
+        )
+        check_poll(api)
+        self.assertEqual(api.sent, [])
+
+
+class ThePollWorkflowKeepsTheMarker(unittest.TestCase):
+    """The step the watchdog reads has to exist under the name it is given."""
+
+    def test_the_step_the_watchdog_reads_is_in_the_poll_workflow(self):
+        text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
+        found = re.search(r'--unanswered-step "([^"]+)"', text)
+        assert found, "watchdog.yml no longer passes the marker step"
+        poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        self.assertIn(f"- name: {found.group(1)}\n        if: steps.poll.outputs.answered != 'true'", poll)
+
+    def test_an_answered_poll_is_what_the_poll_step_reports(self):
+        poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        script = poll.split('if [ -z "$response" ]; then', 1)[1]
+        unreachable, answered = script.split("\n          fi\n", 1)
+        self.assertNotIn("answered=true", unreachable)
+        self.assertIn('echo "answered=true" >> "$GITHUB_OUTPUT"', answered)
+
+    def test_a_build_by_hand_reaches_the_script_only_through_the_environment(self):
+        poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        self.assertIn("BUILD: ${{ inputs.build }}", poll)
+        script = poll.split("Poll the master server", 1)[1].split("run: |", 1)[1]
+        self.assertNotIn("inputs.build", script)
+        by_hand = script.split('if [ -n "$BUILD" ]; then', 1)[1].split("else", 1)[0]
+        self.assertNotIn("curl", by_hand)
+
+    def test_an_unanswered_poll_still_ends_green(self):
+        poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        branch = poll.split('if [ -z "$response" ]; then', 1)[1].split("\n          fi\n", 1)[0]
+        self.assertIn("exit 0", branch)
+        self.assertNotIn("exit 1", branch)
+
+
+def run_main(api, argv):
+    """Runs main() against the stub and hides what it prints."""
+    with (
+        patch.object(watchdog, "Api", lambda *_: api),
+        patch.object(watchdog, "now", lambda: NOW),
+        contextlib.redirect_stdout(io.StringIO()),
+        contextlib.redirect_stderr(io.StringIO()),
+    ):
+        return watchdog.main(argv)
+
+
+class TheCommandLineChoosesTheCheck(unittest.TestCase):
+    POLL = ["--workflow", "game-versions.yml", "--unanswered-step", STEP]
+
+    def test_the_unanswered_step_reads_the_marker_of_the_poll(self):
+        api = PollApi(poll_runs(30), {1: job_with("skipped")})
+        self.assertEqual(run_main(api, self.POLL), 0)
+        self.assertEqual(jobs_read(api), ["/actions/runs/1/jobs"])
+
+    def test_an_unanswered_outage_is_reported_and_still_exits_zero(self):
+        runs = poll_runs(30, 330, 630)
+        api = PollApi(runs, {number: job_with("success") for number in range(1, 4)})
+        self.assertEqual(run_main(api, self.POLL), 0)
+        self.assertEqual(api.writes("POST", "/issues")[0][2]["title"], watchdog.POLL_TITLE)
+
+    def test_without_the_step_no_job_is_read(self):
+        api = StubApi({"/actions/workflows": run_list(12), "/issues": []})
+        self.assertEqual(run_main(api, []), 0)
+        self.assertEqual(jobs_read(api), [])
+
+    def test_an_unreadable_run_list_fails_the_poll_check(self):
+        api = PollApi(poll_runs(30), {})
+        api.failing = ["/actions/workflows"]
+        self.assertEqual(run_main(api, self.POLL), 1)
+
+
+def poll_check_step():
+    """The text of the step of watchdog.yml that runs the poll check."""
+    text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
+    return text.split("- name: Check when the master server last answered a poll\n", 1)[1]
+
+
+def reported_polls():
+    """The count of unanswered polls the watchdog workflow reports at."""
+    found = re.search(
+        r"UNANSWERED_POLLS: \$\{\{ inputs\.unanswered_polls \|\| '(\d+)' \}\}",
+        poll_check_step(),
+    )
+    assert found, "watchdog.yml no longer passes a default count of polls"
+    return int(found.group(1))
+
+
+class TheWorkflowRunsThePollCheck(unittest.TestCase):
+    """These lines only run on GitHub, so the text is what a local test can hold."""
+
+    def test_the_check_watches_the_poll_workflow(self):
+        self.assertIn("--workflow game-versions.yml\n", poll_check_step())
+
+    def test_the_first_check_does_not_stop_the_second(self):
+        self.assertTrue(poll_check_step().startswith("        if: ${{ !cancelled() }}\n"))
+
+    def test_the_count_reaches_the_tool(self):
+        self.assertIn('--unanswered-polls "$UNANSWERED_POLLS"', poll_check_step())
+
+    def test_the_workflow_reports_at_the_count_the_tool_defaults_to(self):
+        self.assertEqual(reported_polls(), parse_arguments([]).unanswered_polls)
+
+    def test_a_hand_dispatch_offers_the_same_count(self):
+        text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
+        inputs = text.split("  unanswered_polls:\n", 1)[1].split("dry_run:", 1)[0]
+        found = re.search(r'default: "(\d+)"', inputs)
+        assert found, "watchdog.yml no longer offers a count of polls"
+        self.assertEqual(int(found.group(1)), reported_polls())
+
+    def test_the_default_needs_more_than_one_failed_poll(self):
+        # A poll fails now and then, and one failed poll must report nothing.
+        self.assertGreater(reported_polls(), 1)
 
 
 class TheArguments(unittest.TestCase):
@@ -232,6 +599,17 @@ class TheArguments(unittest.TestCase):
     def test_an_age_of_zero_is_refused(self):
         with self.assertRaises(SystemExit):
             parse_arguments(["--stale-minutes", "0"])
+
+    def test_a_count_no_run_list_can_reach_is_refused(self):
+        # A count past the listed page would never report.
+        for count in ("0", str(watchdog.LISTED_POLLS + 1)):
+            with self.subTest(count=count), self.assertRaises(SystemExit):
+                with contextlib.redirect_stderr(io.StringIO()):
+                    parse_arguments(["--unanswered-polls", count])
+        self.assertEqual(
+            parse_arguments(["--unanswered-polls", str(watchdog.LISTED_POLLS)]).unanswered_polls,
+            watchdog.LISTED_POLLS,
+        )
 
 
 WORKFLOWS = Path(__file__).resolve().parent.parent / ".github" / "workflows"
