@@ -6,6 +6,11 @@ on:
   schedule:
     - cron: "23 * * * *"
   workflow_dispatch:
+    inputs:
+      build:
+        description: "A production build to add by hand, for example when the master server does not answer"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -37,19 +42,28 @@ jobs:
 
       - name: Poll the master server
         id: poll
+        env:
+          BUILD: ${{ inputs.build }}
         run: |
           set -euo pipefail
-          response="$(curl -fsS --max-time 30 --retry 3 --retry-delay 5 \
-            http://ksa-master1.rocketwerkz.com:8082/version || true)"
+          if [ -n "$BUILD" ]; then
+            response="$(jq -n --arg version "$BUILD" '{Version: $version}')"
+          else
+            response="$(curl -fsS --max-time 30 --retry 3 --retry-delay 5 \
+              http://ksa-master1.rocketwerkz.com:8082/version || true)"
+          fi
           if [ -z "$response" ]; then
             echo "master server unreachable, nothing to do this run"
             echo "added=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "answered=true" >> "$GITHUB_OUTPUT"
-          echo "master server says: $response"
+          echo "version response: $response"
           added="$(python3 tools/update_game_versions.py "$response")"
           echo "added=$added" >> "$GITHUB_OUTPUT"
+          if [ -n "$BUILD" ] && [ -z "$added" ]; then
+            echo "::warning title=No build added::The build given by hand was not added, and the line above says why."
+          fi
 
       # An unanswered poll stays a green run, so this step is what tells it apart.
       # tools/watchdog.py reads it off the run: skipped means the server answered.

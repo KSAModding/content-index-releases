@@ -46,6 +46,8 @@ It is seeded from `Content/Versions/`, the dated history every installed copy of
 
 That poll only ever sees the build that is current when it runs, so a build superseded within the hour can be missing from it. The copy on your own disk stays the complete source.
 
+When the master server does not answer, a steward adds a build by starting `game-versions.yml` by hand with its `build` input. The same checks apply as for a build from the server.
+
 A poll the master server does not answer ends green and changes nothing, because a single failed poll is normal.
 The workflow then runs its `Master server did not answer` step, which is skipped in a run that got an answer.
 When three polls in a row got no answer, the watchdog opens an issue, as described under [When no tick ran at all](#when-no-tick-ran-at-all).

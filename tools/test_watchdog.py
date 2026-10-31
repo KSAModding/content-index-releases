@@ -490,6 +490,14 @@ class ThePollWorkflowKeepsTheMarker(unittest.TestCase):
         self.assertNotIn("answered=true", unreachable)
         self.assertIn('echo "answered=true" >> "$GITHUB_OUTPUT"', answered)
 
+    def test_a_build_by_hand_reaches_the_script_only_through_the_environment(self):
+        poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        self.assertIn("BUILD: ${{ inputs.build }}", poll)
+        script = poll.split("Poll the master server", 1)[1].split("run: |", 1)[1]
+        self.assertNotIn("inputs.build", script)
+        by_hand = script.split('if [ -n "$BUILD" ]; then', 1)[1].split("else", 1)[0]
+        self.assertNotIn("curl", by_hand)
+
     def test_an_unanswered_poll_still_ends_green(self):
         poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
         branch = poll.split('if [ -z "$response" ]; then', 1)[1].split("\n          fi\n", 1)[0]
