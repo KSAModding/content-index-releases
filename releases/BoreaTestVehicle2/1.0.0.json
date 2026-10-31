@@ -1,0 +1,38 @@
+{
+  "spec_version": 1,
+  "id": "BoreaTestVehicle2",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-31T16:57:15Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/BoreaTestVehicle2/1.0.0",
+    "sha256": "DF4868075ED6CFCCAEEE865825DEEBF3EBA183FF5EEB35B2E8C9604F5194FC6F",
+    "size": 8906,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-boreatestvehicle2-1_0_0-eb14b080/BoreaTestVehicle2-1.0.0.zip"
+    ]
+  },
+  "install_size": 123850,
+  "install": {
+    "root": "Borea Test Vehicle 1",
+    "derived": true,
+    "folder": "Borea Test Vehicle 1"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Borea Test Vehicle 2",
+    "authors": [
+      "SafeShows"
+    ],
+    "abstract": "Testing",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/BoreaTestVehicle2"
+    }
+  }
+}
