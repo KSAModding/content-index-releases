@@ -1,0 +1,36 @@
+{
+  "spec_version": 1,
+  "id": "superheavy33",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-31T20:10:43Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/superheavy33/1.0.0",
+    "sha256": "BE067760567CB896B7070D1DD731DCCEBC2F84A6F429F906C574E998725A19C9",
+    "size": 12839,
+    "content_type": "application/zip"
+  },
+  "install_size": 244378,
+  "install": {
+    "root": "superheavystock",
+    "derived": true,
+    "folder": "superheavystock"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Superheavy booster engine layout - Stock",
+    "authors": [
+      "elevatorctln"
+    ],
+    "abstract": "A configuration of tanks and engines that mimick the layout of the Super Heavy booster in real life.",
+    "description": "Not a full rocket and certainly not a recreation of Supeheavy. it is just tanks configured to support 33 engines symmetrically in the same layout as Superheavy, with the stock LR-91 Sea engines installed. Scale is mostly accurate, it's like 10m wide or something.",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/superheavy33"
+    }
+  }
+}
