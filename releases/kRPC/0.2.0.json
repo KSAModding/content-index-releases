@@ -1,0 +1,49 @@
+{
+  "spec_version": 1,
+  "id": "kRPC",
+  "type": "mod",
+  "version": "0.2.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-10-30T23:30:15Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/krpc/krpc/releases/download/ksa-v0.2.0/krpc-ksa-0.2.0.zip",
+    "sha256": "5AC4615A1C8CCC93AF7BB62093EAA9A95B4F53B73692D78FD4950DB0B6408311",
+    "size": 26327525,
+    "content_type": "application/zip"
+  },
+  "install_size": 59481136,
+  "install": {
+    "root": "kRPC",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/krpc/krpc/releases/tag/ksa-v0.2.0",
+  "changelog_text": "## Changes\n\n- Mod\n  - **Breaking:** Rename the mod folder and id from `kRPC.KSA` to `kRPC` (#1205)\n  - Support KSA v2026.10.25.5707 (#1205)\n  - Show a pop-up listing the RPCs found broken when KSA is not the version kRPC was built for (#1206, #1210)\n  - Put the `kRPC` mod folder at the top of the release archive, so the Borea mod manager can install it (#1205)\n  - Add a kRPC menu to the game's menu bar, with a server window and an info window that start and stop the server and edit its settings (#1206)\n  - Reset the server settings to the defaults when the mod is updated (#1206)\n  - Add a gRPC server, with a `.proto` file and an API reference for each service, to control the game from any language gRPC supports (#1222)\n  - **Breaking:** Use `float` for values that do not need `double` precision, such as `Flight.Speed` and `Engine.Thrust` (#1214)\n\n- Vehicles and parts\n  - **Breaking:** Return the separated vehicles from `Decoupler.Decouple` and `DockingPort.Undock` (#1207)\n  - Add the target part, debris, on-rails and structural load to `Vehicle` (#1207)\n  - Add `Vehicle.Destroy` and `Vehicle.Recover` (#1213)\n  - Add part velocities, and part lists by name and by module (#1207)\n  - Add engine gimbals, propellant tanks, fuel links, and the minimum throttle and propellants of engines (#1210)\n  - Add power, lights, deployable parts and magnetic scoops (#1211)\n  - Add kittens, their radiation doses, crew seats and EVA (#1212)\n  - **Breaking:** Return `null` from `KSA.ActiveVehicle` while the player controls a kitten on EVA (#1212)\n  - Add `KSA.VehicleDesigns`, the designs `KSA.LaunchVehicle` can launch (#1213)\n  - Fix `KSA.LaunchVehicle` failing in the game's placement code for an EVA kitten, which now throws an exception (#1212)\n\n- Flight and orbits\n  - Add manual rotation and translation inputs to `Control`, and pulsed thrust (#1207)\n  - Add surface directions, the biome and radiation dose rates to `Flight` (#1207, #1211)\n  - Add atmosphere, ocean, biome and position queries to `Body` (#1207)\n  - Add shape, energy, node and closest approach members to `Orbit` (#1207)\n  - Add the time to, position, reference frame and orbit average dose rate of a `Burn` (#1207, #1211)\n  - Add relative and hybrid reference frames (#1207)\n  - **Breaking:** `Burn.Orbit` and `Orbit.NextOrbit` follow the game's current prediction (#1209)\n  - Fix an edited `Burn` getting a new object (#1209)\n\n- Game\n  - Add `KSA.Save`, `KSA.Load` and `KSA.SaveExists` (#1207)\n  - Add the camera, screenshots and on-screen messages (#1213)\n  - Add `KSA.Debug`, which teleports vehicles, sets their attitude, fills and empties their resources, and runs console commands (#1213)\n  - Add drawing of lines, shapes and text in the scene (#1215)\n  - Add user interface windows, with labels, buttons, toggles, input fields, sliders and dropdowns (#1215)\n  - Raise `KRPC.ObjectDestroyedException` from a call through an object whose game object is gone (#1209)\n  - Fix `KRPC.GameStateLoads` not counting save loads (#1209)",
+  "listing": {
+    "name": "kRPC",
+    "authors": [
+      "djungelorm"
+    ],
+    "abstract": "Control the game from your own scripts, written in Python, C#, C++, C, Java, Lua and more.",
+    "description": "kRPC lets you control Kitten Space Agency from scripts running outside the game. A server mod inside the game exposes the game's API, and your scripts call it over a network connection, from the same computer or another one.\n\nThis Python script launches a rocket straight up, and cuts the engine at 10 km:\n\n```python\nimport krpc\n\nconn = krpc.connect(name=\"Launch\")\nvehicle = conn.ksa.launch_vehicle(\"Rocket\", \"CCSFS LC-39A\")\nflight = vehicle.flight\n\nvehicle.auto_pilot.target_pitch_and_heading(90, 90)\nvehicle.auto_pilot.engage()\nvehicle.control.throttle = 1\nvehicle.control.activate_next_sequence()\nvehicle.control.engine_on = True\n\nevent = conn.add_event(lambda: flight.mean_altitude > 10000)\nwith event.condition:\n    event.wait()\nvehicle.control.engine_on = False\n```\n\n**Features**\n\n- Client libraries for Python, C#, C++, C, Java and Lua, the same ones kRPC uses for Kerbal Space Program\n- A gRPC server, to generate a client for many other languages\n- APIs covering vehicles, parts, engines, crew, flight data, orbits, burns, reference frames, auto-pilot, and more\n- Streams and events, for efficient telemetry and waiting\n- Server side functions that run your code inside the game\n- APIs for saving and loading, the camera, on-screen messages, and drawing lines and user interface windows in the game\n\nkRPC for KSA is experimental, and its API may change between releases.\n\n- [Documentation](https://krpc.github.io/krpc/experimental/ksa/)\n- [Source](https://github.com/krpc/krpc)\n- [Issues](https://github.com/krpc/krpc/issues)",
+    "license": "LGPL-3.0-or-later",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/krpc-v0-1-0-control-ksa-with-scripts-in-python-c-c-c-java-lua-and-more.1462/",
+      "homepage": "https://krpc.github.io/krpc/experimental/ksa/index.html",
+      "repository": "https://github.com/krpc/krpc",
+      "spacedock": "https://spacedock.info/mod/4747/kRPC",
+      "bugtracker": "https://github.com/krpc/krpc/issues"
+    }
+  }
+}
