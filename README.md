@@ -46,6 +46,10 @@ It is seeded from `Content/Versions/`, the dated history every installed copy of
 
 That poll only ever sees the build that is current when it runs, so a build superseded within the hour can be missing from it. The copy on your own disk stays the complete source.
 
+A poll the master server does not answer ends green and changes nothing, because a single failed poll is normal.
+The workflow then runs its `Master server did not answer` step, which is skipped in a run that got an answer.
+When three polls in a row got no answer, the watchdog opens an issue, as described under [When no tick ran at all](#when-no-tick-ran-at-all).
+
 ## Download counts
 
 `download-counts.json` holds the download counts GitHub and SpaceDock report for each listing and release version, as [RFC 0052](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0052-static-download-counts.md) defines them.
@@ -118,7 +122,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
 | `tools/hosts.py` | The release hosts, GitHub, SpaceDock and the share hosts of `hosts.toml`, behind one interface. GitHub and a share host are polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
-| `tools/watchdog.py` | When the watcher last succeeded on its schedule. Keeps one issue current on this repository. |
+| `tools/watchdog.py` | When the watcher last succeeded on its schedule, and when the master server last answered a poll. Keeps one issue current on this repository for each. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
 | `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the snapshot documents clients fetch: the main document and a file for each type of `TYPE_FILES`. Needs no token. |
 
@@ -210,6 +214,16 @@ The issue is kept current and closes itself when a scheduled run succeeds, so th
 
 ```text
 python3 tools/watchdog.py --dry-run
+```
+
+The same workflow checks the master server in a second step.
+It reads the recent runs of `game-versions.yml` and takes the runs in which `Master server did not answer` was skipped as the polls that got an answer.
+It opens one issue here once three polls in a row got no answer, and closes it when a poll does.
+It counts polls and not time, because GitHub starts that schedule hours apart, so a stretch with no poll neither opens nor closes the issue.
+A run from before that step existed counts as answered.
+
+```text
+python3 tools/watchdog.py --workflow game-versions.yml --unanswered-step "Master server did not answer" --unanswered-polls 3 --dry-run
 ```
 
 ## The snapshot

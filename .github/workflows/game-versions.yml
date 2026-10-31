@@ -46,9 +46,17 @@ jobs:
             echo "added=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          echo "answered=true" >> "$GITHUB_OUTPUT"
           echo "master server says: $response"
           added="$(python3 tools/update_game_versions.py "$response")"
           echo "added=$added" >> "$GITHUB_OUTPUT"
+
+      # An unanswered poll stays a green run, so this step is what tells it apart.
+      # tools/watchdog.py reads it off the run: skipped means the server answered.
+      # Keep its name in step with the --unanswered-step of watchdog.yml.
+      - name: Master server did not answer
+        if: steps.poll.outputs.answered != 'true'
+        run: echo "::warning title=Master server did not answer::The poll got no answer, so no build was added this run."
 
       - name: Commit
         if: steps.poll.outputs.added != ''
