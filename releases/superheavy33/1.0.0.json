@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/superheavy33/1.0.0",
     "sha256": "BE067760567CB896B7070D1DD731DCCEBC2F84A6F429F906C574E998725A19C9",
     "size": 12839,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-superheavy33-1_0_0-5d21a8ea/superheavy33-1.0.0.zip"
+    ]
   },
   "install_size": 244378,
   "install": {
