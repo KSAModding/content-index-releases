@@ -1,0 +1,43 @@
+{
+  "spec_version": 1,
+  "id": "TestModdedNuclearVehicle",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-01T07:28:41Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/TestModdedNuclearVehicle/1.0.0",
+    "sha256": "0AB034A4325CAD39AB3DF250EE8A1DAD9FAB76A7143C806E77BED411A633DCA4",
+    "size": 5158,
+    "content_type": "application/zip"
+  },
+  "install_size": 57989,
+  "install": {
+    "root": "Test Modded Nuclear Vehicle",
+    "derived": true,
+    "folder": "Test Modded Nuclear Vehicle"
+  },
+  "dependencies": [
+    {
+      "id": "KSArmory",
+      "kind": "required",
+      "min": "0.10.0",
+      "source": "authored"
+    }
+  ],
+  "listing": {
+    "name": "Test Modded Nuclear Vehicle",
+    "authors": [
+      "MrJeranimo"
+    ],
+    "abstract": "Test Modded Rocket, Carries two nuclear bombs",
+    "description": "This is a test vehicle to see if mod requirements work correctly for ksamods.gg and Borea.\n\nThis is a rocket that is built for suborbital flight and carries two nuclear bombs to meet all your destruction needs. The nuclear bombs are from KSArmory.",
+    "license": "MIT",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/TestModdedNuclearVehicle"
+    }
+  }
+}
