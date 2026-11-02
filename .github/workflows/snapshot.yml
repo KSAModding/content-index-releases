@@ -10,6 +10,7 @@ on:
       - releases/**
       - game-versions.json
       - download-counts.json
+      - forums-status.json
       - tools/build_snapshot.py
       - tools/authored.py
       - tools/stamp_release.py

@@ -274,6 +274,8 @@ In the same way, `hosts.toml` of the authored checkout becomes the optional top-
 
 When `download-counts.json` is present, each listing, vehicle and save that is not delisted carries its entry as `downloads`. An entry for an id that is none of these fails the build.
 
+When `forums-status.json` marks a listing, vehicle, save or pack that is not delisted, its entry carries `forums.unavailable_since` (RFC 0110), and nothing else of that file. An entry for an id that left the index is noted, because the next run of the forums status drops it.
+
 Each listing and pack that is not delisted carries the dates of RFC 0058 next to its `id`.
 `published_at` is the earliest release date, yanked and retracted versions included.
 `updated_at` is the latest release date of a version that is neither yanked nor retracted.

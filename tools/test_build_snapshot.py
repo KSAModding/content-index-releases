@@ -1237,6 +1237,42 @@ class DownloadCounts(Fixture):
         self.assertNotIn("downloads", self.entry(self.index.build(download_counts=absent), "AutoStage"))
 
 
+class ForumsStatus(Fixture):
+    def status_file(self, *entries, text=None):
+        path = self.index.root / "forums-status.json"
+        document = {"spec_version": 1, "listings": list(entries)}
+        self.index.write(path, text if text is not None else json.dumps(document, indent=2) + "\n")
+        return path
+
+    @staticmethod
+    def marked(identifier):
+        return {"id": identifier, "thread": 1, "in_sitemap": False, "unavailable_since": "2026-11-04T04:09:00Z"}
+
+    def test_a_vehicle_and_a_pack_carry_their_mark_and_a_tombstone_none(self):
+        self.index.vehicle("Rover")
+        self.index.pack("Bundle", "1.0.0")
+        self.index.listing("Gone")
+        self.index.status({"id": "Gone", "state": "delisted"})
+        path = self.status_file(self.marked("Bundle"), self.marked("Gone"), self.marked("Rover"))
+        files = self.index.build_files(forums_status=path)
+        mark = {"unavailable_since": "2026-11-04T04:09:00Z"}
+        self.assertEqual(self.typed(files, "vehicles", "Rover")["forums"], mark)
+        self.assertEqual(self.entry(files[MAIN_FILE], "Bundle")["forums"], mark)
+        self.assertEqual(sorted(self.entry(files[MAIN_FILE], "Gone")), ["id", "index_status"])
+
+    def test_an_entry_of_a_removed_document_is_noted(self):
+        self.index.listing("AutoStage")
+        path = self.status_file(self.marked("Removed"))
+        self.assertNotIn("forums", self.entry(self.index.build(forums_status=path), "AutoStage"))
+        self.assertTrue(any("Removed" in note for note in self.index.notes))
+
+    def test_an_invalid_document_is_an_error(self):
+        self.index.listing("AutoStage")
+        path = self.status_file({"id": "AutoStage", "thread": 1, "in_sitemap": False, "since": "x"})
+        with self.assertRaisesRegex(SnapshotError, "since"):
+            self.index.build(forums_status=path)
+
+
 class Dates(Fixture):
     def dated_pack(self, identifier, version, released_at):
         text = PACK.format(identifier=identifier, version=version).replace(
