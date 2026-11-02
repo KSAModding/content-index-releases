@@ -31,6 +31,16 @@ DOWNLOAD_COUNTS_VERSION = 1
 
 DOWNLOAD_HOSTS = ("github", "spacedock")
 
+FORUMS_STATUS_VERSION = 1
+
+# The keys of one entry of forums-status.json, in the order the file writes them.
+# Only `unavailable_since` goes into the snapshot (RFC 0110), and the rest is
+# what tools/forums_status.py needs from one run to the next.
+FORUMS_ENTRY_KEYS = ("id", "thread", "in_sitemap", "gone", "unknown", "unavailable_since", "untold")
+
+# The notes tools/forums_status.py could not send yet.
+FORUMS_NOTES = ("marked", "found", "unknown")
+
 REPOSITORY_VARIABLES = (
     "GIT_DIR",
     "GIT_WORK_TREE",
@@ -441,6 +451,90 @@ def read_download_counts(path):
     return check_download_counts(load_json(Path(path)), str(path))
 
 
+def check_forums_status(document, where):
+    """forums-status.json checked against RFC 0110, its entries keyed by lowercased id."""
+    if not isinstance(document, dict):
+        raise SnapshotError(f"{where}: the document is not an object")
+    unknown = sorted(set(document) - {"spec_version", "checked_at", "counted_at", "held", "listings"})
+    if unknown or "spec_version" not in document or "listings" not in document:
+        raise SnapshotError(
+            f"{where}: the document carries spec_version and listings, and may carry "
+            "checked_at, counted_at and held"
+        )
+    version = document["spec_version"]
+    if isinstance(version, bool) or version != FORUMS_STATUS_VERSION:
+        raise SnapshotError(f"{where}: spec_version {version!r} is not {FORUMS_STATUS_VERSION}")
+    for key in ("checked_at", "counted_at"):
+        if key in document:
+            instant(document[key], f"{where} {key}")
+    if "held" in document:
+        check_count(document["held"], f"{where} held")
+        if document["held"] < 1:
+            raise SnapshotError(f"{where}: held is left out rather than 0")
+    if not isinstance(document["listings"], list):
+        raise SnapshotError(f"{where}: listings has to be an array")
+
+    entries = {}
+    previous = None
+    for position, entry in enumerate(document["listings"], start=1):
+        at = f"{where} listing {position}"
+        if not isinstance(entry, dict):
+            raise SnapshotError(f"{at}: is not an object")
+        stray = sorted(set(entry) - set(FORUMS_ENTRY_KEYS))
+        if stray:
+            raise SnapshotError(f"{at}: carries the unknown key(s) {', '.join(stray)}")
+        missing = [key for key in ("id", "thread", "in_sitemap") if key not in entry]
+        if missing:
+            raise SnapshotError(f"{at}: lacks {', '.join(missing)}")
+        identifier = entry["id"]
+        if not isinstance(identifier, str) or not valid_id(identifier):
+            raise SnapshotError(f"{at}: names no id that satisfies the id rules of RFC 0031")
+        key = identifier.lower()
+        if previous is not None and key <= previous:
+            raise SnapshotError(
+                f"{at}: '{identifier}' is listed twice or out of order, and listings "
+                "are ascending by lowercased id"
+            )
+        previous = key
+
+        thread = entry["thread"]
+        if isinstance(thread, bool) or not isinstance(thread, int) or thread < 1:
+            raise SnapshotError(f"{at}: thread {thread!r} is not a positive integer")
+        if not isinstance(entry["in_sitemap"], bool):
+            raise SnapshotError(f"{at}: in_sitemap has to be true or false")
+        if "gone" in entry:
+            gone = entry["gone"]
+            if not isinstance(gone, list) or not 1 <= len(gone) <= 2:
+                raise SnapshotError(f"{at}: gone has to hold one or two run times")
+            for moment in gone:
+                instant(moment, f"{at} gone")
+        if "unknown" in entry:
+            count = entry["unknown"]
+            check_count(count, f"{at} unknown")
+            if count < 1:
+                raise SnapshotError(f"{at}: unknown is left out rather than 0")
+        if "unavailable_since" in entry:
+            instant(entry["unavailable_since"], f"{at} unavailable_since")
+        if "untold" in entry and entry["untold"] not in FORUMS_NOTES:
+            raise SnapshotError(f"{at}: untold {entry['untold']!r} is none of {', '.join(FORUMS_NOTES)}")
+        entries[key] = entry
+    return entries
+
+
+def read_forums_status(path):
+    """The forums status keyed by lowercased id, or nothing when the file is absent."""
+    if path is None or not Path(path).is_file():
+        return {}
+    return check_forums_status(load_json(Path(path)), str(path))
+
+
+def forums_mark(status):
+    """The `forums` field of a snapshot entry, or None when the entry carries no mark."""
+    if status is None or "unavailable_since" not in status:
+        return None
+    return {"unavailable_since": status["unavailable_since"]}
+
+
 def instant(value, where):
     """A timestamp with an offset as an aware datetime."""
     try:
@@ -551,7 +645,7 @@ def listed_times(authored, log):
     return times
 
 
-def listing_entry(document, status, releases, downloads=None, listed_at=None):
+def listing_entry(document, status, releases, downloads=None, listed_at=None, forums=None):
     """One entry of `listings`, `vehicles` or `saves`. Delisted becomes a tombstone: id and status only."""
     if status is not None and status["state"] == "delisted":
         return {"id": document["id"], "index_status": status}
@@ -571,10 +665,12 @@ def listing_entry(document, status, releases, downloads=None, listed_at=None):
         entry["index_status"] = status  # disputed ships whole, the client warns
     if downloads is not None:
         entry["downloads"] = {key: value for key, value in downloads.items() if key != "id"}
+    if forums is not None:
+        entry["forums"] = forums
     return entry
 
 
-def pack_entry(pack, status, versioned, listed_at=None):
+def pack_entry(pack, status, versioned, listed_at=None, forums=None):
     """One entry of `packs`. A pack has no generated half, so there is no `releases`."""
     identifier = pack["id"]
     if status is not None and status["state"] == "delisted":
@@ -602,18 +698,25 @@ def pack_entry(pack, status, versioned, listed_at=None):
     entry = {"id": identifier, **dates, "versions": rendered}
     if status is not None:
         entry["index_status"] = status
+    if forums is not None:
+        entry["forums"] = forums
     return entry
 
 
-def build(authored, releases, game_versions, sources=None, log=None, download_counts=None):
+def build(
+    authored, releases, game_versions, sources=None, log=None, download_counts=None,
+    forums_status=None,
+):
     """The main snapshot document for the state of the two repositories on disk."""
     return build_files(
-        authored, releases, game_versions, sources, log, download_counts
+        authored, releases, game_versions, sources, log, download_counts,
+        forums_status=forums_status,
     )[MAIN_FILE]
 
 
 def build_files(
-    authored, releases, game_versions, sources=None, log=None, download_counts=None, published=()
+    authored, releases, game_versions, sources=None, log=None, download_counts=None, published=(),
+    forums_status=None,
 ):
     """Every snapshot file for the state of the two repositories on disk, by name, the main document first.
 
@@ -646,6 +749,12 @@ def build_files(
             "which is no listing, vehicle or save"
         )
 
+    # tools/forums_status.py drops the entry of a removed document on its next run,
+    # so until then the entry is only noted.
+    forums = read_forums_status(forums_status)
+    for key in sorted(set(forums) - set(everything) - set(packs)):
+        log(f"forums-status.json names '{forums[key]['id']}', which is in the index no more")
+
     folders = release_folders(releases)
 
     listed = listed_times(authored, log)
@@ -666,12 +775,18 @@ def build_files(
             folder = folders.get(key)
             files = [] if delisted or folder is None else read_releases(folder, document["id"])
             entries.append(
-                listing_entry(document, status, files, counts.get(key), listed.get((group, key)))
+                listing_entry(
+                    document, status, files, counts.get(key), listed.get((group, key)),
+                    forums_mark(forums.get(key)),
+                )
             )
         return entries
 
     rendered_packs = [
-        pack_entry(packs[key], whole.get(key), versioned, listed.get(("packs", key)))
+        pack_entry(
+            packs[key], whole.get(key), versioned, listed.get(("packs", key)),
+            forums_mark(forums.get(key)),
+        )
         for key in sorted(packs)
     ]
 
@@ -790,6 +905,10 @@ def parse_arguments(argv):
         help="the download counts of RFC 0052, optional",
     )
     parser.add_argument(
+        "--forums-status", default="forums-status.json", type=Path,
+        help="the forums status of RFC 0110, optional",
+    )
+    parser.add_argument(
         "--previous", type=Path,
         help="the main document published today, with the published copy of each other "
         "file next to it under its own name. Unchanged content keeps its provenance, "
@@ -870,6 +989,7 @@ def main(argv=None):
             sources=sources_from(arguments),
             log=warn,
             download_counts=arguments.download_counts,
+            forums_status=arguments.forums_status,
             # A copy that does not parse is still published, so existence decides.
             published=[name for name, path in previous.items() if path.is_file()],
         )

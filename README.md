@@ -37,6 +37,7 @@ Vehicles and saves are in files of their own next to it, see [The snapshot](#the
 | `releases/<id>/<version>.json` | One stamped document per release. |
 | `game-versions.json` | Every KSA production build we know of, ordered by revision. |
 | `download-counts.json` | The download counts GitHub and SpaceDock report for each listing and release version. |
+| `forums-status.json` | Whether the forums thread of each listing still exists, and the mark of a thread that is gone. |
 
 ## The game release list
 
@@ -70,6 +71,30 @@ To refresh by hand, dispatch the workflow with `dry_run`, or run it locally agai
 ```text
 python3 tools/download_counts.py --authored ../content-index --dry-run
 ```
+
+## Forums status
+
+`forums-status.json` holds, for each listing, pack, vehicle and save with `links.forums`, whether its forums thread still exists, as [RFC 0110](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0110-gone-forums-thread.md) defines it.
+`.github/workflows/forums-status.yml` runs `tools/forums_status.py` as the org App, and the tool reads the forum at most once in 20 hours, with the User-Agent `Borea-Index/1.0 (+https://github.com/KSAModding/Borea)`, as Ahwoo allowed.
+It reads the sitemap, and every sitemap a sitemap index names, and it reads a listed thread that the sitemap lacks once in that run.
+The sitemap can name a thread as `/threads/<slug>.<id>/` or under its forum as `/forums/<path>/<slug>.<id>/`, so it is matched with the same rule as `links.forums`.
+A 200, or a 301 that ends in 200, keeps the listing, Ahwoo's 404 page for a thread that does not exist counts as gone, and every other answer changes nothing.
+A sitemap that does not answer 200, does not parse, names no thread, or lacks more than 10 percent of the listed threads the last counted run saw makes the run not count.
+The file counts such reads in a row as `held`, and from the third one on the workflow fails after its push, so the stewards hear of it.
+After three counted runs in a row that found the thread gone, the entry gets `unavailable_since`, and the tool tells the owner and the stewards in the listing's watcher issue.
+The sitemap that lists the thread again, or a `links.forums` that names another thread, removes the mark.
+Three unclear answers in a row go to the stewards and mark nothing.
+The file is the whole state, so it lives in this repository and not in the Actions cache, because a lost cache must not reset a count or a mark.
+The snapshot takes only the mark from it.
+
+To see what a run would do, dispatch the workflow with `dry_run`, or run it locally against a checkout of the authored half:
+
+```text
+python3 tools/forums_status.py --authored ../content-index --dry-run
+```
+
+A dry run asks the forum nothing, because it saves no read and the next run would read the forum again.
+Add `--read` only for a deliberate test of the forum.
 
 ## The watcher
 
@@ -274,6 +299,8 @@ In the same way, `hosts.toml` of the authored checkout becomes the optional top-
 
 When `download-counts.json` is present, each listing, vehicle and save that is not delisted carries its entry as `downloads`. An entry for an id that is none of these fails the build.
 
+When `forums-status.json` marks a listing, vehicle, save or pack that is not delisted, its entry carries `forums.unavailable_since` (RFC 0110), and nothing else of that file. An entry for an id that left the index is noted, because the next run of the forums status drops it.
+
 Each listing and pack that is not delisted carries the dates of RFC 0058 next to its `id`.
 `published_at` is the earliest release date, yanked and retracted versions included.
 `updated_at` is the latest release date of a version that is neither yanked nor retracted.
@@ -423,7 +450,7 @@ A listing that names a release host is refused here, because the watcher stamps 
 ## License
 
 Metadata is dedicated to the public domain under [CC0 1.0](LICENSE).
-That means `releases/`, the game release list, the download counts, and the published snapshot.
+That means `releases/`, the game release list, the download counts, the forums status, and the published snapshot.
 
 A mirror, a client, or a website can therefore copy and re-serve the whole index with no conditions attached, which is the point.
 
