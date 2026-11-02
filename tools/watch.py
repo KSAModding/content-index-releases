@@ -472,25 +472,28 @@ class Issues:
             self.log(f"  could not open an issue (HTTP {error.code})")
             return None
 
-    def note(self, listing_id, text, cache):
+    def note(self, listing_id, text, cache, title=None, tell_owner=True):
         """Comment `text` on the listing's issue, and return whether it was sent.
 
         A note is a fact and not an error, so it never opens an issue for the
         listing and never keeps one open. With no open issue, it goes to the
         listing's last watcher issue, which stays closed, and a listing that
-        never had one gets a new issue that is closed at once.
+        never had one gets a new issue under `title` that is closed at once.
+        With `tell_owner` false, the note does not mention the owner.
         """
         try:
             issue = self.find(listing_id, cache) or self.last(listing_id, cache)
             if issue is None and self._degraded:
                 self.log("  the note waits: the issue list could not be read this tick")
                 return False
-            owner = self.owner(listing_id)
+            owner = self.owner(listing_id) if tell_owner else ""
             if owner:
                 text = f"{text}\n\n{owner}"
             if issue is None:
                 body = f"{LISTING_MARKER.format(id=listing_id)}\n{text}"
-                created = self._open_issue(f"{listing_id}: releases gone from their host", body)
+                created = self._open_issue(
+                    title or f"{listing_id}: releases gone from their host", body
+                )
                 if not created:
                     return False
                 number = created["number"]
