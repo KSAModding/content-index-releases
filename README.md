@@ -61,7 +61,10 @@ A release counts the downloads of its archive for every platform together with t
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
-A share host that serves its files itself (RFC 0104) has no counts, and no request is sent for them.
+A share host that serves its files itself (RFC 0104) is counted from the optional `downloads` object of its release list `releases/<type>/<id>.json`, `{"total": n, "versions": {"<version>": n}, "updated": "<RFC 3339 UTC>"}`, which is read only after the signature of the list by `key` is valid.
+Its counts only go up, so a value lower than the stored one keeps the stored one, and a version the object no longer names keeps its count.
+A list without `downloads` changes nothing, and an object of any other shape is a note in the log and changes nothing either.
+A version key that does not normalize to a stamped release of the listing under `releases/` counts in the total only, and versions that add up to more than the total make the object invalid.
 A share host that left `hosts.toml`, or that the listing no longer names, keeps its last known count.
 
 Known limit: a deleted GitHub release without its own version entry, and an archive uploaded again, lower a count that the host did not lower.
@@ -160,7 +163,7 @@ A list without a valid signature holds its listings back as an outage does, and 
 Each entry gives the archive in `url`, an https URL under a prefix in `downloads`, and the release date in `date`, an RFC 3339 time in UTC that is not in the future, and an entry that breaks one of these is reported in the listing's issue.
 The download of an archive follows a redirect only while it stays under `downloads`, and an archive that ends up anywhere else is reported.
 An entry that the host removes is marked as gone as any other release is, a day after the list drops it and once its `url` answers `410 Gone`.
-Such a host has no download counts.
+Such a host has no asset counts, and its download counts come from the `downloads` object its signed list can carry, as [Download counts](#download-counts) describes.
 The watcher checks the signatures with the `cryptography` package that `tools/requirements.txt` pins, and when `hosts.toml` registers such a host and the package is not installed, the run exits with code 2 before it counts any listing.
 
 There is no queue. What is stamped here is the whole of the watcher's state, which is why a tick GitHub delays, drops or cancels costs latency and not data, and why a re-run stamps nothing twice.
