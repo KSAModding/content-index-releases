@@ -1,17 +1,28 @@
-# Keeps the actions the scheduled jobs run on current. Same shape as the file
-# in KSAModding/Borea, so one convention covers every repository in the org.
-#
-# It matters more here than elsewhere: the game versions job and the watcher run
-# unattended, so an action that goes stale is not something a person walks into.
+# Keeps every pinned dependency of this repository current: the actions of the workflows and the Python packages of the tools.
+# It matters more here than elsewhere, because the game versions job and the watcher run unattended, so a stale pin is not something a person walks into.
+# Each entry runs daily, so a fixed release reaches a pull request within a working day.
+# Security updates do not wait for this schedule, because Dependabot opens them when an advisory is published.
 version: 2
 updates:
   - package-ecosystem: "github-actions"
     # Dependabot reads .github/workflows/ from here.
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     groups:
-      # Minor and patch bumps as one pull request instead of one each. A major
-      # bump stays on its own, because that is the one that can break a job.
+      # All action bumps arrive as one pull request, because the checks of that one pull request show at once whether a job breaks.
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: "pip"
+    # The exact pins the checks and the privileged jobs install with pip install --only-binary=:all: -r.
+    directory: "/tools"
+    schedule:
+      interval: "daily"
+    # The increase strategy writes the new version into the == pin, so a pin stays exact.
+    versioning-strategy: "increase"
+    groups:
+      # Minor and patch bumps arrive as one pull request.
+      # A major bump stays on its own, because that is the one that can break a job.
       minor-and-patch:
         update-types: ["minor", "patch"]
