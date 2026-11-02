@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "Boatmobile",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-02T15:12:25Z",
+  "game_min": "2026.10.13.5602",
+  "game_min_revision": 5602,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/Boatmobile/1.0.0",
+    "sha256": "73D565E786ACFFCC79768D371E1CE470CC49549A86EB613ADCF58A464C5B1A3D",
+    "size": 3028,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-boatmobile-1_0_0-a792e00d/Boatmobile-1.0.0.zip"
+    ]
+  },
+  "install_size": 32128,
+  "install": {
+    "root": "Boatmobile",
+    "derived": true,
+    "folder": "Boatmobile"
+  },
+  "dependencies": [
+    {
+      "id": "FastAndPurrious",
+      "kind": "required",
+      "min": "0.1.12",
+      "source": "authored"
+    }
+  ],
+  "listing": {
+    "name": "Boatmobile",
+    "authors": [
+      "Kiwi Shark"
+    ],
+    "abstract": "A \"boat\" that you can drive around.",
+    "description": "My take on a \"boatmobile\", reminiscent of the ones in Spongebob. Some carefully scaled parts built on top of the Cadillac from Fast & Purrious. Works the same as the car by itself, just with the nautical new look.\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-3)\n\n![Screenshot 2](ksa-image:screenshot-4)\n\n![Screenshot 3](ksa-image:screenshot-5)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "boat",
+      "car",
+      "spongebob",
+      "meme"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/Boatmobile"
+    }
+  }
+}
