@@ -1,0 +1,44 @@
+{
+  "spec_version": 1,
+  "id": "AmongUsCrewmate",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-02T14:56:26Z",
+  "game_min": "2026.8.19.5261",
+  "game_min_revision": 5261,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/AmongUsCrewmate/1.0.0",
+    "sha256": "6648DC999A74E83666FB481CB2DF6540DE17040EA8AB9882EBD4DF2020340526",
+    "size": 2009,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-amonguscrewmate-1_0_0-84db10d3/AmongUsCrewmate-1.0.0.zip"
+    ]
+  },
+  "install_size": 16788,
+  "install": {
+    "root": "Among Us",
+    "derived": true,
+    "folder": "Among Us"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Crewmate",
+    "authors": [
+      "Kiwi Shark"
+    ],
+    "abstract": "A crewmate from Among Us.",
+    "description": "Make your KSA experience *sus* with a crewmate from Among Us. This little dude is made from some fuel tanks and imagination.  A little off-balance but it's a gimmick vehicle.\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-1)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "crewmate",
+      "among-us",
+      "meme"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/AmongUsCrewmate"
+    }
+  }
+}
