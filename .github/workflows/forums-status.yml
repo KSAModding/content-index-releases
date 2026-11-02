@@ -1,0 +1,115 @@
+# Refresh forums-status.json (RFC 0110) and commit it when its bytes changed.
+# The file is the whole state of the forums status, so it lives in this repository and not in the Actions cache.
+name: forums status
+
+on:
+  schedule:
+    # Several slots because GitHub drops scheduled runs. The tool reads the forum at most once in 20 hours.
+    - cron: "27 5,11,17,23 * * *"
+  # Follows a changed links.forums and drops removed listings without asking the forum.
+  repository_dispatch:
+    types: [index-changed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Print the document from the stored state, ask the forum nothing, and write, commit and tell nothing."
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # The watcher's group, so this run and the watcher never push to main at the same time.
+  group: watcher
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: refresh
+    runs-on: ubuntu-latest
+    # The key of the org App is a secret of this environment, which only main may use.
+    environment: index-bot
+    timeout-minutes: 15
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: content-index-releases
+          permission-contents: write
+
+      # A token of its own for the notes, which go to the watcher issue of a listing in the authored repository.
+      - uses: actions/create-github-app-token@v3
+        id: issues-token
+        with:
+          app-id: ${{ vars.INDEX_APP_ID }}
+          private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: content-index
+          permission-issues: write
+
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          token: ${{ steps.app-token.outputs.token }}
+
+      # The listings, and tools/ownership.py, which names the owner a note mentions.
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ github.repository_owner }}/content-index
+          ref: main
+          path: .authored
+
+      - name: Refresh
+        id: refresh
+        env:
+          GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
+          EVENT: ${{ github.event_name }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          arguments=(--authored .authored)
+          if [ "$EVENT" = "repository_dispatch" ]; then
+            arguments+=(--no-read)
+          fi
+          if [ "$DRY_RUN" = "true" ]; then
+            arguments+=(--dry-run)
+          fi
+          # Exit 3 means the reads count nothing any more, and the file still has to be committed first.
+          code=0
+          python3 tools/forums_status.py "${arguments[@]}" || code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" -ne 0 ] && [ "$code" -ne 3 ]; then
+            exit "$code"
+          fi
+
+      - name: Commit and push
+        if: ${{ inputs.dry_run != true }}
+        run: |
+          set -euo pipefail
+          if [ -z "$(git status --porcelain -- forums-status.json)" ]; then
+            echo "the forums status is unchanged, so nothing is committed"
+            exit 0
+          fi
+          git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
+          git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
+          git add forums-status.json
+          git commit -m "Refresh the forums status"
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            git pull --rebase
+          done
+          echo "could not push after three attempts; the next run tries again"
+          exit 1
+
+      # A failed run is what notify-failure tells the stewards about.
+      - name: Fail when the reads count nothing
+        if: ${{ steps.refresh.outputs.code == '3' }}
+        run: |
+          echo "the last reads of the forum did not count, so a steward has to look at the sitemap and forums-status.json"
+          exit 1
