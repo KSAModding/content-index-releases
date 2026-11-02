@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "GEE",
+  "type": "mod",
+  "version": "0.1.0-beta",
+  "version_scheme": "semver",
+  "release_status": "testing",
+  "release_date": "2026-11-02T15:04:31Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/KarloDerEchte/KSA-GEE-General-Earth-Enhancements/releases/download/v0.1.0-beta/GEE-0.1.0-beta.zip",
+    "sha256": "C7C6A61AE07066C0469E6AEF4F576E6FF3C94B7B1C6A3F654621A8203D990A68",
+    "size": 5410504,
+    "content_type": "application/x-zip-compressed"
+  },
+  "install_size": 13361235,
+  "install": {
+    "root": "GEE",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/KarloDerEchte/KSA-GEE-General-Earth-Enhancements/releases/tag/v0.1.0-beta",
+  "changelog_text": "First public beta of **GEE - General Earth Enhancements**, a StarMap mod for Kitten Space Agency that puts the real world on Earth.\n\n> This is a beta, programmed entirely by Claude (Anthropic's AI). Expect rough edges, and please report what you find.\n\n## What's in it\n\n- **Buildings and roads** from OpenStreetMap, streamed around the camera, with facades, roofs, details and windows\n- **Far field**: simplified buildings out to tens of kilometres\n- **Night**: lit windows, street lights in towns, city lights visible from orbit\n- **Satellite imagery** (Sentinel-2 cloudless) when seen from altitude\n- **Launch complexes** at all of the game's Earth pads: LC-39A/B with the VAB, Starbase, ELA-4, SLC-4E and LC-1\n- Every part can be switched off on its own in the mod window or `settings.json`\n\n## Install\n\n1. Install Kitten Space Agency and the StarMap mod loader.\n2. Download `GEE-0.1.0-beta.zip` below and extract it into `Documents/My Games/Kitten Space Agency/mods/`,\n   so that you get `mods/GEE/mod.toml`.\n3. Start the game through StarMap.\n\nAn internet connection is needed the first time an area is shown; downloads are cached in `mods/GEE/cache/`.\n\n\n## Feedback\n\nIdeas, bugs, places that look wrong: please open an [issue](https://github.com/KarloDerEchte/KSA-GEE-General-Earth-Enhancements/issues). Pull requests are welcome.\n\n## License\n\nGPL-3.0 with an additional permission for the game, StarMap and Harmony. Map data © OpenStreetMap contributors (ODbL), © OpenMapTiles, tiles by OpenFreeMap. Imagery: EOxCloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0. See `NOTICE.md` in the zip.",
+  "listing": {
+    "name": "GEE - General Earth Enhancements",
+    "authors": [
+      "KarloDerEchte"
+    ],
+    "abstract": "Puts the real world on Earth: OpenStreetMap buildings and roads, city lights at night, satellite imagery from altitude, and modelled launch complexes.",
+    "description": "GEE streams buildings and roads from OpenStreetMap around the camera, lights up cities at night and drapes satellite imagery over the ground when you look down from altitude.\n\n- **Buildings and roads** with facades, roofs, details nearby and lit windows. Roads are laid on the terrain, and the game's trees are cleared from roads and buildings.\n- **Far field**: simplified buildings out to tens of kilometres, so cities stay visible after launch.\n- **Night**: lit windows, street lights in towns, and city lights visible from orbit.\n- **Satellite imagery** (Sentinel-2 cloudless, 2016) from altitude.\n- **Launch complexes** at all of the game's Earth pads: LC-39A/B with the VAB and a crew access arm, Starbase, ELA-4, SLC-4E and LC-1.\n\nEvery part can be switched off on its own. The mod needs an internet connection the first time an area is shown and caches everything it downloads.\n\nThis mod was programmed entirely by Claude (Anthropic's AI). It is a hobby project, so expect rough edges.\n\nMap data © OpenStreetMap contributors (ODbL), © OpenMapTiles, tiles by OpenFreeMap. Imagery: EOxCloudless by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), CC BY 4.0.\n",
+    "license": "GPL-3.0-only AND ODbL-1.0",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/gee-general-earth-enhancements.1527/",
+      "repository": "https://github.com/KarloDerEchte/KSA-GEE-General-Earth-Enhancements",
+      "bugtracker": "https://github.com/KarloDerEchte/KSA-GEE-General-Earth-Enhancements/issues"
+    }
+  }
+}
