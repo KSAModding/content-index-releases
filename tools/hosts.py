@@ -44,6 +44,8 @@ from pathlib import Path
 
 from authored import HOST_KEY, HOSTS, RELEASES_KEYS, host_key
 from stamp_release import (
+    PLATFORM_TYPES,
+    PLATFORMS,
     Archive,
     StampError,
     as_archive,
@@ -158,6 +160,18 @@ class OversizeError(HostError):
 
 
 @dataclasses.dataclass(frozen=True)
+class PlatformArchive:
+    """The archive of a release for one platform, which goes with the archive for every platform."""
+
+    platform: str
+    name: str
+    url: str
+    size: int | None = None
+    content_type: str = "application/zip"
+    downloads: int | None = None
+
+
+@dataclasses.dataclass(frozen=True)
 class HostRelease:
     """One release as a host describes it, before anything is derived from it."""
 
@@ -190,6 +204,8 @@ class HostRelease:
     problem: str | None = None
     # The copies of the archive the host lists besides its own (RFC 0094).
     mirrors: tuple = ()
+    # The PlatformArchive of each platform that has one, in the order of PLATFORMS.
+    platforms: tuple = ()
 
     @property
     def rest(self):
@@ -606,16 +622,21 @@ class GitHubHost(Host):
 
     With a `tag_prefix`, only a release whose tag starts with it is offered,
     and its version is read from the rest of the tag (RFC 0096).
+
+    For a mod or a mod-loader, a zip named `<stem>-<platform>.zip` or
+    `<stem>_<platform>.zip` next to `<stem>.zip` is the archive of one
+    platform, and the archive for every platform is picked from the other zips.
     """
 
     kind = "github"
 
-    def __init__(self, repository, http, listing_id=None, max_pages=5, tag_prefix=""):
+    def __init__(self, repository, http, listing_id=None, max_pages=5, tag_prefix="", content_type=None):
         self.repository = str(repository).strip("/")
         self.http = http
         self.listing_id = listing_id or self.repository.split("/")[-1]
         self.max_pages = max_pages
         self.tag_prefix = tag_prefix or ""
+        self.content_type = content_type
         # The published releases of the last full answer whose tag does not start with the prefix.
         self.skipped = 0
         # True when the last scan hit max_pages with more pages left, so the
@@ -687,7 +708,7 @@ class GitHubHost(Host):
 
     def _release(self, payload):
         tag = payload.get("tag_name") or ""
-        asset, candidates = self._asset(payload)
+        asset, candidates, platforms, problem = self._asset(payload)
         return HostRelease(
             host=self.kind,
             tag=tag,
@@ -708,16 +729,33 @@ class GitHubHost(Host):
                 for item in payload.get("assets") or []
                 if item.get("state") == "uploaded" and item.get("browser_download_url")
             ),
+            platforms=tuple(
+                PlatformArchive(
+                    platform=platform,
+                    name=item.get("name", ""),
+                    url=item.get("browser_download_url"),
+                    size=item.get("size"),
+                    content_type=item.get("content_type") or "application/zip",
+                    downloads=_count(item.get("download_count")),
+                )
+                for platform, item in platforms
+            ),
+            problem=problem,
         )
 
     def _asset(self, payload):
-        """The release's archive.
+        """The release's archive, the zip names, the (platform, asset) pairs of its platform archives, and a problem.
 
         One archive is the normal case. Where a release carries several, the one
         named after the listing wins, because that is what every archive in the
         index is named. Anything still ambiguous is reported to the author
         rather than guessed at: picking the wrong asset would stamp a hash
         clients then verify against the wrong file.
+
+        For a mod or a mod-loader the platform-shaped zips are left out of that
+        pick, and those named after the picked archive are its platform
+        archives. Two of them for one platform are a problem, and so are
+        platform-shaped zips without an archive for every platform.
         """
         listed = _objects(
             self.repository,
@@ -733,19 +771,100 @@ class GitHubHost(Host):
             if asset.get("content_type") in ("application/zip", "application/x-zip-compressed")
         ]
         names = [asset.get("name", "") for asset in assets]
+        shaped = {}
+        if self.content_type in PLATFORM_TYPES:
+            lowered = {name.lower() for name in names}
+            for index, name in enumerate(names):
+                shape = _platform_shape(name, lowered)
+                if shape is not None:
+                    shaped[index] = shape
+        pool = [asset for index, asset in enumerate(assets) if index not in shaped]
+
+        asset = self._universal(payload, pool)
+        if asset is None:
+            if not shaped:
+                return None, names, (), None
+            return None, names, (), (
+                f"the release carries the platform archives {_names(assets, shaped)} and "
+                f"{len(pool)} other archives, and none of those is named after the listing "
+                f"({', '.join(item.get('name', '') for item in pool)}), so there is nothing to "
+                "stamp: the archive for every platform has to be there too, named after the "
+                "listing, and the watcher does not guess which archive a client should verify against"
+            )
+
+        stem = asset.get("name", "").lower()[: -len(".zip")]
+        mine = {index: shape for index, shape in shaped.items() if shape[0] == stem}
+        platforms = []
+        for platform in PLATFORMS:
+            found = [index for index, shape in mine.items() if shape[1] == platform]
+            if len(found) > 1:
+                return asset, names, (), (
+                    f"the release carries {_names(assets, {index: mine[index] for index in found})} "
+                    f"for {platform}, and the watcher does not guess which of them a client on "
+                    f"{platform} should verify against: upload one archive for each platform"
+                )
+            if found:
+                platforms.append((platform, assets[found[0]]))
+        return asset, names, tuple(platforms), None
+
+    def _universal(self, payload, assets):
+        """The archive for every platform among `assets`, by name, or None."""
         if len(assets) <= 1:
-            return (assets[0] if assets else None), names
+            return assets[0] if assets else None
 
         identifier = self.listing_id.lower()
         tag = (payload.get("tag_name") or "")[len(self.tag_prefix):].lstrip("vV").lower()
         for wanted in (f"{identifier}.zip", f"{identifier}-{tag}.zip", f"{identifier}_{tag}.zip"):
             for asset in assets:
                 if asset["name"].lower() == wanted:
-                    return asset, names
-        return None, names
+                    return asset
+        return None
 
     def download(self, release):
+        if release.problem:
+            raise StampError(release.problem)
         return download(self.http, release)
+
+
+def _platform_shape(name, lowered):
+    """(stem, platform) of a zip named `<stem>-<platform>.zip` or `<stem>_<platform>.zip`, compared without case.
+
+    It is a platform archive only when `<stem>.zip` is among the zip names `lowered` too.
+    """
+    lower = name.lower()
+    for platform in PLATFORMS:
+        for mark in "-_":
+            ending = f"{mark}{platform}.zip"
+            stem = lower[: -len(ending)]
+            if lower.endswith(ending) and stem and f"{stem}.zip" in lowered:
+                return stem, platform
+    return None
+
+
+def _names(assets, indexes):
+    """The names of the assets at `indexes`, joined for a message."""
+    return ", ".join(assets[index].get("name", "") for index in sorted(indexes))
+
+
+def platform_archives(host, release):
+    """The platform archives of `release` as `stamp` takes them, as (platform, facts, fetch).
+
+    `fetch` downloads one archive from `host` only when the stamper reaches it.
+    The stamper closes each archive before it fetches the next one, so at most
+    one archive is on disk. A host failure is a HostError and a gone or too
+    large archive a StampError, as for the archive for every platform.
+    """
+    def fetch(item):
+        served = dataclasses.replace(
+            release, url=item.url, size=item.size, content_type=item.content_type,
+            asset_name=item.name, candidates=(), platforms=(), problem=None,
+        )
+        return lambda: host.download(served)[0]
+
+    return [
+        (item.platform, {"url": item.url, "content_type": item.content_type}, fetch(item))
+        for item in release.platforms
+    ]
 
 
 class SpaceDockHost(Host):
@@ -1291,7 +1410,9 @@ def named(releases_section, http, listing_id=None, content_type=None, registry=N
     prefix = tag_prefix(section)
     found = {}
     if section.get("github"):
-        found["github"] = GitHubHost(section["github"], http, listing_id, tag_prefix=prefix)
+        found["github"] = GitHubHost(
+            section["github"], http, listing_id, tag_prefix=prefix, content_type=content_type
+        )
     if section.get("spacedock"):
         found["spacedock"] = SpaceDockHost(section["spacedock"], http)
     for key in share_keys(section):

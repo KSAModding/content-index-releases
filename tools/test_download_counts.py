@@ -191,6 +191,15 @@ class GitHubCounts(Fixture):
         self.assertEqual(entry["hosts"], {"github": 3})
         self.assertEqual([release["version"] for release in entry["releases"]], ["1.1.0"])
 
+    def test_a_release_counts_its_platform_archives_too(self):
+        self.listing(releases=GITHUB_ONLY)
+        http = FakeHttp({GITHUB: github(
+            github_release("v1.0.0", 0, assets=[asset("Mod.zip", 3), asset("Mod-linux.zip", 4), asset("Mod_windows.zip", 5)]),
+        )})
+        entry = self.only(self.refresh(http))
+        self.assertEqual(entry["hosts"], {"github": 12})
+        self.assertEqual(entry["releases"], [{"version": "1.0.0", "total": 12, "hosts": {"github": 12}}])
+
     def test_a_count_that_is_not_a_non_negative_integer_is_not_counted(self):
         self.listing(releases=GITHUB_ONLY)
         http = FakeHttp({GITHUB: github(

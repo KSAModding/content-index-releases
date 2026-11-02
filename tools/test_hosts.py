@@ -44,6 +44,7 @@ from hosts import (
     download,
     listed_mirrors,
     named,
+    platform_archives,
     registered,
     share_keys,
     signed,
@@ -539,6 +540,86 @@ class AssetSelection(unittest.TestCase):
         http = FakeHttp({"https://spacedock.info/api/mod/1": Response(200, {}, body.encode())})
         releases, _ = SpaceDockHost(1, http).releases()
         self.assertEqual(releases[0].archives, ("https://spacedock.info/d/1",))
+
+
+class PlatformArchives(unittest.TestCase):
+    """A zip named `<stem>-<platform>.zip` or `<stem>_<platform>.zip` next to `<stem>.zip`."""
+
+    def payload(self, *names, tag="ksa-v0.3.0"):
+        return {
+            "tag_name": tag,
+            "published_at": "2026-10-01T00:00:00Z",
+            "assets": [
+                {
+                    "state": "uploaded",
+                    "name": name,
+                    "browser_download_url": f"https://github.com/o/krpc/releases/download/{tag}/{name}",
+                    "content_type": "application/zip",
+                    "size": 10 + index,
+                    "download_count": index,
+                }
+                for index, name in enumerate(names)
+            ],
+        }
+
+    def host(self, content_type="mod", http=None):
+        return GitHubHost(
+            "o/krpc", http or FakeHttp({}), listing_id="kRPC", tag_prefix="ksa-", content_type=content_type
+        )
+
+    def test_the_platform_archives_go_with_the_archive_for_every_platform(self):
+        found = self.host()._release(self.payload(
+            "krpc-ksa-0.3.0-linux.zip", "krpc-ksa-0.3.0.zip", "KRPC-KSA-0.3.0_Windows.zip",
+        ))
+        self.assertEqual(found.asset_name, "krpc-ksa-0.3.0.zip")
+        self.assertIsNone(found.problem)
+        self.assertEqual(
+            [(item.platform, item.name, item.size, item.downloads) for item in found.platforms],
+            [("windows", "KRPC-KSA-0.3.0_Windows.zip", 12, 2), ("linux", "krpc-ksa-0.3.0-linux.zip", 10, 0)],
+        )
+        self.assertEqual(found.platforms[1].url, "https://github.com/o/krpc/releases/download/ksa-v0.3.0/krpc-ksa-0.3.0-linux.zip")
+        self.assertEqual(found.platforms[1].content_type, "application/zip")
+
+    def test_a_vehicle_picks_its_archive_as_before(self):
+        for content_type in ("vehicle", None):
+            found = self.host(content_type)._release(self.payload("x.zip", "x-linux.zip"))
+            self.assertIsNone(found.url, msg=content_type)
+            self.assertEqual(found.platforms, ())
+
+    def test_platform_archives_of_another_archive_are_not_used(self):
+        found = self.host()._release(self.payload("kRPC.zip", "kRPC-linux.zip", "Other.zip", "Other-windows.zip"))
+        self.assertEqual(found.asset_name, "kRPC.zip")
+        self.assertEqual([item.name for item in found.platforms], ["kRPC-linux.zip"])
+
+    def test_platform_archives_without_an_archive_for_every_platform_are_a_problem(self):
+        host = self.host()
+        found = host._release(self.payload("x.zip", "x-linux.zip", "y.zip"))
+        self.assertIsNone(found.url)
+        self.assertIn("the archive for every platform has to be there too", found.problem)
+        with self.assertRaises(StampError) as raised:
+            host.download(found)
+        self.assertEqual(str(raised.exception), found.problem)
+
+    def test_two_archives_for_one_platform_are_a_problem(self):
+        host = self.host()
+        found = host._release(self.payload("kRPC.zip", "kRPC-linux.zip", "kRPC_linux.zip"))
+        self.assertIn("kRPC-linux.zip, kRPC_linux.zip for linux", found.problem)
+        with self.assertRaises(StampError):
+            host.download(found)
+
+    def test_each_platform_archive_downloads_when_the_stamper_fetches_it(self):
+        payload = self.payload("kRPC.zip", "kRPC-linux.zip")
+        http = FakeHttp({payload["assets"][1]["browser_download_url"]: Response(200, {}, b"linux bytes")})
+        host = self.host(http=http)
+        ((platform, facts, fetch),) = platform_archives(host, host._release(payload))
+        self.assertEqual(platform, "linux")
+        self.assertEqual(facts, {"url": payload["assets"][1]["browser_download_url"], "content_type": "application/zip"})
+        with fetch() as archive:
+            self.assertEqual(archive.file.read(), b"linux bytes")
+        # A host that has a bad moment is a transient failure of the whole release.
+        http.routes = {payload["assets"][1]["browser_download_url"]: HostError("down")}
+        with self.assertRaises(HostError):
+            fetch()
 
 
 def gatos_release(tag, *names, draft=False):

@@ -114,6 +114,12 @@ class Dropped(unittest.TestCase):
             )
 
 
+    def test_a_gone_mark_on_a_platform_archive(self):
+        entry = {"url": "https://example.invalid/AFC-linux.zip", "sha256": "B" * 64, "size": 1, "content_type": "application/zip", "install_size": 2}
+        marked = release(platform_downloads={"linux": dict(entry, unavailable_since="2026-09-23T10:24:00Z")})
+        self.assertEqual(archive_facts(marked)["platform_downloads"], {"linux": entry})
+
+
 class Comparison(unittest.TestCase):
     """What the check does with two documents, which is the point of the split."""
 

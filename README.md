@@ -56,6 +56,7 @@ When three polls in a row got no answer, the watchdog opens an issue, as describ
 
 `download-counts.json` holds the download counts GitHub and SpaceDock report for each listing and release version, as [RFC 0052](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0052-static-download-counts.md) defines them.
 Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
+A release counts the downloads of its archive for every platform together with those of its platform archives.
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
@@ -97,6 +98,13 @@ Every other release is not a candidate: it is never stamped, never reported, and
 `since`, the history rule, the mirror match, the release notes, the gone check and the download counts all read the filtered list.
 A candidate whose rest does not parse is reported as before.
 The key is valid only next to a `github` key, and SpaceDock ignores it.
+
+The archive of a GitHub release is the only zip it carries, or else the zip named `<id>.zip`, `<id>-<tag>.zip` or `<id>_<tag>.zip`, where the tag is read without its `tag_prefix` and its leading `v`.
+For a mod or a mod loader, a zip named `<stem>-<platform>.zip` or `<stem>_<platform>.zip` next to `<stem>.zip`, where the platform is `windows`, `linux` or `macos` and the names are compared without case, is the archive of one platform, and the archive for every platform is picked from the other zips.
+The platform archives of the picked archive go into `platform_downloads`, each with its own `sha256`, sizes and `install_size`, so `krpc-ksa-0.3.0-linux.zip` is the Linux archive of `krpc-ksa-0.3.0.zip`.
+Each one has to install into the same root, the `mod.toml` of a mod has to declare the same dependencies, and a mod loader has to hold the `launch` of `[provides]` and the `launch` of its own `[provides.platform]` entry.
+The release is reported when one of them fails, when a platform has two archives, or when the archive for every platform is missing.
+The watcher downloads them one at a time, after the archive for every platform.
 
 The listings are the documents under `listings/`, `vehicles/` and `saves/` of the authored half (RFC 0085), and `tools/authored.py` names the folders and the types each holds.
 A document whose type its folder does not hold is reported in its issue, and so is an id that another document under these folders or under `packs/` also holds, compared without case.

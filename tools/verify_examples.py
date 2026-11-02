@@ -44,6 +44,7 @@ ARCHIVE_FACTS = (
     "release_date",
     "download",
     "install_size",
+    "platform_downloads",
     "changelog",
 )
 
@@ -126,6 +127,13 @@ def archive_facts(document, with_mirrors=True):
         facts["download"] = {
             key: value for key, value in facts["download"].items() if key not in skipped
         }
+    if "platform_downloads" in facts:
+        # Each entry is measured like the download and the install size above.
+        skipped = ("unavailable_since",) if derived_root else ("unavailable_since", "install_size")
+        facts["platform_downloads"] = {
+            platform: {key: value for key, value in entry.items() if key not in skipped}
+            for platform, entry in facts["platform_downloads"].items()
+        }
     return facts
 
 
@@ -207,7 +215,7 @@ def main(argv=None):
 def _restamp(http, listing_toml, version, game_versions, expected, check_mirrors):
     authored = tomllib.loads(listing_toml)
     authority, mirror_hosts = hosts.build(
-        authored.get("releases"), http, authored.get("id")
+        authored.get("releases"), http, authored.get("id"), authored.get("type")
     )
     if authority is None:
         raise StampError("the listing names no release host")
@@ -228,6 +236,7 @@ def _restamp(http, listing_toml, version, game_versions, expected, check_mirrors
     with as_archive(archive) as archive:
         document = stamp(
             authored, facts, archive, game_versions, now=datetime.now(timezone.utc),
+            platforms=hosts.platform_archives(authority, release),
         )
 
     # Checked after the archive is closed, like the watcher does, so one archive is on disk.
