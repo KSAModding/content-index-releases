@@ -943,8 +943,10 @@ class ShareHost(Host):
     itself, and each entry gives the archive in its `url` and the date in its
     `date`. That list is read over plain HTTPS without the token, and it counts
     only with a valid signature by `key` beside it (rule 22). Such a host has no
-    download counts. The host's own service is never asked. The stored ETag
-    carries the time of the next full read, see FULL_READ_HOURS.
+    asset counts, and its list can carry its own counts in `downloads`, which
+    the signature covers with the rest of the list. The host's own service is
+    never asked. The stored ETag carries the time of the next full read, see
+    FULL_READ_HOURS.
     """
 
     kind = "share"
@@ -964,6 +966,9 @@ class ShareHost(Host):
         self.max_bytes = min(limits.get(content_type, MAX_ARCHIVE_BYTES), MAX_ARCHIVE_BYTES)
         # True when the list holds more than max_releases entries, of which only the last are read.
         self.truncated = False
+        # Whether the last list read from `data` carried `downloads`, and its value, read only after the signature check.
+        self.reports_counts = False
+        self.reported_counts = None
 
     @property
     def key(self):
@@ -971,6 +976,8 @@ class ShareHost(Host):
 
     def releases(self, etag=None):
         self.truncated = False
+        self.reports_counts = False
+        self.reported_counts = None
         path = SHARE_LIST.format(type=self.content_type, id=self.listing_id)
         try:
             if self.data is None:
@@ -1003,6 +1010,9 @@ class ShareHost(Host):
                 f"the release list {path} of `{self.name}` names the {payload.get('type')} "
                 f"`{payload.get('id')}`, not this listing"
             )
+        if self.data is not None and "downloads" in payload:
+            self.reports_counts = True
+            self.reported_counts = payload["downloads"]
         entries = _objects(url, payload.get("releases") or [], "the releases of the list")
         if len(entries) > self.max_releases:
             self.truncated = True

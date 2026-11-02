@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import hosts
@@ -20,11 +21,12 @@ from build_snapshot import (
     newest_first,
     read_all_listings,
     read_index_status,
+    release_folders,
     serialize,
     warn,
 )
-from hosts import HostError
-from stamp_release import StampError
+from hosts import DATE_SKEW, RFC3339_UTC, HostError
+from stamp_release import StampError, normalize_version
 
 COUNTED_TYPES = ("mod", "mod-loader", "vehicle", "save")
 
@@ -91,6 +93,59 @@ def observe_share(host):
     return summed(host, releases)
 
 
+class Unreported(Exception):
+    """The signed counts of a data host have a shape that is not a count, so nothing of them is kept."""
+
+
+def count_of(value):
+    """Whether `value` is a non-negative integer. A JSON bool is not a count."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def reported(value):
+    """The counts a data host signs in its release list, as {"total": n, "versions": {...}}.
+
+    The object is {"total": n, "versions": {"<version>": n, ...}, "updated": "<RFC 3339 UTC>"}.
+    A version that does not parse counts in the total only, two spellings of one version add up,
+    and a member the object does not define is ignored. Raises Unreported for any other shape,
+    and for versions that add up to more than the total.
+    """
+    if not isinstance(value, dict):
+        raise Unreported("downloads is not an object")
+    total, versions, updated = value.get("total"), value.get("versions"), value.get("updated")
+    if not count_of(total):
+        raise Unreported(f"the total {total!r} is not a non-negative integer")
+    if not isinstance(versions, dict):
+        raise Unreported("versions is not an object")
+    if not isinstance(updated, str) or not RFC3339_UTC.fullmatch(updated):
+        raise Unreported(f"updated {updated!r} is not an RFC 3339 time in UTC")
+    if datetime.fromisoformat(updated.replace("Z", "+00:00")) > datetime.now(timezone.utc) + DATE_SKEW:
+        raise Unreported(f"updated {updated!r} is in the future")
+    counts = {}
+    for text, count in versions.items():
+        if not count_of(count):
+            raise Unreported(f"the count {count!r} of {text!r} is not a non-negative integer")
+        try:
+            version = normalize_version(text)
+        except StampError:
+            continue
+        counts[version] = counts.get(version, 0) + count
+    if sum(counts.values()) > total:
+        raise Unreported(f"the versions add up to more than the total {total}")
+    return {"total": total, "versions": counts}
+
+
+def observe_data(host):
+    """The counts a data host signs in its release list (RFC 0104), or none when it carries no `downloads`.
+
+    The list is read, and its signature checked, before `downloads` is looked at.
+    """
+    host.releases()
+    if not host.reports_counts:
+        return {"total": None, "versions": {}}
+    return reported(host.reported_counts)
+
+
 def observe_spacedock(host):
     """The counts a SpaceDock mod reports."""
     releases, _ = host.releases()
@@ -108,9 +163,8 @@ def observe(host, remembered):
     if host.kind == "github":
         return observe_github(host, remembered)
     if host.kind == "share":
-        # A host that serves its own files has no counts the index can trust (RFC 0104), so it is not asked.
         if host.data is not None:
-            return {"total": None, "versions": {}}
+            return observe_data(host)
         return observe_share(host)
     return observe_spacedock(host)
 
@@ -144,6 +198,34 @@ def merge(kind, stored, observation):
     if kind in ("github", "share"):
         return observation["total"] + sum(kept.values()), merged
     return observation["total"], merged
+
+
+def highest(stored, observation):
+    """One host's (total, versions) that keeps the highest value of each, and whether one went down.
+
+    A data host only ever raises its counts, so a lower value is never taken over.
+    A version the answer lacks keeps its count.
+    """
+    total, versions = stored if stored is not None else (None, {})
+    lowered = False
+    merged = dict(versions)
+    for version, count in observation["versions"].items():
+        if version in merged and count < merged[version]:
+            lowered = True
+            continue
+        merged[version] = count
+    if observation["total"] is None:
+        return (total, merged), lowered
+    if total is not None and observation["total"] < total:
+        return (total, merged), True
+    return (observation["total"], merged), lowered
+
+
+def stamped_only(observation, stamped):
+    """The observation with the counts of the versions in `stamped` only, and the versions it left out."""
+    kept = {version: count for version, count in observation["versions"].items() if version in stamped}
+    left = sorted(set(observation["versions"]) - set(kept))
+    return {"total": observation["total"], "versions": kept}, left
 
 
 def entry_of(identifier, values):
@@ -190,16 +272,19 @@ def named_hosts(document, http, identifier, log, registry=None):
         return []
 
 
-def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
+def refresh(authored, current, http, cache, log=warn, note=info, ask=True, releases=None):
     """The refreshed document. With `ask` false it only drops the entries of deleted listings.
 
     A listing here is a document of any folder of FOLDERS: a mod or mod loader, a vehicle or a save.
+    `releases` is the folder of the stamped release files, whose versions are the only ones
+    a data host can count. Without it, a data host counts in the totals only.
     """
     check_ids_unique(authored)
     listings = {
         key: document for group in read_all_listings(authored).values() for key, document in group.items()
     }
     whole, _, _ = read_index_status(authored)
+    folders = release_folders(releases) if ask and releases is not None else {}
     current = current or {}
     registry = {}
     if ask:
@@ -233,6 +318,12 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
                 previous = remembered.get("observation")
                 try:
                     observation = observe(host, remembered)
+                except Unreported as error:
+                    note(
+                        f"{identifier}: the downloads that {name} signs are not counts, "
+                        f"so its last known values stay: {error}"
+                    )
+                    continue
                 except (HostError, StampError) as error:
                     log(
                         f"{identifier}: {name} could not be counted, so its last "
@@ -247,7 +338,20 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True):
                     continue
                 if previous is not None and observation is previous:
                     note(f"{identifier}: {host.key} is unchanged since the last run")
-                values[name] = merge(host.kind, values.get(name), observation)
+                if host.kind == "share" and host.data is not None:
+                    folder = folders.get(key)
+                    stamped = {path.stem for path in folder.glob("*.json")} if folder else set()
+                    observation, left = stamped_only(observation, stamped)
+                    if left:
+                        note(
+                            f"{identifier}: {name} counts {', '.join(left)}, which is not a stamped "
+                            "release, so it counts in the total only"
+                        )
+                    values[name], lowered = highest(values.get(name), observation)
+                    if lowered:
+                        note(f"{identifier}: {name} signs a lower count than before, so the higher one stays")
+                else:
+                    values[name] = merge(host.kind, values.get(name), observation)
 
         entry = entry_of(identifier, values)
         if entry is not None:
@@ -309,6 +413,10 @@ def parse_arguments(argv):
         help="the document to refresh",
     )
     parser.add_argument(
+        "--releases", default="releases", type=Path,
+        help="the stamped release files, whose versions a data host can count",
+    )
+    parser.add_argument(
         "--cache", type=Path,
         help="the derived cache of GitHub ETags",
     )
@@ -335,7 +443,8 @@ def main(argv=None, http=None):
             return 0
         cache = {} if arguments.prune_only else read_cache(arguments.cache)
         document = refresh(
-            arguments.authored, current, http, cache, ask=not arguments.prune_only
+            arguments.authored, current, http, cache, ask=not arguments.prune_only,
+            releases=arguments.releases,
         )
         rendered = serialize(document)
         check_download_counts(json.loads(rendered), "the refreshed counts")

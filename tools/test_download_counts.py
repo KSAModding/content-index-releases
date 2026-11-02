@@ -3,19 +3,21 @@
 """Tests for the download counts refresh: no network, a fake Http answers or raises.
 """
 
+import base64
 import contextlib
 import io
 import json
 import tempfile
 import unittest
 import urllib.error
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from authored import holder
 from build_snapshot import SnapshotError, check_download_counts, serialize
 from download_counts import main, refresh
 from hosts import HostError, Response
-from test_hosts import STORAGE, Storage, rover, share_entry
+from test_hosts import DATA_LIST, STORAGE, DataHost, Storage, data_entry, rover, share_entry, signing_key
 
 GITHUB = "https://api.github.com/repos/o/r/releases"
 SPACEDOCK = "https://spacedock.info/api/mod/7"
@@ -143,7 +145,8 @@ class Fixture(unittest.TestCase):
     def refresh(self, http, current=None):
         stored = check_download_counts(current, "test") if current is not None else None
         result = refresh(
-            self.authored, stored, http, self.cache, log=self.notes.append, note=self.notes.append
+            self.authored, stored, http, self.cache, log=self.notes.append, note=self.notes.append,
+            releases=self.root / "releases",
         )
         # Everything the refresh produces has to pass the builder's own check.
         check_download_counts(json.loads(serialize(result)), "refreshed")
@@ -436,7 +439,7 @@ class CommandLine(Fixture):
         with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
             code = main(
                 ["--authored", str(self.authored), "--counts", str(counts),
-                 "--cache", str(self.root / "cache.json"), *extra],
+                 "--cache", str(self.root / "cache.json"), "--releases", str(self.root / "releases"), *extra],
                 http=http,
             )
         return code, counts, stdout.getvalue(), stderr.getvalue()
@@ -749,21 +752,150 @@ class ShareHostCounts(Fixture):
         self.assertEqual(entry["hosts"], {"github": 3, "ksamods": 9})
         self.assertEqual(entry["releases"][0]["hosts"], {"github": 3, "ksamods": 9})
 
-    def test_a_host_that_serves_its_own_files_is_not_asked(self):
-        # RFC 0104: such a host has no counts, so the refresh sends it no request.
-        (self.authored / "hosts.toml").write_text(
-            HOSTS_TOML.replace('storage = "ksamods-content/share"', DATA_HOST), encoding="utf-8"
-        )
-        http = FakeHttp({})
-        self.assertEqual(self.refresh(http)["listings"], [])
-        self.assertEqual(http.asked, [])
-
 
 DATA_HOST = """\
 data = "https://data.example.org/share/"
 downloads = ["https://cdn.example.org/archives/"]
-key = "MCowBQYDK2VwAyEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="\
+key = "{key}"\
 """
+
+UPDATED = "2026-10-30T04:00:00Z"
+
+
+def signed_counts(total, versions, updated=UPDATED):
+    return {"total": total, "versions": versions, "updated": updated}
+
+
+class DataHostCounts(Fixture):
+    """A share host that serves its files itself (RFC 0104) is counted from the `downloads` its release list signs."""
+
+    def setUp(self):
+        super().setUp()
+        self.private, key = signing_key("content-index-releases counted data host")
+        (self.authored / "hosts.toml").write_text(
+            HOSTS_TOML.replace('storage = "ksamods-content/share"', DATA_HOST.format(key=key)), encoding="utf-8"
+        )
+        self.listing("ExampleRover", releases=SHARED, content_type="vehicle")
+        self.stamp("1.0.0", "1.1.0")
+
+    def stamp(self, *versions):
+        """Stamped release files of ExampleRover, of which the counts read only the file names."""
+        folder = self.root / "releases" / "ExampleRover"
+        folder.mkdir(parents=True, exist_ok=True)
+        for version in versions:
+            (folder / f"{version}.json").write_text("{}", encoding="utf-8")
+
+    def host(self, downloads=None, signature=None):
+        http = DataHost([data_entry("1.0.0"), data_entry("1.1.0")], self.private, signature)
+        if downloads is not None:
+            http.document["downloads"] = downloads
+        return http
+
+    def test_the_signed_counts_go_under_the_key_of_the_host(self):
+        http = self.host(signed_counts(12, {"1.0.0": 5, "1.1.0": 7}))
+        entry = self.only(self.refresh(http))
+        self.assertEqual((entry["total"], entry["hosts"]), (12, {"ksamods": 12}))
+        self.assertEqual(
+            [(release["version"], release["hosts"]) for release in entry["releases"]],
+            [("1.1.0", {"ksamods": 7}), ("1.0.0", {"ksamods": 5})],
+        )
+        # The list and its signature are all that is asked, and never through the API.
+        self.assertEqual([(url, api) for url, api, _ in http.asked], [(DATA_LIST, False), (DATA_LIST + ".sig", False)])
+        self.assertEqual(self.notes, [])
+
+    def test_a_list_without_downloads_changes_nothing(self):
+        self.assertEqual(self.refresh(self.host())["listings"], [])
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        self.assertEqual(self.refresh(self.host(), stored), stored)
+        self.assertEqual(self.notes, [])
+
+    def test_a_lower_count_keeps_the_higher_one_and_a_new_version_is_added(self):
+        stored = document(counted("ExampleRover", {"ksamods": 20}, ("1.0.0", {"ksamods": 9})))
+        entry = self.only(self.refresh(self.host(signed_counts(15, {"1.0.0": 5, "1.1.0": 7})), stored))
+        self.assertEqual(entry["hosts"], {"ksamods": 20})
+        self.assertEqual(
+            [(release["version"], release["hosts"]) for release in entry["releases"]],
+            [("1.1.0", {"ksamods": 7}), ("1.0.0", {"ksamods": 9})],
+        )
+        self.assertTrue(any("lower count than before" in note for note in self.notes), self.notes)
+
+    def test_a_higher_count_replaces_the_stored_one(self):
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        entry = self.only(self.refresh(self.host(signed_counts(30, {"1.0.0": 11, "1.1.0": 19})), stored))
+        self.assertEqual(entry["hosts"], {"ksamods": 30})
+        self.assertEqual([release["total"] for release in entry["releases"]], [19, 11])
+        self.assertEqual(self.notes, [])
+
+    def test_a_malformed_object_is_a_note_and_no_count(self):
+        tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        for downloads in (
+            [12],
+            "12",
+            {"versions": {}, "updated": UPDATED},
+            signed_counts(-1, {}),
+            signed_counts(True, {}),
+            signed_counts(12.0, {}),
+            signed_counts("12", {}),
+            signed_counts(12, [["1.0.0", 12]]),
+            signed_counts(12, {"1.0.0": -1}),
+            signed_counts(12, {"1.0.0": None}),
+            signed_counts(12, {"1.0.0": 13}),
+            signed_counts(12, {}, updated=None),
+            signed_counts(12, {}, updated="yesterday"),
+            signed_counts(12, {}, updated="2026-10-30"),
+            signed_counts(12, {}, updated="2026-10-30T04:00:00+02:00"),
+            signed_counts(12, {}, updated=tomorrow),
+        ):
+            self.notes.clear()
+            self.assertEqual(self.refresh(self.host(downloads))["listings"], [], downloads)
+            self.assertEqual(self.refresh(self.host(downloads), stored), stored, downloads)
+            self.assertEqual(len(self.notes), 2, (downloads, self.notes))
+            self.assertTrue(all("are not counts" in note for note in self.notes), (downloads, self.notes))
+
+    def test_a_null_downloads_is_malformed_and_not_missing(self):
+        http = self.host()
+        http.document["downloads"] = None
+        self.assertEqual(self.refresh(http)["listings"], [])
+        self.assertTrue(any("are not counts" in note for note in self.notes), self.notes)
+
+    def test_a_version_that_does_not_parse_counts_in_the_total_only(self):
+        entry = self.only(self.refresh(self.host(signed_counts(12, {"1.0.0": 5, "latest": 7}))))
+        self.assertEqual(entry["hosts"], {"ksamods": 12})
+        self.assertEqual([release["version"] for release in entry["releases"]], ["1.0.0"])
+
+    def test_a_version_that_is_not_stamped_counts_in_the_total_only(self):
+        entry = self.only(self.refresh(self.host(signed_counts(12, {"1.0.0": 5, "v1.1.0": 4, "2.0.0": 3}))))
+        self.assertEqual(entry["hosts"], {"ksamods": 12})
+        self.assertEqual(
+            [(release["version"], release["total"]) for release in entry["releases"]],
+            [("1.1.0", 4), ("1.0.0", 5)],
+        )
+        self.assertTrue(any("2.0.0, which is not a stamped release" in note for note in self.notes), self.notes)
+
+    def test_without_stamped_releases_only_the_total_counts(self):
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        result = refresh(
+            self.authored, check_download_counts(stored, "test"), self.host(signed_counts(12, {"1.0.0": 12})),
+            {}, log=self.notes.append, note=self.notes.append,
+        )
+        entry = self.only(result)
+        self.assertEqual(entry["hosts"], {"ksamods": 12})
+        self.assertEqual(entry["releases"], [{"version": "1.0.0", "total": 9, "hosts": {"ksamods": 9}}])
+
+    def test_a_member_the_object_does_not_define_is_ignored(self):
+        downloads = {**signed_counts(12, {"1.0.0": 12}), "today": 3}
+        self.assertEqual(self.only(self.refresh(self.host(downloads)))["hosts"], {"ksamods": 12})
+
+    def test_counts_without_a_valid_signature_are_not_read(self):
+        stored = document(counted("ExampleRover", {"ksamods": 9}, ("1.0.0", {"ksamods": 9})))
+        other, _ = signing_key("not the key of the host")
+        for signature in (b"not base64", base64.b64encode(other.sign(b"{}"))):
+            self.notes.clear()
+            http = self.host(signed_counts(99, {"1.0.0": 99}), signature)
+            self.assertEqual(self.refresh(http), {"spec_version": 1, "listings": []}, signature)
+            self.assertEqual(self.refresh(http, stored), stored, signature)
+            self.assertTrue(all("has no valid signature by key" in note for note in self.notes), self.notes)
 
 
 class Cache(Fixture):
