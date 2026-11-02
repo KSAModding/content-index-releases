@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/save/SaveSharingTest/1.0.0",
     "sha256": "22C840A80010148B3923BA2A44A7734B7396B7814575C7779E179B54131F2733",
     "size": 28251,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-save-savesharingtest-1_0_0-ec3454cd/SaveSharingTest-1.0.0.zip"
+    ]
   },
   "install_size": 458225,
   "install": {
