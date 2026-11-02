@@ -596,16 +596,16 @@ class PlatformArchives(unittest.TestCase):
         found = host._release(self.payload("x.zip", "x-linux.zip", "y.zip"))
         self.assertIsNone(found.url)
         self.assertIn("the archive for every platform has to be there too", found.problem)
-        with self.assertRaises(StampError) as raised:
-            host.download(found)
-        self.assertEqual(str(raised.exception), found.problem)
 
-    def test_two_archives_for_one_platform_are_a_problem(self):
-        host = self.host()
-        found = host._release(self.payload("kRPC.zip", "kRPC-linux.zip", "kRPC_linux.zip"))
+    def test_two_archives_for_one_platform_are_a_problem_that_still_serves_the_archive_for_every_platform(self):
+        payload = self.payload("kRPC.zip", "kRPC-linux.zip", "kRPC_linux.zip")
+        host = self.host(http=FakeHttp({payload["assets"][0]["browser_download_url"]: Response(200, {}, b"all")}))
+        found = host._release(payload)
         self.assertIn("kRPC-linux.zip, kRPC_linux.zip for linux", found.problem)
-        with self.assertRaises(StampError):
-            host.download(found)
+        # A mirror check and a swap check of a stamped release still read the archive for every platform.
+        archive, _ = host.download(found)
+        with archive:
+            self.assertEqual(archive.file.read(), b"all")
 
     def test_each_platform_archive_downloads_when_the_stamper_fetches_it(self):
         payload = self.payload("kRPC.zip", "kRPC-linux.zip")

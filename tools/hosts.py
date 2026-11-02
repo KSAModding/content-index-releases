@@ -821,8 +821,6 @@ class GitHubHost(Host):
         return None
 
     def download(self, release):
-        if release.problem:
-            raise StampError(release.problem)
         return download(self.http, release)
 
 
@@ -1275,9 +1273,14 @@ def stamped_dependencies(http, document):
     raise problem
 
 
-def stamped_release(document, url):
-    """The release a stamped release file describes, served from `url`, one of its stamped URLs."""
+def stamped_release(document, url, platform=None):
+    """The release a stamped release file describes, served from `url`, one of its stamped URLs.
+
+    With `platform`, it is the archive of that entry of `platform_downloads`.
+    """
     download_section = document.get("download") or {}
+    if platform is not None:
+        download_section = (document.get("platform_downloads") or {}).get(platform) or {}
     return HostRelease(
         host="stamped",
         tag=document.get("version"),

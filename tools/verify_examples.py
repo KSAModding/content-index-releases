@@ -224,6 +224,8 @@ def _restamp(http, listing_toml, version, game_versions, expected, check_mirrors
     release = next((entry for entry in releases if entry.version == version), None)
     if release is None:
         raise StampError(f"{authority.key} does not offer {version}")
+    if release.problem:
+        raise StampError(release.problem)
 
     archive, content_type = authority.download(release)
     facts = release.facts()

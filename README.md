@@ -163,6 +163,7 @@ A missing component is filled with `0`, so the tag `0.5` is stamped as `0.5.0` a
 A tag with four components, a leading zero, or no version in it is refused.
 
 A version is stamped exactly once. A tag that reappears with different bytes is rejected and never overwritten, and both hashes are named in that issue until the release is yanked.
+A platform archive of `platform_downloads` is checked the same way, and the same bytes at a new URL change nothing, because an entry has no mirrors.
 Two tags that fill to the same version, such as `0.5` and `0.5.0`, are one version.
 It is stamped from one of them only, the tag it was already stamped from or else the older one, and the other tag is refused with both tags named in that issue.
 
@@ -184,6 +185,8 @@ Other bytes are reported as a swap, and the mark stays.
 Each mark and each removal is one comment on the listing's issue, which mentions the owner the same way, and a mark never keeps that issue open.
 Without an open issue, the comment goes to the last closed one, and a listing that never had an issue gets one that is closed at once.
 The release file stays in the index, a client stops offering the release for a new install, and an installed copy is never touched.
+Each archive of `platform_downloads` goes through the same steps on its own and gets `unavailable_since` in its entry, so a client on that platform takes `download` instead.
+Only `download` decides whether the release is marked.
 The waits are derived cache, so losing the cache only starts them again, and `--gone-budget` limits the requests one tick spends on them.
 
 A release archive may be up to 4 GiB.
