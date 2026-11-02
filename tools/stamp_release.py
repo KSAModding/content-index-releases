@@ -150,6 +150,12 @@ LISTING_FIELDS = ("name", "authors", "abstract", "description", "license", "tags
 
 DEPENDENCY_KINDS = ("required", "optional", "recommends", "suggests", "conflict")
 
+# The platform names of `os` (RFC 0031, RFC 0067), in the order `platform_downloads` lists them.
+PLATFORMS = ("windows", "linux", "macos")
+
+# The types whose release can carry an archive for one platform next to the archive for every platform.
+PLATFORM_TYPES = ("mod", "mod-loader")
+
 INSTALL_ANCHORS = ("mods", "user-data", "game-root", "standalone")
 
 # Bytes of UTF-8 (RFC 0064).
@@ -1041,10 +1047,16 @@ def listing_snapshot(authored):
     return snapshot
 
 
-def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes=None):
+def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes=None, platforms=()):
     """The release file for one release.
 
     `archive` is an Archive or the archive's bytes.
+
+    `platforms` are the archives of a mod or a mod-loader for one platform
+    each, as (platform, facts, fetch). `facts` carries their `url` and
+    `content_type`, and `fetch()` returns the archive as an Archive or bytes.
+    `archive` is closed before the first fetch and each platform archive
+    before the next one, so at most one archive is on disk.
 
     `release` carries the facts the caller read off the host:
 
@@ -1080,6 +1092,8 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes
         )
     if content_type in GAME_FILES and authored.get("loader") is not None:
         raise StampError(f"a {content_type} carries no [loader] (RFC 0085)")
+    if platforms and content_type not in PLATFORM_TYPES:
+        raise StampError(f"a {content_type} has no archives for one platform each")
 
     version = normalize_version(release.get("tag"))
     archive = as_archive(archive)
@@ -1096,9 +1110,8 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes
         install["folder"] = meta["name"]
 
     mod_toml = read_mod_toml(handle, root) if content_type == "mod" else None
-    dependencies = merge_dependencies(
-        derived_dependencies(mod_toml), authored.get("dependencies")
-    )
+    derived = derived_dependencies(mod_toml)
+    dependencies = merge_dependencies(derived, authored.get("dependencies"))
 
     compatibility = authored.get("compatibility") or {}
     if compatibility.get("game_min"):
@@ -1142,17 +1155,11 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes
     if compatibility.get("os"):
         document["os"] = list(compatibility["os"])
 
-    # The archive parsed as a zip above, so that is what it is, whatever the
-    # host declared an asset uploaded as octet-stream to be.
-    content = release.get("content_type")
-    if content in (None, "", "application/octet-stream", "binary/octet-stream"):
-        content = "application/zip"
-
     download = {
         "url": release["url"],
         "sha256": archive.sha256,
         "size": archive.size,
-        "content_type": content,
+        "content_type": zip_content_type(release.get("content_type")),
     }
     if mirrors:
         download["mirrors"] = list(mirrors)
@@ -1174,7 +1181,107 @@ def stamp(authored, release, archive, game_versions, mirrors=(), now=None, notes
         document["changelog_text"] = text
     document["listing"] = listing_snapshot(authored)
 
+    if platforms:
+        handle.close()
+        archive.close()
+        entries = platform_downloads(authored, document, derived, platforms)
+        # The object goes right after install_size, before install.
+        ordered = {}
+        for key, value in document.items():
+            ordered[key] = value
+            if key == "install_size":
+                ordered["platform_downloads"] = entries
+        document = ordered
     return document
+
+
+def zip_content_type(content):
+    """The content type a release file writes for an archive that parsed as a zip.
+
+    It is a zip, whatever the host declared an asset uploaded as octet-stream to be.
+    """
+    if content in (None, "", "application/octet-stream", "binary/octet-stream"):
+        return "application/zip"
+    return content
+
+
+def platform_downloads(authored, document, derived, platforms):
+    """The `platform_downloads` object of `document`, from (platform, facts, fetch) of each platform archive.
+
+    `derived` are the dependencies the mod.toml of the archive for every
+    platform declares. Each archive is fetched, checked and closed before the
+    next one.
+    """
+    entries = {}
+    for platform, facts, fetch in platforms:
+        if platform not in PLATFORMS:
+            raise StampError(f"'{platform}' is not a platform, which is one of {', '.join(PLATFORMS)}")
+        if platform in entries:
+            raise StampError(f"the release carries two archives for {platform}")
+        try:
+            fetched = fetch()
+        except StampError as error:
+            raise StampError(f"the {platform} archive at {facts.get('url')}: {error}") from error
+        with as_archive(fetched) as archive:
+            entries[platform] = platform_entry(authored, document, derived, platform, facts, archive)
+    return {platform: entries[platform] for platform in PLATFORMS if platform in entries}
+
+
+def platform_entry(authored, document, derived, platform, facts, archive):
+    """The entry of one platform archive, checked against the stamped `document` of the archive for every platform.
+
+    The archive has to install into the same root. The mod.toml of a mod has to
+    declare the same dependencies, because the loader acts on the one that is
+    installed. A loader archive has to hold the `launch` of `[provides]` and the
+    `launch` of its own `[provides.platform]` entry.
+    """
+    url = facts.get("url")
+    if not url:
+        raise StampError(f"the host reports no download URL for the {platform} archive")
+    content_type = document["type"]
+    provides = dict(authored.get("provides") or {})
+    if isinstance(provides.get("platform"), dict):
+        provides["platform"] = {
+            key: value for key, value in provides["platform"].items() if key == platform
+        }
+    try:
+        with open_archive(archive) as handle:
+            install = install_object(
+                handle, document["id"], content_type, authored.get("install"), provides=provides
+            )
+            root = (install or {}).get("root", "")
+            expected = (document.get("install") or {}).get("root", "")
+            if root != expected:
+                raise StampError(
+                    f"its install root is {_root_name(root)}, and the archive for every platform "
+                    f"installs {_root_name(expected)}, so the installed folder would differ"
+                )
+            if content_type == "mod":
+                own = derived_dependencies(read_mod_toml(handle, root))
+                if _dependency_set(own) != _dependency_set(derived):
+                    raise StampError(
+                        "its mod.toml declares other dependencies than the mod.toml of the "
+                        "archive for every platform, and the loader acts on the one that is installed"
+                    )
+            size = install_size(handle, root)
+    except StampError as error:
+        raise StampError(f"the {platform} archive at {url}: {error}") from error
+    return {
+        "url": url,
+        "sha256": archive.sha256,
+        "size": archive.size,
+        "content_type": zip_content_type(facts.get("content_type")),
+        "install_size": size,
+    }
+
+
+def _root_name(root):
+    return f"'{root}'" if root else "the archive root"
+
+
+def _dependency_set(dependencies):
+    """Derived dependencies in an order that does not depend on the order of the mod.toml blocks."""
+    return sorted((entry["id"], entry["kind"]) for entry in dependencies)
 
 
 def serialize(document):
