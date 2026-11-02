@@ -1,0 +1,43 @@
+{
+  "spec_version": 1,
+  "id": "SaveSharingTest",
+  "type": "save",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-02T17:52:48Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://ksamods.gg/share/files/save/SaveSharingTest/1.0.0",
+    "sha256": "22C840A80010148B3923BA2A44A7734B7396B7814575C7779E179B54131F2733",
+    "size": 28251,
+    "content_type": "application/zip"
+  },
+  "install_size": 458225,
+  "install": {
+    "root": "SaveSharingTest",
+    "derived": true,
+    "folder": "SaveSharingTest"
+  },
+  "dependencies": [
+    {
+      "id": "FastAndPurrious",
+      "kind": "required",
+      "min": "0.1.12",
+      "source": "authored"
+    }
+  ],
+  "listing": {
+    "name": "SaveSharingTest",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Just a save sharing test for Borea development.",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-6)",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/saves/SaveSharingTest"
+    }
+  }
+}
