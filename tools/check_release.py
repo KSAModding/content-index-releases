@@ -120,6 +120,13 @@ def check_shape(path, head, errors):
                 "amendment, never submitted yanked"
             )
 
+    if "platform_downloads" in head:
+        errors.append(
+            "platform_downloads is stamped only from the platform archives of a GitHub release "
+            "that the watcher reads, and a submitted release carries the archive for every "
+            "platform alone"
+        )
+
     download = head.get("download")
     if not isinstance(download, dict):
         errors.append("download is missing or is not an object")
