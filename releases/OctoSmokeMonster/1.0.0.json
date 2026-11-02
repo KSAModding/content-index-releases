@@ -1,0 +1,39 @@
+{
+  "spec_version": 1,
+  "id": "OctoSmokeMonster",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-02T19:58:54Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/OctoSmokeMonster/1.0.0",
+    "sha256": "7B5572A85D71AF28AA8AF3CF20F9E521044C73BF2CE1366BA2D2113954B27419",
+    "size": 185593,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-octosmokemonster-1_0_0-88765b09/OctoSmokeMonster-1.0.0.zip"
+    ]
+  },
+  "install_size": 1911487,
+  "install": {
+    "root": "Octo Smoke Monster",
+    "derived": true,
+    "folder": "Octo Smoke Monster"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Octo Smoke Monster",
+    "authors": [
+      "Beik"
+    ],
+    "abstract": "How much smoke do you want? Yes.",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-7)",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/OctoSmokeMonster"
+    }
+  }
+}
