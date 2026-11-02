@@ -1,40 +1,42 @@
 {
   "spec_version": 1,
+  "checked_at": "2026-11-02T23:56:01Z",
+  "counted_at": "2026-11-02T23:56:01Z",
   "listings": [
     {
       "id": "AdvancedFlightComputer",
       "thread": 783,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "beiks-flight-planning-essentials-pack",
       "thread": 1281,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "CharacterManager",
       "thread": 1479,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "CompactHUD",
       "thread": 1448,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "Compendium",
       "thread": 647,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "DeltaVMap",
       "thread": 978,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "FastAndPurrious",
       "thread": 1355,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "GEE",
@@ -44,137 +46,137 @@
     {
       "id": "KittenEngineerRedux",
       "thread": 443,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KittenExtensionsContinued",
       "thread": 1259,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "kRPC",
       "thread": 1462,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSA_SeaDragon",
       "thread": 1263,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KsaBabel",
       "thread": 1454,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KsaChinese",
       "thread": 1440,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSAero",
       "thread": 1353,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSAGEffects",
       "thread": 635,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSArmory",
       "thread": 1131,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSARS",
       "thread": 1136,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSATelemetryOverlay",
       "thread": 1237,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSP-Characters",
       "thread": 1474,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSP-Redux",
       "thread": 338,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSP-Redux-OPM",
       "thread": 338,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "LonelyPlanets",
       "thread": 483,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "MacOSMoltenPatcher",
       "thread": 1310,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "MeasureTools",
       "thread": 992,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "ModMenu",
       "thread": 562,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "ModMenu.ExampleMod",
       "thread": 1257,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "MPFX",
       "thread": 812,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "OhMyStars",
       "thread": 1255,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "purr2d2",
       "thread": 1500,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "RealAtmospheres",
       "thread": 1258,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "RealStars",
       "thread": 1285,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "ShaderExtensions",
       "thread": 811,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "StarMap",
       "thread": 384,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "unscience",
       "thread": 1261,
-      "in_sitemap": false
+      "in_sitemap": true
     }
   ]
 }
