@@ -276,6 +276,11 @@ class BeforeAnyRequest(Fixture):
         head["download"]["unavailable_since"] = "2026-09-23T10:24:00Z"
         self.assertIn("download.unavailable_since is the watcher's", self.refused(head))
 
+    def test_platform_downloads_are_the_watchers(self):
+        head = self.stamped()
+        head["platform_downloads"] = {"linux": dict(head["download"], install_size=1)}
+        self.assertIn("platform_downloads is stamped only from", self.refused(head))
+
     def test_a_missing_download_object_is_refused(self):
         head = self.stamped()
         del head["download"]

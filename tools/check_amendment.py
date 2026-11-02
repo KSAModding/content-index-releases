@@ -44,6 +44,7 @@ TOP_LEVEL = frozenset(
         "os",
         "download",
         "install_size",
+        "platform_downloads",
         "install",
         "loader",
         "dependencies",
@@ -65,6 +66,7 @@ IMMUTABLE = (
     "release_date",
     "download",
     "install_size",
+    "platform_downloads",
     "install",
     "changelog",
     "listing",
@@ -230,26 +232,50 @@ def check_immutable(base, head, errors):
             f"'{key}' changed, and identity, the version, the download and the "
             "install data never change after publish"
         )
-        watched = _watcher_keys_only(base.get(key), head.get(key)) if key == "download" else None
+        watched = None
+        if key == "download":
+            watched = _watcher_keys_only(base.get(key), head.get(key))
+        elif key == "platform_downloads":
+            watched = _watcher_platform_keys_only(base.get(key), head.get(key))
         if watched:
             # The author probably branched before the watcher wrote these, so they
             # now look like their own edit. A rebase clears it up.
+            what = "the download differs" if key == "download" else "the platform downloads differ"
             errors.append(
-                f"the download differs only in {watched}, which the watcher writes on the "
+                f"{what} only in {watched}, which the watcher writes on the "
                 "default branch: rebase and run tools/amend.py again"
             )
 
 
-def _watcher_keys_only(base, head):
+def _watcher_keys_only(base, head, where="download", keys=WATCHER_DOWNLOAD_KEYS):
     """The watcher's download keys that differ, when nothing else in the download does."""
     if not isinstance(base, dict) or not isinstance(head, dict):
         return None
-    if {key: value for key, value in base.items() if key not in WATCHER_DOWNLOAD_KEYS} != {
-        key: value for key, value in head.items() if key not in WATCHER_DOWNLOAD_KEYS
+    if {key: value for key, value in base.items() if key not in keys} != {
+        key: value for key, value in head.items() if key not in keys
     }:
         return None
-    differ = [key for key in WATCHER_DOWNLOAD_KEYS if base.get(key) != head.get(key)]
-    return " and ".join(f"'download.{key}'" for key in differ)
+    differ = [key for key in keys if base.get(key) != head.get(key)]
+    return " and ".join(f"'{where}.{key}'" for key in differ)
+
+
+def _watcher_platform_keys_only(base, head):
+    """The `unavailable_since` keys of the platform entries that differ, when nothing else in them does.
+
+    Only the watcher writes `unavailable_since` in an entry, as in `download`.
+    """
+    if not isinstance(base, dict) or not isinstance(head, dict) or set(base) != set(head):
+        return None
+    found = []
+    for platform in base:
+        watched = _watcher_keys_only(
+            base[platform], head[platform], f"platform_downloads.{platform}", ("unavailable_since",)
+        )
+        if watched is None:
+            return None
+        if watched:
+            found.append(watched)
+    return " and ".join(found)
 
 
 def check_changelog_form(document, errors):

@@ -73,9 +73,11 @@ def summed(host, releases):
     for release in releases:
         if release.downloads is None:
             continue
-        total = (total or 0) + release.downloads
+        # A release counts its archive for every platform and its platform archives.
+        count = release.downloads + sum(item.downloads or 0 for item in release.platforms)
+        total = (total or 0) + count
         if release.version is not None:
-            versions[release.version] = versions.get(release.version, 0) + release.downloads
+            versions[release.version] = versions.get(release.version, 0) + count
     return {"total": total, "versions": versions}
 
 

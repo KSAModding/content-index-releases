@@ -4374,5 +4374,141 @@ class VehicleGoneFromTheHost(GoneCase):
         self.assertEqual(self.document()["install"]["folder"], "Example Rover")
 
 
+LINUX_URL = "http://a/M-linux.zip"
+
+
+def platform_file(folder, **linux):
+    """`gone_file` with a linux archive in `platform_downloads`, whose bytes are `linux` and whose size differs from `download`."""
+    return stamped_file(
+        folder,
+        download={"url": GONE_URL, "sha256": digest_of(b"bytes"), "size": 5, "content_type": "application/zip"},
+        platform_downloads={"linux": {
+            "url": LINUX_URL, "sha256": digest_of(b"linux"), "size": 7,
+            "content_type": "application/zip", "install_size": 1, **linux,
+        }},
+    )
+
+
+def platform_release(linux_url=LINUX_URL, linux_size=7, url=GONE_URL):
+    """M 1.0.0 as GitHub lists it with a linux archive."""
+    return HostRelease(
+        host="github", tag="v1.0.0", version="1.0.0", release_date="2020-01-01T00:00:00Z",
+        url=url, size=5, archives=(url, linux_url),
+        platforms=(hosts.PlatformArchive("linux", "M-linux.zip", linux_url, linux_size),),
+    )
+
+
+class PlatformHost(ListingHost):
+    """An authority host that serves the bytes of each URL and keeps each release it downloads."""
+
+    def __init__(self, listed=(), payloads=None):
+        super().__init__(listed)
+        self.payloads = payloads or {}
+        self.served = []
+
+    def download(self, entry):
+        self.fetched.append(entry.url)
+        self.served.append(entry)
+        return self.payloads[entry.url], "application/zip"
+
+
+class PlatformArchives(GoneCase):
+    """The archives of `platform_downloads` are stamped, swap checked and marked one by one."""
+
+    def test_each_platform_archive_is_stamped_after_the_one_before_is_closed(self):
+        universal = TrackedArchive.of_bytes(zip_of({"M/M.dll": "x" * 100, "M/mod.toml": 'name = "M"\n'}))
+        linux = TrackedArchive.of_bytes(zip_of({"M/M.dll": "y" * 50, "M/mod.toml": 'name = "M"\n'}))
+        test = self
+
+        class Authority:
+            def download(self, entry):
+                if entry.url == LINUX_URL:
+                    test.assertTrue(universal.closed, "the archive for every platform is still open")
+                    return linux, "application/zip"
+                return universal, "application/zip"
+
+        watcher = self.watcher_with({})
+        watcher.stamp_one("M", AUTHORED, Authority(), [], platform_release())
+
+        entry = self.document()["platform_downloads"]["linux"]
+        self.assertEqual((entry["url"], entry["sha256"]), (LINUX_URL, linux.sha256))
+        self.assertTrue(linux.closed)
+
+    def test_a_release_with_a_problem_is_rejected_without_a_download(self):
+        host = PlatformHost()
+        release = HostRelease(
+            host="github", tag="v1.0.0", version="1.0.0", release_date=None,
+            url=GONE_URL, archives=(GONE_URL,), problem="two archives for linux",
+        )
+        with self.assertRaises(StampError) as raised:
+            self.watcher_with({}).stamp_one("M", AUTHORED, host, [], release)
+        self.assertEqual((str(raised.exception), host.fetched), ("two archives for linux", []))
+
+    def test_a_rejection_is_downloaded_again_once_a_platform_archive_changes(self):
+        watcher = self.watcher_with({})
+        watcher.remember_rejection("M", AUTHORED, platform_release(), "rejected")
+        self.assertEqual(watcher.known_rejection("M", AUTHORED, platform_release()), "rejected")
+        self.assertIsNone(watcher.known_rejection("M", AUTHORED, platform_release(linux_size=8)))
+
+    def test_other_bytes_of_a_platform_archive_are_a_reported_swap(self):
+        path = platform_file(self.folder)
+        host = PlatformHost(payloads={LINUX_URL: b"other"})
+        for _ in range(2):
+            errors = []
+            settled = self.watcher_with({}).check_for_a_swap(
+                "M", host, platform_release(linux_size=999), path, errors
+            )
+            self.assertTrue(settled)
+            [error] = errors
+            self.assertIn("the linux archive of `1.0.0`", error)
+            self.assertIn(digest_of(b"other"), error)
+        self.assertEqual(host.fetched, [LINUX_URL])
+
+    def test_the_same_platform_archive_at_a_new_url_changes_nothing(self):
+        path = platform_file(self.folder)
+        before = path.read_text()
+        host = PlatformHost(payloads={"http://a/new/M-linux.zip": b"linux"})
+        errors = []
+        self.watcher_with({}).check_for_a_swap(
+            "M", host, platform_release(linux_url="http://a/new/M-linux.zip"), path, errors
+        )
+        self.assertEqual(errors, [])
+        self.assertEqual(host.fetched, ["http://a/new/M-linux.zip"])
+        self.assertEqual(path.read_text(), before)
+
+    def test_a_gone_platform_archive_is_marked_in_its_entry_and_unmarked_when_it_is_back(self):
+        platform_file(self.folder)
+        without = HostRelease(
+            host="github", tag="v1.0.0", version="1.0.0", release_date=None,
+            url=GONE_URL, size=5, archives=(GONE_URL,),
+        )
+        self.gone(0, ListingHost([without]))
+        watcher, errors = self.gone(24, ListingHost([without]), {LINUX_URL: 404})
+        self.assertEqual((watcher.http.status.asked, errors), ([LINUX_URL], []))
+        self.assertEqual(watcher.marked, ["M 1.0.0 linux"])
+        self.assertIn("the linux archive of `1.0.0` is gone", watcher.notes["M"][0])
+        document = self.document()
+        self.assertEqual(document["platform_downloads"]["linux"]["unavailable_since"], iso(START + timedelta(hours=24)))
+        self.assertNotIn("unavailable_since", document["download"])
+
+        host = PlatformHost([platform_release()], {LINUX_URL: b"linux"})
+        watcher, errors = self.gone(25, host)
+        self.assertEqual(errors, [])
+        self.assertEqual(watcher.unmarked, ["M 1.0.0 linux"])
+        self.assertNotIn("unavailable_since", self.document()["platform_downloads"]["linux"])
+        self.assertEqual([entry.size for entry in host.served], [7])
+
+    def test_a_listing_without_releases_marks_a_gone_platform_archive_in_its_entry(self):
+        platform_file(self.folder)
+        answers = {GONE_URL: 200, LINUX_URL: 404}
+        for hours in (0, 24):
+            watcher = self.watcher_with(answers)
+            with at(hours):
+                watcher.gone_by_request("M", [])
+        self.assertEqual(watcher.marked, ["M 1.0.0 linux"])
+        self.assertIn("unavailable_since", self.document()["platform_downloads"]["linux"])
+        self.assertNotIn("unavailable_since", self.document()["download"])
+
+
 if __name__ == "__main__":
     unittest.main()

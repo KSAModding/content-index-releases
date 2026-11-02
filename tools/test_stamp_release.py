@@ -1037,5 +1037,106 @@ class Rfc0035(unittest.TestCase):
             self.stamp_loader(provides={"launch": "StarMap.exe", "content-dir": "somewhere"})
 
 
+class PlatformDownloads(unittest.TestCase):
+    """The archives of one platform each, next to the archive for every platform."""
+
+    def platform(self, name, data, opened=None):
+        """(platform, facts, fetch) of one platform archive.
+
+        Every archive in `opened` has to be closed when the fetch starts, and the fetched one joins them.
+        """
+        def fetch():
+            opened_list = opened if opened is not None else []
+            self.assertTrue(all(archive.file.closed for archive in opened_list))
+            opened_list.append(Archive.of_bytes(data))
+            return opened_list[-1]
+
+        url = f"https://github.com/o/r/releases/download/v0.4.3/AutoStage-{name}.zip"
+        return name, {"url": url, "content_type": "application/octet-stream"}, fetch
+
+    def test_each_archive_is_stamped_after_install_size_in_platform_order(self):
+        universal = Archive.of_bytes(mod_archive())
+        linux = mod_archive(manifest=MOD_TOML + "# linux\n")
+        opened = [universal]
+        document = stamp(
+            LISTING, RELEASE, universal, GAME_VERSIONS, now=NOW,
+            platforms=[self.platform("linux", linux, opened), self.platform("windows", mod_archive(), opened)],
+        )
+        self.assertEqual(len(opened), 3)
+        keys = list(document)
+        self.assertEqual(keys[keys.index("install_size") + 1], "platform_downloads")
+        self.assertEqual(list(document["platform_downloads"]), ["windows", "linux"])
+        self.assertEqual(
+            document["platform_downloads"]["linux"],
+            {
+                "url": "https://github.com/o/r/releases/download/v0.4.3/AutoStage-linux.zip",
+                "sha256": hashlib.sha256(linux).hexdigest().upper(),
+                "size": len(linux),
+                "content_type": "application/zip",
+                "install_size": document["install_size"] + len("# linux\n"),
+            },
+        )
+        self.assertNotIn("platform_downloads", stamp(LISTING, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW))
+
+    def test_a_platform_archive_with_another_root_rejects_the_release(self):
+        with self.assertRaises(StampError) as raised:
+            stamp(
+                LISTING, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW,
+                platforms=[self.platform("linux", mod_archive("AutoStageLinux"))],
+            )
+        self.assertIn("the linux archive at", str(raised.exception))
+        self.assertIn("'AutoStageLinux', which does not match the id", str(raised.exception))
+
+    def test_a_platform_archive_above_the_limit_names_its_platform(self):
+        def fetch():
+            raise StampError("the archive is 5000 MiB, above the 4096 MiB limit")
+
+        with self.assertRaises(StampError) as raised:
+            stamp(
+                LISTING, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW,
+                platforms=[("linux", {"url": "https://a/AutoStage-linux.zip"}, fetch)],
+            )
+        self.assertEqual(
+            str(raised.exception),
+            "the linux archive at https://a/AutoStage-linux.zip: the archive is 5000 MiB, above the 4096 MiB limit",
+        )
+
+    def test_a_platform_archive_with_other_dependencies_rejects_the_release(self):
+        manifest = MOD_TOML.replace("MeasureTools", "OtherTools")
+        with self.assertRaises(StampError) as raised:
+            stamp(
+                LISTING, RELEASE, mod_archive(), GAME_VERSIONS, now=NOW,
+                platforms=[self.platform("linux", mod_archive(manifest=manifest))],
+            )
+        self.assertIn("other dependencies", str(raised.exception))
+
+    def test_a_loader_archive_holds_the_launch_and_its_own_platform_launch(self):
+        listing = {
+            "spec_version": 1,
+            "id": "StarMap",
+            "type": "mod-loader",
+            "name": "StarMap",
+            "compatibility": {"game_min": "2026.8.3.5117"},
+            "provides": {
+                "launch": "StarMap.exe",
+                "platform": {"linux": {"launch": "StarMap.dll"}, "macos": {"launch": "StarMap.app"}},
+            },
+        }
+        universal = archive({"StarMap.exe": "x", "StarMap.dll": "y", "StarMap.app": "z"})
+        release = dict(RELEASE, tag="0.4.6")
+        # The macOS launch is not needed in the Linux archive.
+        good = archive({"StarMap.exe": "x", "StarMap.dll": "y"})
+        document = stamp(
+            listing, release, universal, GAME_VERSIONS, now=NOW, platforms=[self.platform("linux", good)]
+        )
+        self.assertEqual(list(document["platform_downloads"]), ["linux"])
+        for missing in ({"StarMap.dll": "y"}, {"StarMap.exe": "x"}):
+            with self.assertRaises(StampError, msg=missing):
+                stamp(
+                    listing, release, universal, GAME_VERSIONS, now=NOW,
+                    platforms=[self.platform("linux", archive(missing))],
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

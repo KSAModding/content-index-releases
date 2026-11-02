@@ -113,6 +113,21 @@ class Immutable(unittest.TestCase):
             any("'download.unavailable_since'" in m and "rebase" in m for m in errors), errors
         )
 
+    def test_the_platform_downloads_never_change(self):
+        base = head(platform_downloads={"linux": dict(BASE["download"], install_size=1)})
+        for document in (head(), head(platform_downloads={"linux": dict(BASE["download"], install_size=2)})):
+            errors = errors_for(document, base=base)
+            self.assertTrue(any("'platform_downloads' changed" in message for message in errors), errors)
+            self.assertFalse(any("rebase" in message for message in errors), errors)
+
+    def test_an_unavailable_mark_on_a_platform_archive_says_to_rebase(self):
+        entry = dict(BASE["download"], install_size=1)
+        base = head(platform_downloads={"linux": dict(entry, unavailable_since="2026-09-23T10:24:00Z"), "windows": entry})
+        errors = errors_for(head(platform_downloads={"linux": entry, "windows": entry}), base=base)
+        self.assertTrue(
+            any("'platform_downloads.linux.unavailable_since'" in m and "rebase" in m for m in errors), errors
+        )
+
     def test_the_install_data_never_changes(self):
         document = head()
         document["install"]["root"] = "Elsewhere"

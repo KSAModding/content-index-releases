@@ -20,6 +20,8 @@ with it out of the host's answer, so no pass sees them (RFC 0096).
 A stamped release that the host no longer lists for a day, and whose every URL
 then answers that the archive is gone, gets `download.unavailable_since`, and
 the field goes again once the host serves the stamped bytes (RFC 0078).
+An archive of `platform_downloads` gets the field in its own entry the same way,
+and only `download` decides whether the release is gone.
 
 What is stamped in the repository is the whole state, so a tick GitHub delays,
 drops or cancels costs latency and not data, and a re-run stamps nothing twice.
@@ -187,11 +189,45 @@ def reaches(version, floor):
 
 
 def stamped_urls(download):
-    """`download.url` and every mirror, the URLs a client may fetch a release from."""
+    """The `url` and every mirror of `download` or of a `platform_downloads` entry, the URLs a client may fetch that archive from.
+
+    An entry has no mirrors, so its URLs are its `url` alone.
+    """
     return [
         url for url in [download.get("url"), *(download.get("mirrors") or [])]
         if isinstance(url, str) and url
     ]
+
+
+def platform_names(document):
+    """The platforms of the `platform_downloads` entries of a stamped release, in the order of the file."""
+    entries = document.get("platform_downloads")
+    if not isinstance(entries, dict):
+        return []
+    return [platform for platform, entry in entries.items() if isinstance(entry, dict)]
+
+
+def archive_of(document, platform=None):
+    """`download` of a stamped release, or its `platform_downloads` entry of `platform`."""
+    if platform is None:
+        return document.get("download") or {}
+    return (document.get("platform_downloads") or {}).get(platform) or {}
+
+
+def archive_key(listing_id, version, platform=None):
+    """The cache key of one archive of a release, which is the key of the release for `download`."""
+    key = f"{listing_id}/{version}"
+    return key if platform is None else f"{key}/{platform}"
+
+
+def archive_name(version, platform=None):
+    """How a message names one archive of a release."""
+    return f"`{version}`" if platform is None else f"the {platform} archive of `{version}`"
+
+
+def platform_facts(release):
+    """The platform, URL and size of each platform archive of a host release."""
+    return [[item.platform, item.url, item.size] for item in release.platforms]
 
 
 def served(answer):
@@ -1680,6 +1716,7 @@ class Watcher:
             or (not any_age and now() - checked >= timedelta(hours=REJECTION_HOURS))
             or seen.get("url") != release.url
             or seen.get("size") != release.size
+            or seen.get("platforms", []) != platform_facts(release)
             or seen.get("inputs") != self.stamp_inputs(listing_id, authored)
         ):
             return None
@@ -1689,6 +1726,7 @@ class Watcher:
         self.cache.data["rejected"][f"{listing_id}/{release.version}"] = {
             "url": release.url,
             "size": release.size,
+            "platforms": platform_facts(release),
             "inputs": self.stamp_inputs(listing_id, authored),
             "checked": iso(now()),
             "error": message,
@@ -1697,9 +1735,12 @@ class Watcher:
     def stamp_one(self, listing_id, authored, authority, mirror_hosts, release):
         """Stamp one release, then look for its mirrors.
 
-        The archive is closed before a mirror downloads, so at most one archive
-        is on disk and the mirror is checked against the stamped digest.
+        The archive is closed before a platform archive or a mirror downloads,
+        and each platform archive before the next one, so at most one archive is
+        on disk and the mirror is checked against the stamped digest.
         """
+        if release.problem:
+            raise StampError(release.problem)
         if authored.get("type") in GAME_FILES:
             # Read first, so a broken release file does not cost a download every tick.
             self.install_folders(authored["type"])
@@ -1708,7 +1749,10 @@ class Watcher:
         with as_archive(archive) as archive:
             facts = release.facts()
             facts["content_type"] = content_type
-            document = stamp(authored, facts, archive, self.game_versions, now=now(), notes=notes)
+            document = stamp(
+                authored, facts, archive, self.game_versions, now=now(), notes=notes,
+                platforms=hosts.platform_archives(authority, release),
+            )
 
         folder = (document.get("install") or {}).get("folder")
         holders = None
@@ -1769,65 +1813,91 @@ class Watcher:
         keeping the byte count needs every archive re-downloaded per tick for an
         answer `download.sha256` already gives the client. SpaceDock reports no
         size, so only the URL comparison remains there. A deleted asset is not
-        in the list at all, which `gone_pass` handles.
+        in the list at all, which `gone_pass` handles. Each stamped platform
+        archive the host still lists for its platform is checked the same way.
         """
         document = self.read_release(path, errors)
         if document is None:
             return True  # Reported; nothing changes here until a human acts.
-        download = document.get("download") or {}
-        stamped_digest = (download.get("sha256") or "").upper()
-        same_size = release.size is None or release.size == download.get("size")
-        same_url = (release.url or download.get("url")) == download.get("url")
-        if same_size and same_url:
-            return True
         # A yank is the way forward the swap report names, so a yanked release
         # is not reported again. Its file stays as it is and gets no mirror,
-        # and the archive is not downloaded.
+        # and no archive is downloaded.
         if document.get("yanked") is True:
+            return True
+
+        settled = self.check_one_archive(
+            listing_id, release, path, document, errors,
+            release.url, release.size, lambda: authority.download(release)[0],
+        )
+        listed = {item.platform: item for item in release.platforms}
+        fetches = {platform: fetch for platform, _, fetch in hosts.platform_archives(authority, release)}
+        for platform in platform_names(document):
+            if platform in listed:
+                settled = self.check_one_archive(
+                    listing_id, release, path, document, errors,
+                    listed[platform].url, listed[platform].size, fetches[platform], platform,
+                ) and settled
+        return settled
+
+    def check_one_archive(self, listing_id, release, path, document, errors, url, size, fetch, platform=None):
+        """The swap check of `download`, or of the `platform_downloads` entry of `platform`, against the `url` and `size` the host lists.
+
+        Returns False when the archive could not be downloaded this tick.
+        """
+        stamped = archive_of(document, platform)
+        stamped_digest = (stamped.get("sha256") or "").upper()
+        same_size = size is None or size == stamped.get("size")
+        same_url = (url or stamped.get("url")) == stamped.get("url")
+        if same_size and same_url:
             return True
 
         # A rejection is permanent, so re-downloading the swapped archive every
         # tick would spend the tick on an answer that is already known. The
         # cache is derived: losing it costs one more download.
-        seen = self.cache.section("swaps", f"{listing_id}/{release.version}")
-        if seen.get("size") == release.size and seen.get("url") == release.url:
+        seen = self.cache.section("swaps", archive_key(listing_id, release.version, platform))
+        if seen.get("size") == size and seen.get("url") == url:
             if seen.get("digest"):
                 errors.append(
-                    self.swap_error(release.version, stamped_digest, seen["digest"])
+                    self.swap_error(release.version, stamped_digest, seen["digest"], platform)
                 )
             return True
 
         try:
-            archive, _ = authority.download(release)
+            archive = fetch()
         except HostError as error:
             self.log(f"    {release.version}: {error}")
             return False
         except StampError as error:
-            errors.append(f"`{release.version}`: {error}")
+            errors.append(f"{archive_name(release.version, platform)}: {error}")
             return True
 
         with as_archive(archive) as archive:
             digest = archive.sha256
-        seen.update({"size": release.size, "url": release.url, "checked": iso(now())})
+        seen.update({"size": size, "url": url, "checked": iso(now())})
         if digest == stamped_digest:
             seen["digest"] = None
+            if platform is not None:
+                # An entry has no mirrors and its URL is never rewritten, so
+                # the stamped URL keeps to the gone rules.
+                self.log(f"    {release.version}: the same {platform} archive at a new URL")
+                return True
             self.log(f"    {release.version}: the same bytes at a new URL")
-            self.append_mirror(path, document, release.url)
-            if "unavailable_since" in download:
+            self.append_mirror(path, document, url)
+            if "unavailable_since" in stamped:
                 self.unmark(listing_id, path, document)
             return True
 
         seen["digest"] = digest
-        errors.append(self.swap_error(release.version, stamped_digest, digest))
+        errors.append(self.swap_error(release.version, stamped_digest, digest, platform))
         return True
 
     @staticmethod
-    def swap_error(version, stamped_digest, served_digest):
+    def swap_error(version, stamped_digest, served_digest, platform=None):
         return (
-            f"`{version}` is already stamped from `{stamped_digest}`, and the host now "
-            f"serves `{served_digest}` for the same tag. A version is stamped exactly "
-            "once and the file is never overwritten, so this release is rejected. The "
-            "way forward is a new version, or a yank of this one."
+            f"{archive_name(version, platform)} is already stamped from `{stamped_digest}`, "
+            f"and the host now serves `{served_digest}` for the same tag. A version is "
+            "stamped exactly once and the file is never overwritten, so this release is "
+            "rejected. The way forward is a new version, or a yank of this one."
         )
 
     def month_pass(self, listing_id, path, errors):
@@ -2380,47 +2450,65 @@ class Watcher:
         Returns False when a marked release is listed again but its bytes could
         not be checked, so that the next tick fetches the full list and checks
         them, instead of an unchanged answer that keeps the mark.
+
+        Each `platform_downloads` entry goes through the same steps on its own,
+        and its mark is in the entry.
         """
         settled = True
         listed = None
+        sizes = {}
         if releases is not None:
             listed = {
                 url for release in releases for url in (release.url, *release.archives) if url
             }
+            for release in releases:
+                for item in (release, *release.platforms):
+                    sizes.setdefault(item.url, item.size)
         truncated = getattr(authority, "truncated", False)
-        section = self.cache.data["gone"]
         for version, path in self.stamped_versions(listing_id).items():
             document = self.read_release(path, errors)
             if document is None:
                 continue
-            key = f"{listing_id}/{version}"
-            download = document.get("download") or {}
-            marked = "unavailable_since" in download
-            found = [url for url in stamped_urls(download) if listed and url in listed]
-            if found:
-                if marked:
-                    size = next((item.size for item in releases if item.url == found[0]), None)
-                    if not self.restore(
-                        listing_id, authority.download, path, document, found[0], size, errors
-                    ):
-                        settled = False
-                else:
-                    section.pop(key, None)
-            elif marked:
-                if listed is None:
-                    self.report_swap(listing_id, document, errors)
-                else:
-                    section.pop(key, None)
-            elif listed is not None and not truncated:
-                wait = section.setdefault(key, {})
-                wait.setdefault("since", iso(now()))
-                self.confirm(listing_id, path, document, wait)
-            elif listed is None and "since" in section.get(key, {}):
-                self.confirm(listing_id, path, document, section[key])
+            for platform in (None, *platform_names(document)):
+                if not self.gone_check(
+                    listing_id, authority, listed, sizes, truncated, path, document, errors, platform
+                ):
+                    settled = False
         return settled
 
-    def confirm(self, listing_id, path, document, wait):
-        """Ask every stamped URL of a release the host stopped listing, once the wait is over.
+    def gone_check(self, listing_id, authority, listed, sizes, truncated, path, document, errors, platform=None):
+        """One step of `gone_pass` for `download`, or for the `platform_downloads` entry of `platform`.
+
+        `sizes` are the sizes the host lists by URL. Returns False when a marked
+        archive is listed again but its bytes could not be checked.
+        """
+        section = self.cache.data["gone"]
+        key = archive_key(listing_id, document.get("version"), platform)
+        stamped = archive_of(document, platform)
+        marked = "unavailable_since" in stamped
+        found = [url for url in stamped_urls(stamped) if listed and url in listed]
+        if found:
+            if marked:
+                return self.restore(
+                    listing_id, authority.download, path, document, found[0],
+                    sizes.get(found[0]), errors, platform,
+                )
+            section.pop(key, None)
+        elif marked:
+            if listed is None:
+                self.report_swap(listing_id, document, errors, platform)
+            else:
+                section.pop(key, None)
+        elif listed is not None and not truncated:
+            wait = section.setdefault(key, {})
+            wait.setdefault("since", iso(now()))
+            self.confirm(listing_id, path, document, wait, platform)
+        elif listed is None and "since" in section.get(key, {}):
+            self.confirm(listing_id, path, document, section[key], platform)
+        return True
+
+    def confirm(self, listing_id, path, document, wait, platform=None):
+        """Ask every stamped URL of an archive the host stopped listing, once the wait is over.
 
         Every URL has to answer that the archive is gone. Any other answer
         marks nothing, and the watcher asks again a day later.
@@ -2431,13 +2519,13 @@ class Watcher:
         asked = parse_iso(wait.get("asked"))
         if started is None or now() - started < day or (asked and now() - asked < day):
             return
-        urls = stamped_urls(document.get("download") or {})
+        urls = stamped_urls(archive_of(document, platform))
         answers = self.ask(urls)
         if not answers:
             return
         wait["asked"] = iso(now())
         if all(answer in hosts.GONE for answer in answers):
-            self.mark(listing_id, path, document)
+            self.mark(listing_id, path, document, platform)
             return
         self.log(f"    {version}: its host does not list it, and not every URL says it is gone")
         if answers[0] in hosts.GONE and any(served(answer) for answer in answers[1:]):
@@ -2455,42 +2543,49 @@ class Watcher:
         A release is marked when every URL said that the archive is gone in
         every answer over at least a day, and its mark goes once a URL serves
         the stamped bytes again. A host that could not be evaluated is no
-        observation.
+        observation. Each `platform_downloads` entry is asked on its own, and
+        its mark is in the entry.
         """
-        section = self.cache.data["gone"]
-        day = timedelta(hours=GONE_HOURS)
         for version, path in self.stamped_versions(listing_id).items():
             document = self.read_release(path, errors)
             if document is None:
                 continue
-            entry = section.setdefault(f"{listing_id}/{version}", {})
-            download = document.get("download") or {}
-            marked = "unavailable_since" in download
-            urls = stamped_urls(download)
-            asked = parse_iso(entry.get("asked"))
-            answers = self.ask(urls) if asked is None or now() - asked >= day else None
-            if not answers:
-                self.report_swap(listing_id, document, errors)
-                continue
-            entry["asked"] = iso(now())
-            serving = [url for url, answer in zip(urls, answers) if served(answer)]
-            if serving:
-                # Asked once a day, so the bytes are downloaded again each time.
-                entry.pop("since", None)
-                entry.pop("swap", None)
-                if marked and not self.restore(
-                    listing_id, lambda release: hosts.download(self.http, release),
-                    path, document, serving[0], None, errors,
-                ):
-                    # The bytes are not checked yet, so the next tick asks again.
-                    entry.pop("asked", None)
-            elif all(answer in hosts.GONE for answer in answers):
-                entry.pop("swap", None)
-                since = parse_iso(entry.setdefault("since", iso(now())))
-                if not marked and now() - since >= day:
-                    self.mark(listing_id, path, document)
-            elif None not in answers:
-                entry.pop("since", None)
+            for platform in (None, *platform_names(document)):
+                self.ask_archive(listing_id, path, document, errors, platform)
+
+    def ask_archive(self, listing_id, path, document, errors, platform=None):
+        """One step of `gone_by_request` for `download`, or for the `platform_downloads` entry of `platform`."""
+        day = timedelta(hours=GONE_HOURS)
+        entry = self.cache.data["gone"].setdefault(
+            archive_key(listing_id, document.get("version"), platform), {}
+        )
+        stamped = archive_of(document, platform)
+        marked = "unavailable_since" in stamped
+        urls = stamped_urls(stamped)
+        asked = parse_iso(entry.get("asked"))
+        answers = self.ask(urls) if asked is None or now() - asked >= day else None
+        if not answers:
+            self.report_swap(listing_id, document, errors, platform)
+            return
+        entry["asked"] = iso(now())
+        serving = [url for url, answer in zip(urls, answers) if served(answer)]
+        if serving:
+            # Asked once a day, so the bytes are downloaded again each time.
+            entry.pop("since", None)
+            entry.pop("swap", None)
+            if marked and not self.restore(
+                listing_id, lambda release: hosts.download(self.http, release),
+                path, document, serving[0], None, errors, platform,
+            ):
+                # The bytes are not checked yet, so the next tick asks again.
+                entry.pop("asked", None)
+        elif all(answer in hosts.GONE for answer in answers):
+            entry.pop("swap", None)
+            since = parse_iso(entry.setdefault("since", iso(now())))
+            if not marked and now() - since >= day:
+                self.mark(listing_id, path, document, platform)
+        elif None not in answers:
+            entry.pop("since", None)
 
     def ask(self, urls):
         """The status each URL answers, None for one that could not be evaluated.
@@ -2512,8 +2607,8 @@ class Watcher:
                 answers.append(None)
         return answers
 
-    def restore(self, listing_id, fetch, path, document, url, size, errors):
-        """Remove the gone mark once `url` serves the stamped bytes again.
+    def restore(self, listing_id, fetch, path, document, url, size, errors, platform=None):
+        """Remove the gone mark of `download`, or of the entry of `platform`, once `url` serves the stamped bytes again.
 
         Other bytes are a swap, reported like any other, and the mark stays.
         The swap is remembered by URL and size, so it is not downloaded again
@@ -2521,66 +2616,73 @@ class Watcher:
         is False when the gone budget is spent or the download failed.
         """
         version = document.get("version")
-        entry = self.cache.section("gone", f"{listing_id}/{version}")
+        entry = self.cache.section("gone", archive_key(listing_id, version, platform))
         swap = entry.get("swap")
         if swap and swap.get("url") == url and swap.get("size") == size:
-            self.report_swap(listing_id, document, errors)
+            self.report_swap(listing_id, document, errors, platform)
             return True
         if self.gone_budget <= 0:
             self.log(f"    {version}: the gone budget is spent, the next tick checks its bytes")
             return False
         self.gone_budget -= 1
         try:
-            archive, _ = fetch(hosts.stamped_release(document, url))
+            archive, _ = fetch(hosts.stamped_release(document, url, platform))
         except (HostError, StampError) as error:
             self.log(f"    {version}: {error}, the next tick checks its bytes")
             return False
         with as_archive(archive) as archive:
             digest = archive.sha256
-        if digest == (document["download"].get("sha256") or "").upper():
-            self.unmark(listing_id, path, document)
+        if digest == (archive_of(document, platform).get("sha256") or "").upper():
+            self.unmark(listing_id, path, document, platform)
             return True
         entry["swap"] = {"url": url, "size": size, "digest": digest}
-        self.report_swap(listing_id, document, errors)
+        self.report_swap(listing_id, document, errors, platform)
         return True
 
-    def report_swap(self, listing_id, document, errors):
-        """Report the other bytes a marked release was last found with, which keeps its mark.
+    def report_swap(self, listing_id, document, errors, platform=None):
+        """Report the other bytes a marked archive was last found with, which keeps its mark.
 
         A yanked release is not reported, because the yank is the way forward
         the report names.
         """
         version = document.get("version")
-        swap = self.cache.data["gone"].get(f"{listing_id}/{version}", {}).get("swap")
-        download = document.get("download") or {}
-        if swap and "unavailable_since" in download and document.get("yanked") is not True:
+        swap = self.cache.data["gone"].get(archive_key(listing_id, version, platform), {}).get("swap")
+        stamped = archive_of(document, platform)
+        if swap and "unavailable_since" in stamped and document.get("yanked") is not True:
             errors.append(
-                self.swap_error(version, (download.get("sha256") or "").upper(), swap["digest"])
+                self.swap_error(
+                    version, (stamped.get("sha256") or "").upper(), swap["digest"], platform
+                )
             )
 
-    def mark(self, listing_id, path, document):
-        """Write `download.unavailable_since`, which keeps its value while the mark stands."""
+    def mark(self, listing_id, path, document, platform=None):
+        """Write `unavailable_since` into `download`, or into the entry of `platform`, which keeps its value while the mark stands."""
         version = document["version"]
-        document["download"]["unavailable_since"] = iso(now())
-        self.write(path, serialize(document), f"Mark {listing_id} {version} as gone from its host")
-        self.log(f"    marked {version} as gone from its host")
-        self.marked.append(f"{listing_id} {version}")
-        self.tell_later(listing_id, f"`{version}` is gone from its host, so the watcher marked it.")
+        archive_of(document, platform)["unavailable_since"] = iso(now())
+        what = f"{listing_id} {version}" if platform is None else f"the {platform} archive of {listing_id} {version}"
+        self.write(path, serialize(document), f"Mark {what} as gone from its host")
+        self.log(f"    marked {archive_name(version, platform)} as gone from its host")
+        self.marked.append(" ".join(filter(None, (listing_id, version, platform))))
+        line = f"{archive_name(version, platform)} is gone from its host, so the watcher marked it"
+        if platform is not None:
+            line += f", and a client on {platform} takes the archive for every platform"
+        self.tell_later(listing_id, line + ".")
 
-    def unmark(self, listing_id, path, document):
-        """Remove `download.unavailable_since`, after the stamped bytes were found again."""
+    def unmark(self, listing_id, path, document, platform=None):
+        """Remove `unavailable_since` from `download`, or from the entry of `platform`, after the stamped bytes were found again."""
         version = document["version"]
-        document["download"].pop("unavailable_since", None)
-        self.write(path, serialize(document), f"Remove the gone mark from {listing_id} {version}")
-        entry = self.cache.data["gone"].get(f"{listing_id}/{version}") or {}
+        archive_of(document, platform).pop("unavailable_since", None)
+        what = f"{listing_id} {version}" if platform is None else f"the {platform} archive of {listing_id} {version}"
+        self.write(path, serialize(document), f"Remove the gone mark from {what}")
+        entry = self.cache.data["gone"].get(archive_key(listing_id, version, platform)) or {}
         for name in ("since", "mirror", "swap"):
             entry.pop(name, None)
-        self.log(f"    removed the gone mark from {version}")
-        self.unmarked.append(f"{listing_id} {version}")
+        self.log(f"    removed the gone mark from {archive_name(version, platform)}")
+        self.unmarked.append(" ".join(filter(None, (listing_id, version, platform))))
         self.tell_later(
             listing_id,
-            f"`{version}` is on its host again with the stamped bytes, so the watcher "
-            "removed its mark.",
+            f"{archive_name(version, platform)} is on its host again with the stamped bytes, "
+            "so the watcher removed its mark.",
         )
 
     def tell_later(self, listing_id, line):

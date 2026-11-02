@@ -109,6 +109,9 @@ python3 tools/stamp_release.py --listing ../content-index/listings/<id>.toml --a
 
 The file is named after the stored version, which fills a short tag such as `v1.2` to `1.2.0`.
 
+A release by pull request has one archive, for every platform.
+The checks refuse a submitted `platform_downloads`, because the watcher stamps it only from the platform archives of a GitHub release, as the README describes.
+
 Validate it the way the checks will, which downloads the archive from the URL the file names:
 
 ```sh
