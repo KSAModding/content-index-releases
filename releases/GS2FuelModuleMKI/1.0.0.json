@@ -1,0 +1,39 @@
+{
+  "spec_version": 1,
+  "id": "GS2FuelModuleMKI",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-03T14:30:28Z",
+  "game_min": "2026.9.7.5402",
+  "game_min_revision": 5402,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/GS2FuelModuleMKI/1.0.0",
+    "sha256": "0543CE302FF730FC31E4CBB0C90517CAEA919C871CA1595CD60F071AE356A501",
+    "size": 19542,
+    "content_type": "application/zip"
+  },
+  "install_size": 334011,
+  "install": {
+    "root": "GS-2 Fuel Module MK I",
+    "derived": true,
+    "folder": "GS-2 Fuel Module MK I"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "GS-2 Fuel Module MK I",
+    "authors": [
+      "Goddchen"
+    ],
+    "abstract": "A fuel module for the Goddchen Station 2.",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-9)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "station"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/GS2FuelModuleMKI"
+    }
+  }
+}
