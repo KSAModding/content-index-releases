@@ -34,7 +34,8 @@ env:
 jobs:
   build:
     name: build
-    runs-on: ubuntu-latest
+    # A fixed image, so a change of the latest label does not change the job.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
       changed: ${{ steps.compare.outputs.changed }}
@@ -103,7 +104,8 @@ jobs:
     name: deploy
     needs: build
     if: needs.build.outputs.changed == 'true'
-    runs-on: ubuntu-latest
+    # A fixed image, so a change of the latest label does not change the job.
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     # Pages serves the strong ETag and answers If-None-Match
     permissions:

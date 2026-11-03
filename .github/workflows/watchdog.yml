@@ -34,7 +34,8 @@ concurrency:
 jobs:
   check:
     name: check
-    runs-on: ubuntu-latest
+    # A fixed image, so a change of the latest label does not change the job.
+    runs-on: ubuntu-24.04
     # The key of the org App is a secret of this environment, which only main may use.
     environment: index-bot
     timeout-minutes: 5
@@ -46,7 +47,7 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ vars.INDEX_APP_ID }}
+          client-id: ${{ vars.INDEX_APP_CLIENT_ID }}
           private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: content-index-releases
