@@ -982,6 +982,99 @@ class PruneOnly(Fixture):
         self.assertFalse(counts.exists())
 
 
+ROVER_BOTH = '[releases]\ngithub = "o/r"\nksamods = "ExampleRover"\nauthority = "ksamods"\n'
+
+
+class ShareHostsOnly(Fixture):
+    """A pass that asks the share hosts only, and keeps every GitHub and SpaceDock count as it is."""
+
+    run_main = CommandLine.run_main
+
+    def setUp(self):
+        super().setUp()
+        (self.authored / "hosts.toml").write_text(HOSTS_TOML, encoding="utf-8")
+        self.listing("ExampleRover", releases=ROVER_BOTH, content_type="vehicle")
+        self.listing("Mod", releases=BOTH_HOSTS)
+        self.stored = document(
+            counted("ExampleRover", {"github": 3, "ksamods": 9}, ("1.0.0", {"github": 3, "ksamods": 9})),
+            counted("Mod", {"github": 4, "spacedock": 5}, ("1.0.0", {"github": 4, "spacedock": 5})),
+        )
+
+    def storage(self):
+        return Storage(
+            [share_entry("1.0.0"), share_entry("1.1.0")], [rover("1.0.0", count=5), rover("1.1.0", count=7)]
+        )
+
+    def share_pass(self, http, current):
+        result = refresh(
+            self.authored, check_download_counts(current, "test"), http, self.cache,
+            log=self.notes.append, note=self.notes.append, releases=self.root / "releases", kinds={"share"},
+        )
+        check_download_counts(json.loads(serialize(result)), "refreshed")
+        return result
+
+    def test_only_the_share_host_is_asked_and_the_other_counts_stay(self):
+        # Storage fails on a GitHub or SpaceDock URL, so a request to one would leave a note.
+        http = self.storage()
+        rover_entry, mod_entry = self.share_pass(http, self.stored)["listings"]
+        self.assertEqual(rover_entry["hosts"], {"github": 3, "ksamods": 12})
+        self.assertEqual(
+            [(release["version"], release["hosts"]) for release in rover_entry["releases"]],
+            [("1.1.0", {"ksamods": 7}), ("1.0.0", {"github": 3, "ksamods": 5})],
+        )
+        self.assertEqual(mod_entry, self.stored["listings"][1])
+        self.assertTrue(http.asked)
+        self.assertTrue(all(url.startswith(STORAGE) for url, _ in http.asked))
+        self.assertEqual(self.notes, [])
+
+    def test_a_listing_that_is_gone_still_loses_its_entry(self):
+        rover_entry, mod_entry = self.stored["listings"]
+        stored = document(rover_entry, counted("Gone", {"github": 2}, ("1.0.0", {"github": 2})), mod_entry)
+        result = self.share_pass(self.storage(), stored)
+        self.assertEqual([entry["id"] for entry in result["listings"]], ["ExampleRover", "Mod"])
+
+    def test_the_github_answers_in_the_cache_stay(self):
+        remembered = {"etag": 'W/"a"', "pages": 1, "observation": {"total": 4, "versions": {"1.0.0": 4}}}
+        self.cache = {"mod/github:o/r": dict(remembered)}
+        self.share_pass(self.storage(), self.stored)
+        self.assertEqual(self.cache["mod/github:o/r"], remembered)
+
+    def test_the_command_writes_the_counts_and_leaves_the_cache_alone(self):
+        counts = self.root / "download-counts.json"
+        counts.write_bytes(serialize(self.stored).encode("utf-8"))
+        cache = self.root / "cache.json"
+        cache.write_text("{oops", encoding="utf-8")
+        code, counts, _, _ = self.run_main(self.storage(), "--share-hosts-only")
+        self.assertEqual(code, 0)
+        written = json.loads(counts.read_text(encoding="utf-8"))
+        self.assertEqual(written["listings"][0]["hosts"], {"github": 3, "ksamods": 12})
+        self.assertEqual(written["listings"][1], self.stored["listings"][1])
+        self.assertEqual(cache.read_text(encoding="utf-8"), "{oops")
+
+    def test_an_unchanged_share_host_keeps_the_bytes(self):
+        counts = self.root / "download-counts.json"
+        self.run_main(self.storage(), "--share-hosts-only")
+        before = counts.read_bytes()
+        code, counts, _, stderr = self.run_main(self.storage(), "--share-hosts-only")
+        self.assertEqual(code, 0)
+        self.assertEqual(counts.read_bytes(), before)
+        self.assertIn("already current", stderr)
+
+    def test_a_dry_run_prints_the_document_and_writes_nothing(self):
+        counts = self.root / "download-counts.json"
+        raw = serialize(self.stored).encode("utf-8")
+        counts.write_bytes(raw)
+        code, counts, stdout, _ = self.run_main(self.storage(), "--share-hosts-only", "--dry-run")
+        self.assertEqual(code, 0)
+        self.assertEqual(counts.read_bytes(), raw)
+        self.assertFalse((self.root / "cache.json").exists())
+        self.assertEqual(json.loads(stdout)["listings"][0]["hosts"], {"github": 3, "ksamods": 12})
+
+    def test_it_cannot_be_combined_with_prune_only(self):
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.run_main(FakeHttp({}), "--share-hosts-only", "--prune-only")
+
+
 class BuilderCheck(unittest.TestCase):
     def test_a_valid_document_comes_back_keyed_by_lowercased_id(self):
         entries = check_download_counts(document(counted("Mod", {"github": 1})), "test")

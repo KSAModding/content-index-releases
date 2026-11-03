@@ -59,6 +59,8 @@ When three polls in a row got no answer, the watchdog opens an issue, as describ
 Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
 A release counts the downloads of its archive for every platform together with those of its platform archives.
 `.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
+Every 6 hours, a second pass of the same workflow asks the share hosts only and keeps every GitHub and SpaceDock count as it is (`--share-hosts-only`).
+Each pass commits the document only when a count changed.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
 A share host that serves its files itself (RFC 0104) is counted from the optional `downloads` object of its release list `releases/<type>/<id>.json`, `{"total": n, "versions": {"<version>": n}, "updated": "<RFC 3339 UTC>"}`, which is read only after the signature of the list by `key` is valid.
@@ -69,7 +71,7 @@ A share host that left `hosts.toml`, or that the listing no longer names, keeps 
 
 Known limit: a deleted GitHub release without its own version entry, and an archive uploaded again, lower a count that the host did not lower.
 
-To refresh by hand, dispatch the workflow with `dry_run`, or run it locally against a checkout of the authored half:
+To refresh by hand, dispatch the workflow with `dry_run`, and with `share_hosts_only` for the share host pass, or run it locally against a checkout of the authored half:
 
 ```text
 python3 tools/download_counts.py --authored ../content-index --dry-run

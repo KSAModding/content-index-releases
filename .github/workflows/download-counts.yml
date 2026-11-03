@@ -5,6 +5,8 @@ on:
   schedule:
     # Several slots because GitHub drops scheduled runs. The age check below keeps it to one refresh a day.
     - cron: "9 4,10,16,22 * * *"
+    # The share host pass on its own slots, so a share host count is at most 6 hours old.
+    - cron: "39 1,7,13,19 * * *"
   # Drops the counts of deleted listings without asking a host.
   repository_dispatch:
     types: [index-changed]
@@ -12,6 +14,10 @@ on:
     inputs:
       dry_run:
         description: "Ask the hosts and print the document, write and commit nothing."
+        type: boolean
+        default: false
+      share_hosts_only:
+        description: "Ask the share hosts only, and keep every GitHub and SpaceDock count as it is."
         type: boolean
         default: false
 
@@ -26,7 +32,8 @@ concurrency:
 jobs:
   refresh:
     name: refresh
-    runs-on: ubuntu-latest
+    # A fixed image, so a change of the latest label does not change the job.
+    runs-on: ubuntu-24.04
     # The key of the org App is a secret of this environment, which only main may use.
     environment: index-bot
     timeout-minutes: 15
@@ -34,7 +41,7 @@ jobs:
       - uses: actions/create-github-app-token@v3
         id: app-token
         with:
-          app-id: ${{ vars.INDEX_APP_ID }}
+          client-id: ${{ vars.INDEX_APP_CLIENT_ID }}
           private-key: ${{ secrets.INDEX_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: content-index-releases
@@ -51,13 +58,20 @@ jobs:
         id: mode
         env:
           EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+          SHARE_HOSTS_ONLY: ${{ inputs.share_hosts_only }}
         run: |
           set -euo pipefail
           mode=refresh
           if [ "$EVENT" = "repository_dispatch" ]; then
             mode=prune
+          elif [ "$EVENT" = "workflow_dispatch" ] && [ "$SHARE_HOSTS_ONLY" = "true" ]; then
+            mode=share
+          elif [ "$EVENT" = "schedule" ] && [ "$SCHEDULE" = "39 1,7,13,19 * * *" ]; then
+            mode=share
           elif [ "$EVENT" = "schedule" ]; then
-            last="$(git log -1 --format=%ct -- download-counts.json)"
+            # Only a full refresh sets the age, because the share host pass commits the same file.
+            last="$(git log -1 --format=%ct --fixed-strings --grep="Refresh the download counts" -- download-counts.json)"
             if [ -n "$last" ] && [ "$(( $(date +%s) - last ))" -lt "$(( 20 * 3600 ))" ]; then
               echo "the counts were committed less than 20 hours ago, so this run asks no host"
               mode=skip
@@ -75,11 +89,11 @@ jobs:
       # The counts of a data host are read only after its signature check, which needs the
       # cryptography package, and the system Python takes no pip install. No pip cache,
       # because this job holds the App key.
-      - if: steps.mode.outputs.mode == 'refresh'
+      - if: steps.mode.outputs.mode == 'refresh' || steps.mode.outputs.mode == 'share'
         uses: actions/setup-python@v7
         with:
           python-version: '3.13'
-      - if: steps.mode.outputs.mode == 'refresh'
+      - if: steps.mode.outputs.mode == 'refresh' || steps.mode.outputs.mode == 'share'
         run: |
           pip install --only-binary=:all: -r tools/requirements.txt
 
@@ -103,6 +117,9 @@ jobs:
           arguments=(--authored .authored)
           if [ "$MODE" = "prune" ]; then
             arguments+=(--prune-only)
+          elif [ "$MODE" = "share" ]; then
+            # The ETag cache holds GitHub answers only, so this pass leaves it alone.
+            arguments+=(--share-hosts-only)
           else
             arguments+=(--cache .download-counts/cache.json)
           fi
@@ -124,6 +141,8 @@ jobs:
           message="Refresh the download counts"
           if [ "$MODE" = "prune" ]; then
             message="Drop the download counts of removed listings"
+          elif [ "$MODE" = "share" ]; then
+            message="Refresh the share host download counts"
           fi
           git config user.name "${{ steps.app-token.outputs.app-slug }}[bot]"
           git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
