@@ -3,9 +3,9 @@
   "listings": [
     {
       "id": "AdvancedFlightComputer",
-      "total": 2217,
+      "total": 2218,
       "hosts": {
-        "github": 1089,
+        "github": 1090,
         "spacedock": 1128
       },
       "releases": [
@@ -41,9 +41,9 @@
         },
         {
           "version": "0.11.1",
-          "total": 17,
+          "total": 18,
           "hosts": {
-            "github": 13,
+            "github": 14,
             "spacedock": 4
           }
         },
@@ -531,16 +531,16 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 0,
+      "total": 2,
       "hosts": {
-        "ksamods": 0
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 0,
+          "total": 2,
           "hosts": {
-            "ksamods": 0
+            "ksamods": 2
           }
         }
       ]
@@ -799,17 +799,17 @@
     },
     {
       "id": "DeltaVMap",
-      "total": 7968,
+      "total": 7969,
       "hosts": {
-        "github": 7101,
+        "github": 7102,
         "spacedock": 867
       },
       "releases": [
         {
           "version": "1.5.2",
-          "total": 62,
+          "total": 63,
           "hosts": {
-            "github": 42,
+            "github": 43,
             "spacedock": 20
           }
         },
@@ -1142,16 +1142,23 @@
     },
     {
       "id": "GEE",
-      "total": 19,
+      "total": 21,
       "hosts": {
-        "github": 19
+        "github": 21
       },
       "releases": [
         {
-          "version": "0.2.0",
-          "total": 6,
+          "version": "0.2.1",
+          "total": 1,
           "hosts": {
-            "github": 6
+            "github": 1
+          }
+        },
+        {
+          "version": "0.2.0",
+          "total": 7,
+          "hosts": {
+            "github": 7
           }
         },
         {
@@ -1172,32 +1179,32 @@
     },
     {
       "id": "GS2FuelModuleMKI",
-      "total": 1,
+      "total": 2,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 1,
+          "total": 2,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 2
           }
         }
       ]
     },
     {
       "id": "GS2MKI",
-      "total": 1,
+      "total": 2,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 1,
+          "total": 2,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 2
           }
         }
       ]
@@ -1318,17 +1325,17 @@
     },
     {
       "id": "KittenExtensionsContinued",
-      "total": 330,
+      "total": 331,
       "hosts": {
-        "github": 158,
+        "github": 159,
         "spacedock": 172
       },
       "releases": [
         {
           "version": "0.5.3",
-          "total": 116,
+          "total": 117,
           "hosts": {
-            "github": 74,
+            "github": 75,
             "spacedock": 42
           }
         },
@@ -2205,18 +2212,18 @@
     },
     {
       "id": "KSARS",
-      "total": 278,
+      "total": 279,
       "hosts": {
         "github": 50,
-        "spacedock": 228
+        "spacedock": 229
       },
       "releases": [
         {
           "version": "1.0.1",
-          "total": 39,
+          "total": 40,
           "hosts": {
             "github": 12,
-            "spacedock": 27
+            "spacedock": 28
           }
         },
         {
@@ -2804,18 +2811,18 @@
     },
     {
       "id": "ModMenu",
-      "total": 2359,
+      "total": 2360,
       "hosts": {
         "github": 502,
-        "spacedock": 1857
+        "spacedock": 1858
       },
       "releases": [
         {
           "version": "0.2.3",
-          "total": 155,
+          "total": 156,
           "hosts": {
             "github": 108,
-            "spacedock": 47
+            "spacedock": 48
           }
         },
         {
@@ -3462,16 +3469,16 @@
     },
     {
       "id": "StarMap",
-      "total": 5509,
+      "total": 5511,
       "hosts": {
-        "github": 5509
+        "github": 5511
       },
       "releases": [
         {
           "version": "0.4.8",
-          "total": 316,
+          "total": 318,
           "hosts": {
-            "github": 316
+            "github": 318
           }
         },
         {
