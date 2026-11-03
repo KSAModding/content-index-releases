@@ -272,8 +272,11 @@ def named_hosts(document, http, identifier, log, registry=None):
         return []
 
 
-def refresh(authored, current, http, cache, log=warn, note=info, ask=True, releases=None):
+def refresh(authored, current, http, cache, log=warn, note=info, ask=True, releases=None, kinds=None):
     """The refreshed document. With `ask` false it only drops the entries of deleted listings.
+
+    `kinds` names the kinds of host that are asked, and None asks every host.
+    A host of another kind is not asked and keeps its stored values.
 
     A listing here is a document of any folder of FOLDERS: a mod or mod loader, a vehicle or a save.
     `releases` is the folder of the stamped release files, whose versions are the only ones
@@ -312,6 +315,8 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True, relea
             note(f"{identifier}: a {document.get('type')!r} listing has no counts")
         else:
             for name, host in named_hosts(document, http, identifier, log, registry):
+                if kinds is not None and host.kind not in kinds:
+                    continue
                 slot = f"{key}/{host.key}"
                 asked.add(slot)
                 remembered = cache.setdefault(slot, {})
@@ -357,7 +362,8 @@ def refresh(authored, current, http, cache, log=warn, note=info, ask=True, relea
         if entry is not None:
             entries.append(entry)
 
-    if ask:
+    # A pass that asks some kinds only does not know which slots of the other kinds are still in use.
+    if ask and kinds is None:
         for slot in [slot for slot in cache if slot not in asked]:
             del cache[slot]
     return {"spec_version": DOWNLOAD_COUNTS_VERSION, "listings": entries}
@@ -425,10 +431,17 @@ def parse_arguments(argv):
         help="ask no host, only drop the counts of deleted listings",
     )
     parser.add_argument(
+        "--share-hosts-only", action="store_true",
+        help="ask the share hosts only, and keep every GitHub and SpaceDock count as it is",
+    )
+    parser.add_argument(
         "--dry-run", action="store_true",
         help="print the document, write nothing",
     )
-    return parser.parse_args(argv)
+    arguments = parser.parse_args(argv)
+    if arguments.prune_only and arguments.share_hosts_only:
+        parser.error("--prune-only and --share-hosts-only cannot be used together")
+    return arguments
 
 
 def main(argv=None, http=None):
@@ -441,10 +454,12 @@ def main(argv=None, http=None):
         if arguments.prune_only and current is None:
             info(f"{arguments.counts} does not exist, so there is nothing to drop")
             return 0
-        cache = {} if arguments.prune_only else read_cache(arguments.cache)
+        # The cache holds GitHub answers only, so a share host pass neither reads nor writes it.
+        partial = arguments.prune_only or arguments.share_hosts_only
+        cache = {} if partial else read_cache(arguments.cache)
         document = refresh(
             arguments.authored, current, http, cache, ask=not arguments.prune_only,
-            releases=arguments.releases,
+            releases=arguments.releases, kinds={"share"} if arguments.share_hosts_only else None,
         )
         rendered = serialize(document)
         check_download_counts(json.loads(rendered), "the refreshed counts")
@@ -463,7 +478,7 @@ def main(argv=None, http=None):
             handle.write(rendered)
         info(f"wrote {arguments.counts}")
 
-    if not arguments.dry_run and not arguments.prune_only:
+    if not arguments.dry_run and not partial:
         write_cache(arguments.cache, cache)
     info(f"{len(document['listings'])} listing(s) with counts, {requests} host request(s)")
     return 0
