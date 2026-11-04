@@ -531,16 +531,16 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 3,
+      "total": 4,
       "hosts": {
-        "ksamods": 3
+        "ksamods": 4
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 3,
+          "total": 4,
           "hosts": {
-            "ksamods": 3
+            "ksamods": 4
           }
         }
       ]
@@ -1179,6 +1179,22 @@
     },
     {
       "id": "GS2FuelModuleMKI",
+      "total": 4,
+      "hosts": {
+        "ksamods": 4
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 4,
+          "hosts": {
+            "ksamods": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "GS2MKI",
       "total": 3,
       "hosts": {
         "ksamods": 3
@@ -1189,22 +1205,6 @@
           "total": 3,
           "hosts": {
             "ksamods": 3
-          }
-        }
-      ]
-    },
-    {
-      "id": "GS2MKI",
-      "total": 2,
-      "hosts": {
-        "ksamods": 2
-      },
-      "releases": [
-        {
-          "version": "1.0.0",
-          "total": 2,
-          "hosts": {
-            "ksamods": 2
           }
         }
       ]
