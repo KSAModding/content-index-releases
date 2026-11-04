@@ -1,7 +1,7 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-03T22:23:40Z",
-  "counted_at": "2026-11-03T22:23:40Z",
+  "checked_at": "2026-11-04T22:42:04Z",
+  "counted_at": "2026-11-04T22:42:04Z",
   "listings": [
     {
       "id": "AdvancedFlightComputer",
@@ -41,7 +41,7 @@
     {
       "id": "GEE",
       "thread": 1527,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KittenEngineerRedux",
