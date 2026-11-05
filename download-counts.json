@@ -515,32 +515,32 @@
     },
     {
       "id": "AmongUsCrewmate",
-      "total": 1,
+      "total": 2,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 1,
+          "total": 2,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 2
           }
         }
       ]
     },
     {
       "id": "ArgiziontMKI",
-      "total": 5,
+      "total": 11,
       "hosts": {
-        "ksamods": 5
+        "ksamods": 11
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 5,
+          "total": 11,
           "hosts": {
-            "ksamods": 5
+            "ksamods": 11
           }
         }
       ]
@@ -563,16 +563,16 @@
     },
     {
       "id": "BoreaTestVehicle2",
-      "total": 1,
+      "total": 2,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 1,
+          "total": 2,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 2
           }
         }
       ]
@@ -1179,32 +1179,32 @@
     },
     {
       "id": "GS2FuelModuleMKI",
-      "total": 5,
+      "total": 7,
       "hosts": {
-        "ksamods": 5
+        "ksamods": 7
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 5,
+          "total": 7,
           "hosts": {
-            "ksamods": 5
+            "ksamods": 7
           }
         }
       ]
     },
     {
       "id": "GS2MKI",
-      "total": 4,
+      "total": 6,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 6
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 4,
+          "total": 6,
           "hosts": {
-            "ksamods": 4
+            "ksamods": 6
           }
         }
       ]
@@ -2810,16 +2810,16 @@
     },
     {
       "id": "Minecraft_Villager",
-      "total": 1,
+      "total": 2,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 1,
+          "total": 2,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 2
           }
         }
       ]
@@ -3023,16 +3023,16 @@
     },
     {
       "id": "OctoSmokeMonster",
-      "total": 2,
+      "total": 3,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 3
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 3
           }
         }
       ]
@@ -3676,38 +3676,6 @@
     },
     {
       "id": "superheavy33",
-      "total": 1,
-      "hosts": {
-        "ksamods": 1
-      },
-      "releases": [
-        {
-          "version": "1.0.0",
-          "total": 1,
-          "hosts": {
-            "ksamods": 1
-          }
-        }
-      ]
-    },
-    {
-      "id": "TestModdedNuclearVehicle",
-      "total": 0,
-      "hosts": {
-        "ksamods": 0
-      },
-      "releases": [
-        {
-          "version": "1.0.0",
-          "total": 0,
-          "hosts": {
-            "ksamods": 0
-          }
-        }
-      ]
-    },
-    {
-      "id": "TheGuy",
       "total": 2,
       "hosts": {
         "ksamods": 2
@@ -3718,6 +3686,38 @@
           "total": 2,
           "hosts": {
             "ksamods": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "TestModdedNuclearVehicle",
+      "total": 2,
+      "hosts": {
+        "ksamods": 2
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 2,
+          "hosts": {
+            "ksamods": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "TheGuy",
+      "total": 4,
+      "hosts": {
+        "ksamods": 4
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 4,
+          "hosts": {
+            "ksamods": 4
           }
         }
       ]
