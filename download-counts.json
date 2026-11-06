@@ -3029,6 +3029,22 @@
       ]
     },
     {
+      "id": "Multirocket",
+      "total": 1,
+      "hosts": {
+        "ksamods": 1
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 1,
+          "hosts": {
+            "ksamods": 1
+          }
+        }
+      ]
+    },
+    {
       "id": "OctoSmokeMonster",
       "total": 6,
       "hosts": {
@@ -3521,6 +3537,22 @@
           "total": 5,
           "hosts": {
             "github": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "SillyFighterIII",
+      "total": 1,
+      "hosts": {
+        "ksamods": 1
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 1,
+          "hosts": {
+            "ksamods": 1
           }
         }
       ]
