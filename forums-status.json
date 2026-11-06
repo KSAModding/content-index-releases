@@ -84,6 +84,11 @@
       "in_sitemap": true
     },
     {
+      "id": "KSAMainMenu",
+      "thread": 1554,
+      "in_sitemap": false
+    },
+    {
       "id": "KSArmory",
       "thread": 1131,
       "in_sitemap": true
