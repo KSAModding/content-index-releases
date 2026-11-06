@@ -522,54 +522,38 @@
     },
     {
       "id": "AmongUsCrewmate",
-      "total": 2,
+      "total": 4,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 4
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 4,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 4
           }
         }
       ]
     },
     {
       "id": "ArgiziontMKI",
-      "total": 11,
+      "total": 16,
       "hosts": {
-        "ksamods": 11
+        "ksamods": 16
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 11,
+          "total": 16,
           "hosts": {
-            "ksamods": 11
+            "ksamods": 16
           }
         }
       ]
     },
     {
       "id": "Boatmobile",
-      "total": 1,
-      "hosts": {
-        "ksamods": 1
-      },
-      "releases": [
-        {
-          "version": "1.0.0",
-          "total": 1,
-          "hosts": {
-            "ksamods": 1
-          }
-        }
-      ]
-    },
-    {
-      "id": "BoreaTestVehicle2",
       "total": 2,
       "hosts": {
         "ksamods": 2
@@ -580,6 +564,22 @@
           "total": 2,
           "hosts": {
             "ksamods": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "BoreaTestVehicle2",
+      "total": 4,
+      "hosts": {
+        "ksamods": 4
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 4,
+          "hosts": {
+            "ksamods": 4
           }
         }
       ]
@@ -1186,32 +1186,32 @@
     },
     {
       "id": "GS2FuelModuleMKI",
-      "total": 7,
+      "total": 10,
       "hosts": {
-        "ksamods": 7
+        "ksamods": 10
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 7,
+          "total": 10,
           "hosts": {
-            "ksamods": 7
+            "ksamods": 10
           }
         }
       ]
     },
     {
       "id": "GS2MKI",
-      "total": 6,
+      "total": 8,
       "hosts": {
-        "ksamods": 6
+        "ksamods": 8
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 6,
+          "total": 8,
           "hosts": {
-            "ksamods": 6
+            "ksamods": 8
           }
         }
       ]
@@ -2817,16 +2817,16 @@
     },
     {
       "id": "Minecraft_Villager",
-      "total": 2,
+      "total": 4,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 4
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 4,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 4
           }
         }
       ]
@@ -3030,16 +3030,16 @@
     },
     {
       "id": "OctoSmokeMonster",
-      "total": 3,
+      "total": 6,
       "hosts": {
-        "ksamods": 3
+        "ksamods": 6
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 3,
+          "total": 6,
           "hosts": {
-            "ksamods": 3
+            "ksamods": 6
           }
         }
       ]
@@ -3711,16 +3711,16 @@
     },
     {
       "id": "superheavy33",
-      "total": 2,
+      "total": 4,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 4
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 4,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 4
           }
         }
       ]
@@ -3743,16 +3743,16 @@
     },
     {
       "id": "TheGuy",
-      "total": 4,
+      "total": 6,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 6
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 4,
+          "total": 6,
           "hosts": {
-            "ksamods": 4
+            "ksamods": 6
           }
         }
       ]
