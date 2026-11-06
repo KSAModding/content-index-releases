@@ -1,0 +1,39 @@
+{
+  "spec_version": 1,
+  "id": "Multirocket",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-04T21:35:36Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/Multirocket/1.0.0",
+    "sha256": "A6BD076DDF501F75DC49814C419AE73AE58C5EF96B5CC6F63237B7B24030DF85",
+    "size": 9677,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-multirocket-1_0_0-6239c5cd/Multirocket-1.0.0.zip"
+    ]
+  },
+  "install_size": 157938,
+  "install": {
+    "root": "Multirocket",
+    "derived": true,
+    "folder": "Multirocket"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Multirocket",
+    "authors": [
+      "Onyx"
+    ],
+    "abstract": "Rocket",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-11)",
+    "license": "CC0-1.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/Multirocket"
+    }
+  }
+}
