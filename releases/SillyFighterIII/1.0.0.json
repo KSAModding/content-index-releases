@@ -1,0 +1,39 @@
+{
+  "spec_version": 1,
+  "id": "SillyFighterIII",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-06T01:12:23Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/SillyFighterIII/1.0.0",
+    "sha256": "8740CDFABAC13C0CF9ADDA5945B6397D157C28E418B26C1B247AC8B2B99E6328",
+    "size": 15187,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-sillyfighteriii-1_0_0-8d8c12fe/SillyFighterIII-1.0.0.zip"
+    ]
+  },
+  "install_size": 248383,
+  "install": {
+    "root": "SillyFighterIII",
+    "derived": true,
+    "folder": "SillyFighterIII"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "SillyFighterIII",
+    "authors": [
+      "Beik"
+    ],
+    "abstract": "Patrol the skies. Ammo refill not included.",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-12)",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/SillyFighterIII"
+    }
+  }
+}
