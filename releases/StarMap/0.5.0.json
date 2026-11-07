@@ -21,7 +21,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/StarMapLoader/StarMap/releases/tag/0.5.0",
-  "changelog_text": "Automated release for version 0.5.0\nCreated from tag 0.5.0 at commit 96fb290173aa7bd669426f639f774298c818be5f",
+  "changelog_text": "Full changelog: https://starmaploader.github.io/StarMap/changelog/",
   "listing": {
     "name": "StarMap",
     "authors": [
