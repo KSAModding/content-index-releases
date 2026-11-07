@@ -5,13 +5,13 @@
   "version": "0.5.0",
   "version_scheme": "semver",
   "release_status": "stable",
-  "release_date": "2026-11-07T14:02:41Z",
+  "release_date": "2026-11-07T14:13:55Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
   "download": {
     "url": "https://github.com/StarMapLoader/StarMap/releases/download/0.5.0/StarMap-0.5.0.zip",
-    "sha256": "D14BA0B18DCEC48DB4CBAA77362264C5429AB6FFA58FDC7195F977D96F7B01D5",
-    "size": 981980,
+    "sha256": "C343E651B4855028D3F0954E4E97D651F7675D1FD927EE543367CAF0C1563FED",
+    "size": 981958,
     "content_type": "application/zip"
   },
   "install_size": 2759281,
