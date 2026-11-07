@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "Oxidizer",
+  "type": "mod-loader",
+  "version": "0.5.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-07T19:12:14Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "os": [
+    "windows",
+    "linux"
+  ],
+  "download": {
+    "url": "https://github.com/SafeShows/Oxidizer/releases/download/v0.5.0/Oxidizer-0.5.0.zip",
+    "sha256": "13323D31816FC202DDCADC4D601CA2E5D7F89592C797C22D2CE2DFF85BDDCD4F",
+    "size": 4355359,
+    "content_type": "application/zip"
+  },
+  "install_size": 14296419,
+  "install": {
+    "root": "Oxidizer",
+    "derived": false,
+    "target": "standalone"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/SafeShows/Oxidizer/releases/tag/v0.5.0",
+  "changelog_text": "### Added\n\n- Oxidizer runs as a StarMap mod: `Oxidizer.StarMap-<version>.zip` holds an `Oxidizer.StarMap` folder for `mods/`. StarMap starts the game and loads it like any C# mod, and Oxidizer then runs the Rhai and Rust mods, side by side with StarMap's C# mods. Standalone Oxidizer stays as it was.\n- Oxidizer's core is also a library (`oxidizer_core.dll` / `liboxidizer_core.so`), which the StarMap mod loads.\n\n### Changed\n\n- Rust mods keep their library in a subfolder, `dll = \"bin/my_mod\"`: StarMap tries to load `mods/<id>/<id>.dll` as a C# mod, and a native library there stops the game. `dll` paths may now include folders.\n- Release zips are named `Oxidizer-<version>.zip` and `Oxidizer.StarMap-<version>.zip` (no `v`), which the content index needs to tell them apart.\n\n### Removed\n\n- The `[loader]` table in the example `mod.toml` files: nothing reads it there. Loaders are declared in the content index listing.",
+  "listing": {
+    "name": "Oxidizer",
+    "authors": [
+      "SafeShows"
+    ],
+    "abstract": "Mod loader that runs Kitten Space Agency mods written in Rust or as Rhai scripts.",
+    "description": "Oxidizer is a mod loader for Kitten Space Agency, written in Rust. It loads code mods written in Rust and mods written as Rhai scripts, so no C# is needed.\n\n![The two example mods, one in Rhai and one in Rust, drawing ImGui windows in game](ksa-image:example-mods)\n\nMods can run code every frame, draw their own ImGui windows with the game's ImGui, read and change game objects by name, and patch game methods before or after they run.\n\nRust mods use the `oxidizer_api` crate from crates.io. Rhai mods are plain `.rhai` files that need no compiling, and they reload while the game runs when you save them.\n\nIn game, **Mods > Oxidizer** in the menu bar shows the loaded mods, their errors and the log, and mods can add their own entries to the Mods menu.\n\nMods go in `Documents/My Games/Kitten Space Agency/mods/<ModName>/`. Oxidizer loads a mod when its `mod.toml` has an `[oxidizer]` section that names a `dll` or a `script`, and skips mods that are disabled in the game's manifest.\n\nYou run `oxidizer.exe` (`oxidizer` on Linux) rather than the game. The first run writes an `oxidizer.toml` next to it, where `game_path` points at the folder Kitten Space Agency was installed in.\n\nOxidizer runs on Windows and Linux. It starts the game itself, so it does not run together with another launcher such as StarMap.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/tools/oxidizer-write-ksa-mods-in-rust-or-rhai-scripts-mod-loader.1559/",
+      "repository": "https://github.com/SafeShows/Oxidizer",
+      "bugtracker": "https://github.com/SafeShows/Oxidizer/issues"
+    }
+  }
+}
