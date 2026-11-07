@@ -9,7 +9,8 @@
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
   "os": [
-    "windows"
+    "windows",
+    "linux"
   ],
   "download": {
     "url": "https://github.com/SafeShows/Oxidizer/releases/download/v0.2.0/Oxidizer-v0.2.0.zip",
