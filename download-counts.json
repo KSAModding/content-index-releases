@@ -529,16 +529,16 @@
     },
     {
       "id": "AmongUsCrewmate",
-      "total": 4,
+      "total": 5,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 5
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 4,
+          "total": 5,
           "hosts": {
-            "ksamods": 4
+            "ksamods": 5
           }
         }
       ]
@@ -561,16 +561,16 @@
     },
     {
       "id": "Boatmobile",
-      "total": 2,
+      "total": 3,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 3
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 3
           }
         }
       ]
@@ -3053,11 +3053,18 @@
     },
     {
       "id": "Multirocket",
-      "total": 1,
+      "total": 3,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 3
       },
       "releases": [
+        {
+          "version": "2.0.0",
+          "total": 2,
+          "hosts": {
+            "ksamods": 2
+          }
+        },
         {
           "version": "1.0.0",
           "total": 1,
@@ -3069,16 +3076,16 @@
     },
     {
       "id": "OctoSmokeMonster",
-      "total": 6,
+      "total": 9,
       "hosts": {
-        "ksamods": 6
+        "ksamods": 9
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 6,
+          "total": 9,
           "hosts": {
-            "ksamods": 6
+            "ksamods": 9
           }
         }
       ]
@@ -3566,16 +3573,16 @@
     },
     {
       "id": "SillyFighterIII",
-      "total": 1,
+      "total": 3,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 3
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 1,
+          "total": 3,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 3
           }
         }
       ]
@@ -3766,16 +3773,16 @@
     },
     {
       "id": "superheavy33",
-      "total": 4,
+      "total": 6,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 6
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 4,
+          "total": 6,
           "hosts": {
-            "ksamods": 4
+            "ksamods": 6
           }
         }
       ]
@@ -3798,16 +3805,16 @@
     },
     {
       "id": "TheGuy",
-      "total": 6,
+      "total": 7,
       "hosts": {
-        "ksamods": 6
+        "ksamods": 7
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 6,
+          "total": 7,
           "hosts": {
-            "ksamods": 6
+            "ksamods": 7
           }
         }
       ]
