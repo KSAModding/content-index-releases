@@ -25,6 +25,7 @@
   "loader": {
     "id": "StarMap",
     "min": "0.4.8",
+    "max": "0.4.8",
     "source": "authored"
   },
   "dependencies": [],
