@@ -1,0 +1,42 @@
+{
+  "spec_version": 1,
+  "id": "StarMap",
+  "type": "mod-loader",
+  "version": "0.5.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-07T18:41:58Z",
+  "game_min": "2026.8.3.5117",
+  "game_min_revision": 5117,
+  "download": {
+    "url": "https://github.com/StarMapLoader/StarMap/releases/download/0.5.2/StarMap-0.5.2.zip",
+    "sha256": "9FF39F55406A22BB790DAFC726AA571B72B1D42C0BBA57EF14CB4537EEB2F494",
+    "size": 981949,
+    "content_type": "application/zip"
+  },
+  "install_size": 2759281,
+  "install": {
+    "derived": true,
+    "target": "standalone"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/StarMapLoader/StarMap/releases/tag/0.5.2",
+  "changelog_text": "Automated release for version 0.5.2\nCreated from tag 0.5.2 at commit 465bdac24e06e1060cee9e1a50f49023bde962b0",
+  "listing": {
+    "name": "StarMap",
+    "authors": [
+      "KlaasWhite"
+    ],
+    "abstract": "Mod loader that runs code mods for Kitten Space Agency.",
+    "description": "A prototype arbitrary code modloader for Kitten Space Agency.\nIt can run with that functionality in the background, or as a dumb loader that only loads mods.\n\nIt uses Assembly Load Contexts so each mod's dependencies are managed separately, which reduces conflicts.\n\nMods go in `Documents/My Games/Kitten Space Agency/mods/<ModName>/`, which is recommended because it survives game updates, or in `<KSA Installation>/Content/<ModName>/`.\nStarMap uses the game's own manifest system to discover mods in both locations.\n\nYou run `StarMap.exe` rather than the game. The first run fails and writes a `StarMapConfig.json` next to it, where `GameLocation` points at the folder Kitten Space Agency was installed in.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/threads/starmap-mod-loader.384/",
+      "repository": "https://github.com/StarMapLoader/StarMap",
+      "bugtracker": "https://github.com/StarMapLoader/StarMap/issues"
+    }
+  }
+}
