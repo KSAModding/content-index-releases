@@ -1,7 +1,7 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-07T20:58:51Z",
-  "counted_at": "2026-11-07T20:58:51Z",
+  "checked_at": "2026-11-08T21:14:45Z",
+  "counted_at": "2026-11-08T21:14:45Z",
   "listings": [
     {
       "id": "AdvancedFlightComputer",
@@ -91,6 +91,11 @@
     {
       "id": "KSAMainMenu",
       "thread": 1554,
+      "in_sitemap": false
+    },
+    {
+      "id": "KSAMultiplayer",
+      "thread": 1578,
       "in_sitemap": false
     },
     {
