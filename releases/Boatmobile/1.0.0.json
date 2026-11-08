@@ -8,6 +8,8 @@
   "release_date": "2026-11-02T15:12:25Z",
   "game_min": "2026.10.13.5602",
   "game_min_revision": 5602,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/Boatmobile/1.0.0",
     "sha256": "73D565E786ACFFCC79768D371E1CE470CC49549A86EB613ADCF58A464C5B1A3D",
