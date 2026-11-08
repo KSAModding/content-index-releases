@@ -8,6 +8,8 @@
   "release_date": "2026-11-07T14:13:55Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://github.com/StarMapLoader/StarMap/releases/download/0.5.0/StarMap-0.5.0.zip",
     "sha256": "C343E651B4855028D3F0954E4E97D651F7675D1FD927EE543367CAF0C1563FED",
