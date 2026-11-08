@@ -8,6 +8,8 @@
   "release_date": "2026-11-06T01:12:23Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/SillyFighterIII/1.0.0",
     "sha256": "8740CDFABAC13C0CF9ADDA5945B6397D157C28E418B26C1B247AC8B2B99E6328",
