@@ -8,6 +8,8 @@
   "release_date": "2026-11-03T14:30:28Z",
   "game_min": "2026.9.7.5402",
   "game_min_revision": 5402,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/GS2FuelModuleMKI/1.0.0",
     "sha256": "0543CE302FF730FC31E4CBB0C90517CAEA919C871CA1595CD60F071AE356A501",
