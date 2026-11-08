@@ -8,6 +8,8 @@
   "release_date": "2026-10-31T20:10:43Z",
   "game_min": "2026.9.7.5402",
   "game_min_revision": 5402,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/superheavy33/1.0.0",
     "sha256": "BE067760567CB896B7070D1DD731DCCEBC2F84A6F429F906C574E998725A19C9",
