@@ -29,12 +29,6 @@
   },
   "dependencies": [
     {
-      "id": "KittenExtensionsContinued",
-      "kind": "recommends",
-      "min": "0.5.3",
-      "source": "authored"
-    },
-    {
       "id": "ModMenu",
       "kind": "suggests",
       "min": "0.2.3",
