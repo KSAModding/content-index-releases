@@ -567,16 +567,16 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 18,
+      "total": 20,
       "hosts": {
-        "ksamods": 18
+        "ksamods": 20
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 18,
+          "total": 20,
           "hosts": {
-            "ksamods": 18
+            "ksamods": 20
           }
         }
       ]
@@ -599,16 +599,16 @@
     },
     {
       "id": "BoreaTestVehicle2",
-      "total": 4,
+      "total": 5,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 5
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 4,
+          "total": 5,
           "hosts": {
-            "ksamods": 4
+            "ksamods": 5
           }
         }
       ]
@@ -1215,32 +1215,32 @@
     },
     {
       "id": "GS2FuelModuleMKI",
-      "total": 11,
+      "total": 12,
       "hosts": {
-        "ksamods": 11
+        "ksamods": 12
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 11,
+          "total": 12,
           "hosts": {
-            "ksamods": 11
+            "ksamods": 12
           }
         }
       ]
     },
     {
       "id": "GS2MKI",
-      "total": 9,
+      "total": 10,
       "hosts": {
-        "ksamods": 9
+        "ksamods": 10
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 9,
+          "total": 10,
           "hosts": {
-            "ksamods": 9
+            "ksamods": 10
           }
         }
       ]
@@ -3075,16 +3075,16 @@
     },
     {
       "id": "Multirocket",
-      "total": 4,
+      "total": 5,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 5
       },
       "releases": [
         {
           "version": "2.0.0",
-          "total": 3,
+          "total": 4,
           "hosts": {
-            "ksamods": 3
+            "ksamods": 4
           }
         },
         {
@@ -3950,32 +3950,32 @@
     },
     {
       "id": "TestModdedNuclearVehicle",
-      "total": 2,
+      "total": 3,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 3
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 3
           }
         }
       ]
     },
     {
       "id": "TheGuy",
-      "total": 7,
+      "total": 8,
       "hosts": {
-        "ksamods": 7
+        "ksamods": 8
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 7,
+          "total": 8,
           "hosts": {
-            "ksamods": 7
+            "ksamods": 8
           }
         }
       ]
