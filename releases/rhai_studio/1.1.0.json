@@ -1,0 +1,51 @@
+{
+  "spec_version": 1,
+  "id": "rhai_studio",
+  "type": "mod",
+  "version": "1.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-08T16:57:32Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "os": [
+    "windows",
+    "linux"
+  ],
+  "download": {
+    "url": "https://github.com/SafeShows/oxidizer-rhai-studio/releases/download/v1.1.0/rhai_studio-1.1.0.zip",
+    "sha256": "AC09B768B0BDB1153D5F46A8162A3C6AB9D7E12A1551BCB5A3DC3FE5AD07277A",
+    "size": 1152144,
+    "content_type": "application/zip"
+  },
+  "install_size": 2859241,
+  "install": {
+    "root": "rhai_studio",
+    "derived": true
+  },
+  "loader": {
+    "id": "Oxidizer",
+    "min": "0.7.0",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/SafeShows/oxidizer-rhai-studio/releases/tag/v1.1.0",
+  "changelog_text": "### Added\n\n- **Autocomplete:** suggestions as you type, with signatures and a line of docs: the game's API (`ksa::Program::con` offers `controlled_vehicle() -> Vehicle`), game object members after a dot, Oxidizer's and Rhai's functions, keywords and the names your script defines. Up/Down choose, Tab or Enter insert.\n- **API explorer:** the **API** button opens a panel with everything a script can call. Search it, open a module (`ksa::Universe::`) to see what's in it, read signatures and docs, and **INSERT** a call into the script.\n\nBoth read the definition files Oxidizer writes, so they always match your game version. Still works with Oxidizer 0.7.0 or later.\n\n**Full Changelog**: https://github.com/SafeShows/oxidizer-rhai-studio/compare/v1.0.0...v1.1.0",
+  "listing": {
+    "name": "Rhai Studio",
+    "authors": [
+      "SafeShows"
+    ],
+    "abstract": "Write mods inside the game: an editor for Oxidizer's Rhai mods with syntax colors, hot reload, a new-mod wizard and a live console.",
+    "description": "Rhai Studio is an in-game editor for Oxidizer's Rhai mods. Open a mod's script, change it, press **Ctrl+S**, and the mod reloads within a second while you keep flying. No compiler, no restarting the game.\n\n![Rhai Studio in game: the mod list, a script with syntax colors, and the console](ksa-image:studio)\n\n- **Editor with syntax colors:** keywords, strings, numbers, comments, calls and `ksa::` game modules each get their own color, with line numbers. Undo, select all, copy and paste work as usual.\n- **Hot reload:** SAVE (or Ctrl+S) writes the file and Oxidizer reloads the mod right away. Files changed in another editor show up in the open tab too.\n- **New mod wizard:** type a name and press CREATE: Rhai Studio makes the mod with a starter script that opens a window, and it starts running at once.\n- **Errors where you need them:** a mod that fails to load or stops on an error shows it above the editor, with the line number.\n- **Live console:** a drawer with the log as it comes in and a line that runs Rhai against your current game, e.g. `ksa::Program::controlled_vehicle().id`.\n\n**F9** or **Mods > Rhai Studio** opens it, and the × closes it. It is styled after the game's own dialogs.\n\nRhai Studio is a Rust mod for [Oxidizer](https://github.com/SafeShows/Oxidizer), which a mod manager installs with it, and a full example of Oxidizer's API. MIT-0, so copy any of it into your own mods.\n",
+    "license": "MIT-0",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/tools/rhai-studio-1-0-0-write-mods-inside-the-game-oxidizer.1575/",
+      "repository": "https://github.com/SafeShows/oxidizer-rhai-studio",
+      "bugtracker": "https://github.com/SafeShows/oxidizer-rhai-studio/issues"
+    }
+  }
+}
