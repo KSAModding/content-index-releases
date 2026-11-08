@@ -8,6 +8,8 @@
   "release_date": "2026-11-02T15:03:33Z",
   "game_min": "2026.8.19.5261",
   "game_min_revision": 5261,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/Minecraft_Villager/1.0.0",
     "sha256": "06CE49106B25C00F311BF63C1C0CC5717F988275810FF8C1E66ADC1B50652001",
