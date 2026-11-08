@@ -1,0 +1,49 @@
+{
+  "spec_version": 1,
+  "id": "purr2d2",
+  "type": "mod",
+  "version": "1.21.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-08T03:13:48Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/meow-sci/purr2d2/releases/download/v1.21.0/purr2d2-1.21.0.zip",
+    "sha256": "C1BD1AF7D7A52A8718B0E12E80A77DA3A00C1B25725E02CB317873BC04ECACA1",
+    "size": 3625636,
+    "content_type": "application/zip"
+  },
+  "install_size": 5068253,
+  "install": {
+    "root": "purr2d2",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/purr2d2/releases/tag/v1.21.0",
+  "changelog_text": "- clutter slicing (trees and rocks)\n- tree slicing has a tree ring texture applied\n- tree slicing has fire vfx\n- rock slicing has glowing vfx\n- the furce rotation gained a shift modifier to rotate on a different axis\n- added drop/undrop mechanic\n- improved some performance\n- improved the cut detection and slice plane (also added options to change algoritms for experimentation - the ones i think work the best are the current defaults)",
+  "listing": {
+    "name": "purr2d2",
+    "authors": [
+      "Alex",
+      "tomservo"
+    ],
+    "abstract": "BFL9K and The Furce at your fingertips",
+    "description": "A Kitten Spacy Agency mod to add:\n\n- BFL9K (Big Fucking Laser 9000)\n- The Furce\n\n# media\n\n![bfl9k_01](ksa-image:bfl9k_01)\n\n![bfl9k_02](ksa-image:bfl9k_02)\n\n![bfl9k_03](ksa-image:bfl9k_03)\n\n![blf9k_04](ksa-image:blf9k_04)\n\n![slicing_01](ksa-image:slicing_01)\n\n![the_furce_01](ksa-image:the_furce_01)\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/purr2d2n-release.1500/",
+      "homepage": "https://github.com/meow-sci/purr2d2",
+      "repository": "https://github.com/meow-sci/purr2d2",
+      "bugtracker": "https://github.com/meow-sci/purr2d2/issues"
+    }
+  }
+}
