@@ -8,6 +8,8 @@
   "release_date": "2026-11-01T07:28:41Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/TestModdedNuclearVehicle/1.0.0",
     "sha256": "0AB034A4325CAD39AB3DF250EE8A1DAD9FAB76A7143C806E77BED411A633DCA4",
