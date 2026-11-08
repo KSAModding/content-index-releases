@@ -8,6 +8,8 @@
   "release_date": "2026-10-27T16:17:03Z",
   "game_min": "2026.10.19.5638",
   "game_min_revision": 5638,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://spacedock.info/mod/4753/KSP%20Characters/download/0.2.0",
     "sha256": "95C963119CB46C3353330CA7C6C7DFD4386800A85952956AC883531D19310CE9",

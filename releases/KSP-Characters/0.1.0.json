@@ -8,6 +8,8 @@
   "release_date": "2026-10-27T11:34:52Z",
   "game_min": "2026.10.19.5638",
   "game_min_revision": 5638,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://github.com/paulo-santana/KSA-KSP-Characters/releases/download/v0.1.0/KSP-Characters-v0.1.0.zip",
     "sha256": "1BDD1D3C618123A41809D56DCCA58AC987FC75759D2A7DCACB031541D73D8918",
