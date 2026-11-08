@@ -39,6 +39,11 @@
       "in_sitemap": true
     },
     {
+      "id": "flight_panel",
+      "thread": 1571,
+      "in_sitemap": false
+    },
+    {
       "id": "GEE",
       "thread": 1527,
       "in_sitemap": true
