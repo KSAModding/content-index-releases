@@ -12,7 +12,10 @@
     "url": "https://github.com/Maximilian-Nesslauer/KSA-MeasureTools/releases/download/v1.1.18/MeasureTools.zip",
     "sha256": "AEB4F59C657DE8FCEF3F4D70D38FEA97CC8068967ADD490387D9B2225ADD8355",
     "size": 42522,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4319/MeasureTools/download/1.1.18"
+    ]
   },
   "install_size": 89668,
   "install": {
