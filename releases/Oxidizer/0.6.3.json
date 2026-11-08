@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "Oxidizer",
+  "type": "mod-loader",
+  "version": "0.6.3",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-08T12:30:24Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "os": [
+    "windows",
+    "linux"
+  ],
+  "download": {
+    "url": "https://github.com/SafeShows/Oxidizer/releases/download/v0.6.3/Oxidizer-0.6.3.zip",
+    "sha256": "CE9BF55B75708429CE19FCD2E6FC8EB1AEC4D596058A6DF0031947B53A7891A3",
+    "size": 6981710,
+    "content_type": "application/zip"
+  },
+  "install_size": 24488656,
+  "install": {
+    "root": "Oxidizer",
+    "derived": false,
+    "target": "standalone"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/SafeShows/Oxidizer/releases/tag/v0.6.3",
+  "changelog_text": "### Changed\n\n- Rhai editor definitions now carry types for instance members too (`fn get_surface_speed(obj: Obj) -> float`), with the game types that have each member in its description. A member that game types define differently keeps `?`. Types are named as scripts see them: `int`, `float`, `bool`, `String`, or the game type.\n- The definitions are rewritten when Oxidizer updates too, not only when the game does.",
+  "listing": {
+    "name": "Oxidizer",
+    "authors": [
+      "SafeShows"
+    ],
+    "abstract": "Mod loader that runs Kitten Space Agency mods written in Rust or as Rhai scripts.",
+    "description": "Oxidizer is a mod loader for Kitten Space Agency, written in Rust. It loads code mods written in Rust and mods written as Rhai scripts, so no C# is needed.\n\n![The two example mods, one in Rhai and one in Rust, drawing ImGui windows in game](ksa-image:example-mods)\n\nThis is the standalone loader: you start the game through `oxidizer.exe` (`oxidizer` on Linux) instead of the game, and no StarMap is needed. If you use StarMap or other C# mods, install `Oxidizer.StarMap` instead: the same Oxidizer as a StarMap mod, and the same mods run with both.\n\nMods can run code every frame, draw their own ImGui windows with the game's ImGui, read and change game objects, patch game methods before or after they run and change what they return, react to hotkeys, keep their own settings, and add entries to a Mods menu in the game's menu bar. **Mods > Oxidizer** shows the loaded mods, their errors and the log.\n\nRhai mods are plain `.rhai` files that need no compiling, and they reload while the game runs when you save them. Rust mods use the `oxidizer_api` crate from crates.io, and `oxidizer --bindgen` generates typed Rust bindings for the whole game, with autocomplete and compile-time checks.\n\nMods go in `Documents/My Games/Kitten Space Agency/mods/<ModName>/`. Oxidizer loads a mod when its `mod.toml` has an `[oxidizer]` section that names a `dll` or a `script`, and skips mods that are disabled in the game's manifest. The first run writes an `oxidizer.toml` next to the executable, where `game_path` points at the folder Kitten Space Agency was installed in.\n\nOxidizer runs on Windows and Linux.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/tools/oxidizer-write-ksa-mods-in-rust-or-rhai-scripts-mod-loader.1559/",
+      "repository": "https://github.com/SafeShows/Oxidizer",
+      "bugtracker": "https://github.com/SafeShows/Oxidizer/issues"
+    }
+  }
+}
