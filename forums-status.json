@@ -189,6 +189,11 @@
       "in_sitemap": true
     },
     {
+      "id": "rhai_studio",
+      "thread": 1575,
+      "in_sitemap": false
+    },
+    {
       "id": "ShaderExtensions",
       "thread": 811,
       "in_sitemap": true
