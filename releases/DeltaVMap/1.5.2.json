@@ -8,6 +8,8 @@
   "release_date": "2026-10-29T22:06:35Z",
   "game_min": "2026.10.19.5638",
   "game_min_revision": 5638,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap/releases/download/v1.5.2/DeltaVMap.zip",
     "sha256": "1140745B286B524E90BEAF1166CF060F70FD9DD814C38FC353A984BBED6D77AF",
