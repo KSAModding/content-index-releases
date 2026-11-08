@@ -8,6 +8,8 @@
   "release_date": "2026-11-02T17:52:48Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/save/SaveSharingTest/1.0.0",
     "sha256": "22C840A80010148B3923BA2A44A7734B7396B7814575C7779E179B54131F2733",
