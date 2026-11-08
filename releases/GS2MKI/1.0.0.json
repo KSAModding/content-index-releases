@@ -8,6 +8,8 @@
   "release_date": "2026-11-03T14:19:56Z",
   "game_min": "2026.9.7.5402",
   "game_min_revision": 5402,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/GS2MKI/1.0.0",
     "sha256": "B4415B16875C076E9F66A527776D1DC098FC80DD2A93509BEC26B226250BE5C1",
