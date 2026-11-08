@@ -8,6 +8,8 @@
   "release_date": "2026-11-02T14:56:26Z",
   "game_min": "2026.8.19.5261",
   "game_min_revision": 5261,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/AmongUsCrewmate/1.0.0",
     "sha256": "6648DC999A74E83666FB481CB2DF6540DE17040EA8AB9882EBD4DF2020340526",
