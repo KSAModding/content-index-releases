@@ -8,6 +8,8 @@
   "release_date": "2026-11-03T14:31:24Z",
   "game_min": "2026.9.7.5402",
   "game_min_revision": 5402,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/ArgiziontMKI/1.0.0",
     "sha256": "AA5DB853537197C6D0DEB587A6F691B8F542A688CA2D65E7B1244FE83614BFED",
