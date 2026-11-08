@@ -8,6 +8,8 @@
   "release_date": "2026-11-04T21:35:36Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/Multirocket/1.0.0",
     "sha256": "A6BD076DDF501F75DC49814C419AE73AE58C5EF96B5CC6F63237B7B24030DF85",
