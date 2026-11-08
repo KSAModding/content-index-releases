@@ -8,6 +8,8 @@
   "release_date": "2026-10-31T17:11:35Z",
   "game_min": "2026.10.25.5707",
   "game_min_revision": 5707,
+  "game_max": "2026.10.25.5707",
+  "game_max_revision": 5707,
   "download": {
     "url": "https://ksamods.gg/share/files/vehicle/TheGuy/1.0.0",
     "sha256": "8643C51DD1D13BD8C116968EA26514B09C4A573F1F05D3784518958E24A063B6",
