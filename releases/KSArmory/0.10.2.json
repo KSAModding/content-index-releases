@@ -1,0 +1,57 @@
+{
+  "spec_version": 1,
+  "id": "KSArmory",
+  "type": "mod",
+  "version": "0.10.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-09T15:23:43Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSArmory/releases/download/v0.10.2/KSArmory-0.10.2.zip",
+    "sha256": "F41D24A4498BD0DE2E7DD81C3401D77C2D617D7621510B63661B6D1D02351859",
+    "size": 20293408,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4460/KSArmory/download/0.10.2"
+    ]
+  },
+  "install_size": 29649662,
+  "install": {
+    "root": "KSArmory",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSArmory/releases/tag/v0.10.2",
+  "changelog_text": "## [0.10.2](https://github.com/LaurensDeV/KSArmory/compare/v0.10.1...v0.10.2) (2026-11-09)\n\n### Features\n\n* **infra:** route servers.ksarmory.com to the multiplayer list ([4ebf850](https://github.com/LaurensDeV/KSArmory/commit/4ebf850859b22e6de9f3a028a531b31f0c300959))\n\n\n---\n\nDrop the `KSArmory` folder into your KSA user directory's `mods/`, register it in\n`manifest.toml`, and launch through StarMap. See the README for the full guide.\n\nWorks on Windows and Linux — the mod is a portable .NET assembly.\n\nRelease build: no debug symbols, log starts at INFO. Tick **Verbose log** in the\npanel if you are reporting a bug.",
+  "listing": {
+    "name": "KSArmory",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "Weapon systems for Kitten Space Agency: point defence, guided and unguided munitions, targeting sights and a ballistic computer.",
+    "description": "![KSArmory: weapon systems for Kitten Space Agency](ksa-image:banner)\n\nAdds working weapon systems to Kitten Space Agency. Every launcher searches, tracks, decides and shoots on its own. The mod simulates the rounds itself instead of using the vehicle physics, so guidance and fuzes run at sub-frame accuracy and cannot corrupt a save.\n\nEvery part has a page with a 3D model you can turn around on **[ksarmory.com](https://ksarmory.com)**, along with the install guide and how to use it.\n\n### Air defence\n\n![The Pantsir-S1 point defence system](ksa-image:card-pantsir)\n\nThe **Pantsir-S1** is a complete air-defence vehicle on an 8x8 chassis: a spinning search radar, twelve command-guided missiles in two pods of six, twin 30 mm cannon, and an electro-optical director on the turret roof that you can look through. The turret traverses and the pods elevate. It has its own command module, so the Pantsir alone is a craft you can build and launch.\n\n### Guns\n\n![The Mk 15 Phalanx CIWS, the 5\"/54 Mk 42 mount and the M197 chin turret](ksa-image:sheet-guns)\n\n- **Mk 15 Phalanx CIWS**: a six-barrel 20 mm rotary cannon with its own radar, 4,500 rounds a minute. Stacks on any 3 m node.\n- **5\"/54 Mk 42**: a five-inch naval gun, 40 rounds a minute out to 15.7 km. Its shells burst on a timed fuze at the predicted meeting point, so they do not have to hit.\n- **M197 chin turret**: a three-barrel 20 mm cannon that hangs under a nose and traverses 110 degrees either way.\n\n### Missiles\n\n![The AIM-9J Sidewinder, AIM-120C AMRAAM and AGM-88 HARM](ksa-image:sheet-missiles)\n\nAttach a missile to a wing, a hull or the empty Weapon Mount and it brings its own launch rail. It slides off under its own motor.\n\n- **AIM-9J Sidewinder**: infrared-guided, 400 m to 14 km. Keeps guiding after launch on its own seeker.\n- **AIM-120C AMRAAM**: radar-guided, about Mach 4, out to 105 km.\n- **AGM-88 HARM**: homes on radar transmissions, out to 148 km. It can only engage a craft whose radar is switched on, and if that radar goes quiet, a missile already in the air flies on to where the signal was last heard.\n\n### Rocket pods\n\n![The LAU-10 Zuni pod and the six-round Zuni pod](ksa-image:sheet-rockets)\n\nThe **LAU-10** carries four unguided Zuni 5-inch rockets, and the **six-round pod** carries six. No lock is needed: each press fires one rocket, and a sight draws where it will land. Models and textures by **Mallikas**, who also made the Mk 42 and the M197.\n\n### Sights and sensors\n\n![The EO director, the LITENING targeting pod and the infrared search and track sensor](ksa-image:sheet-sensors)\n\n- **EO Director**: an electro-optical sight on a mast. Watch through it in a camera window or the main view. It needs no weapon on the craft, so a hull with one director on it is an observation post.\n- **Rafael LITENING pod**: the whole nose rolls about the pod's axis while the sensor ball nods inside it. It has TV and thermal modes, zooms to a 1 degree field of view, and carries a laser designator.\n- **IRST**: a passive heat sensor. It sends nothing out, so it cannot be detected or homed on, and it finds targets for the sights.\n\n### Directed energy\n\n![The YAL-1 nose turret](ksa-image:card-yal1)\n\nThe **YAL-1 nose turret** is the Airborne Laser's 1.5 m telescope in a rotating nose. It stacks on a 3 m node, tracks a target and holds a 1 MW beam on whichever part it is aimed at. At 100 km a part burns through in a few seconds.\n\n### Nuclear weapons\n\n![The B61 bomb and the Heavy MIRV Bus](ksa-image:sheet-nuclear)\n\n- **B61**: a guided nuclear bomb on the ejector rack it brings. Designate a point inside the reach ring the sight draws and it steers onto it as it falls. Yield from 0.3 kt to 340 kt.\n- **Heavy MIRV Bus**: the top stage of a ballistic missile, carrying seven reentry vehicles. Click your targets on the map and the ballistic computer flies the whole rocket: ascent, guided cutoff, post-boost trim, and the release of each warhead. It picks up from wherever the vehicle already is, on the pad, mid-ascent or in orbit.\n\n![A nuclear fireball over open ground, its shock front bending the sky around it](ksa-image:nuclear-burst)\n\nA burst behaves differently at every altitude, from a surface burst's mushroom cloud to the aurora and glowing debris of one above the atmosphere, with blast, heat, fallout and radiation that KSA's own dose gauge reads.\n\n### Countermeasures\n\nTwo **AN/ALE-47** dispensers, one of flares and one of chaff. They attach to any surface and throw decoys to pull a missile's seeker off the craft carrying them. Fire them by hand or let them fire automatically when a missile comes for you.\n\n### Fire control and damage\n\n- Threats are judged by closest point of approach, so targets flying past can be engaged, not only ones flying straight at you.\n- Teams with their own rules of engagement, so two sites can be on opposite sides.\n- A radar can go silent, but a silent radar cannot see either.\n- Rounds in the air can be shot down.\n- Damage is per part: fragments, blast and impacts wear each part's health down, tanks leak from the holes, and parts catch fire.\n- A paintball mode marks hits with each team's paint instead of breaking anything.\n\n### Weapon packs\n\nYou can add weapons without writing code. A weapon pack is an ordinary KSA mod with a folder of definition files, and KSArmory's own weapons are defined the same way. Any built-in family can be switched off. See [the pack guide](https://ksarmory.com/modding/weapon-packs/).\n",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "user-interface",
+      "audio",
+      "weapons",
+      "physics"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kessler-systems-armory-ksarmory.1131/",
+      "homepage": "https://ksarmory.com",
+      "repository": "https://github.com/LaurensDeV/KSArmory",
+      "spacedock": "https://spacedock.info/mod/4460/KSArmory",
+      "bugtracker": "https://github.com/LaurensDeV/KSArmory/issues"
+    }
+  }
+}
