@@ -64,6 +64,11 @@
       "in_sitemap": true
     },
     {
+      "id": "KSA-Simplified-Chinese-Localization",
+      "thread": 1599,
+      "in_sitemap": false
+    },
+    {
       "id": "KSA_SeaDragon",
       "thread": 1263,
       "in_sitemap": true
