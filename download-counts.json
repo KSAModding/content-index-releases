@@ -591,16 +591,16 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 20,
+      "total": 21,
       "hosts": {
-        "ksamods": 20
+        "ksamods": 21
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 20,
+          "total": 21,
           "hosts": {
-            "ksamods": 20
+            "ksamods": 21
           }
         }
       ]
@@ -2871,6 +2871,22 @@
           "total": 0,
           "hosts": {
             "github": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "LunarLander",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
           }
         }
       ]
