@@ -6,8 +6,8 @@
   "version_scheme": "semver",
   "release_status": "stable",
   "release_date": "2026-11-08T18:34:27Z",
-  "game_min": "2026.10.25.5707",
-  "game_min_revision": 5707,
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
   "download": {
     "url": "https://github.com/meow-sci/purr2d2/releases/download/v1.25.0/purr2d2-1.25.0.zip",
     "sha256": "ADCF9F1326C0EC8301EC520CF3C5F1F9F64E41F5DD32C7CF3EDA16324C81A622",
@@ -21,7 +21,7 @@
   },
   "loader": {
     "id": "StarMap",
-    "min": "0.4.8",
+    "min": "0.5.4",
     "source": "authored"
   },
   "dependencies": [],
