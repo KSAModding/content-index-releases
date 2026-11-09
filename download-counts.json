@@ -2877,16 +2877,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 0,
+      "total": 2,
       "hosts": {
-        "ksamods": 0
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 0,
+          "total": 2,
           "hosts": {
-            "ksamods": 0
+            "ksamods": 2
           }
         }
       ]
