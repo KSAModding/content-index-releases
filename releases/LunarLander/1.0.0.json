@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/LunarLander/1.0.0",
     "sha256": "15F61AEDA9B2012A9DC2995F50290DD8B870E680F2F896BB84BEFD4B906344DD",
     "size": 4202,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-lunarlander-1_0_0-a9f65a5e/LunarLander-1.0.0.zip"
+    ]
   },
   "install_size": 44822,
   "install": {
