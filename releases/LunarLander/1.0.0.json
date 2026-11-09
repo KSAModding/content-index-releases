@@ -1,0 +1,41 @@
+{
+  "spec_version": 1,
+  "id": "LunarLander",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-09T01:33:57Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/LunarLander/1.0.0",
+    "sha256": "15F61AEDA9B2012A9DC2995F50290DD8B870E680F2F896BB84BEFD4B906344DD",
+    "size": 4202,
+    "content_type": "application/zip"
+  },
+  "install_size": 44822,
+  "install": {
+    "root": "Lunar Lander",
+    "derived": true,
+    "folder": "Lunar Lander"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Basic Lunar Lander",
+    "authors": [
+      "BarneyTheGod"
+    ],
+    "abstract": "A basic Lunar Lander with ~1km/s of margin.",
+    "description": "This lunar lander is the most basic you can get; Shelter, power, food, water, air, and a clump of hairballs.\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-13)",
+    "license": "CC-BY-SA-4.0",
+    "tags": [
+      "lunar-lander",
+      "life-support",
+      "hunter-approved"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/LunarLander"
+    }
+  }
+}
