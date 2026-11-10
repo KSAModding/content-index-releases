@@ -598,16 +598,16 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 21,
+      "total": 22,
       "hosts": {
-        "ksamods": 21
+        "ksamods": 22
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 21,
+          "total": 22,
           "hosts": {
-            "ksamods": 21
+            "ksamods": 22
           }
         }
       ]
@@ -1335,32 +1335,32 @@
     },
     {
       "id": "GS2FuelModuleMKI",
-      "total": 12,
+      "total": 13,
       "hosts": {
-        "ksamods": 12
+        "ksamods": 13
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 12,
+          "total": 13,
           "hosts": {
-            "ksamods": 12
+            "ksamods": 13
           }
         }
       ]
     },
     {
       "id": "GS2MKI",
-      "total": 10,
+      "total": 11,
       "hosts": {
-        "ksamods": 10
+        "ksamods": 11
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 10,
+          "total": 11,
           "hosts": {
-            "ksamods": 10
+            "ksamods": 11
           }
         }
       ]
@@ -2993,16 +2993,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 2,
+      "total": 5,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 5
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 5,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 5
           }
         }
       ]
