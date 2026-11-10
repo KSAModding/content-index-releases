@@ -2993,16 +2993,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 5,
+      "total": 8,
       "hosts": {
-        "ksamods": 5
+        "ksamods": 8
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 5,
+          "total": 8,
           "hosts": {
-            "ksamods": 5
+            "ksamods": 8
           }
         }
       ]
