@@ -3,18 +3,25 @@
   "listings": [
     {
       "id": "AdvancedFlightComputer",
-      "total": 2407,
+      "total": 2458,
       "hosts": {
-        "github": 1249,
-        "spacedock": 1158
+        "github": 1286,
+        "spacedock": 1172
       },
       "releases": [
         {
-          "version": "0.12.3",
-          "total": 15,
+          "version": "0.12.4-nightly.20261109",
+          "total": 3,
           "hosts": {
-            "github": 13,
-            "spacedock": 2
+            "github": 3
+          }
+        },
+        {
+          "version": "0.12.3",
+          "total": 53,
+          "hosts": {
+            "github": 40,
+            "spacedock": 13
           }
         },
         {
@@ -35,9 +42,9 @@
         },
         {
           "version": "0.12.0",
-          "total": 22,
+          "total": 26,
           "hosts": {
-            "github": 15,
+            "github": 19,
             "spacedock": 7
           }
         },
@@ -273,26 +280,26 @@
         },
         {
           "version": "0.7.2",
-          "total": 208,
+          "total": 210,
           "hosts": {
-            "github": 81,
-            "spacedock": 127
+            "github": 82,
+            "spacedock": 128
           }
         },
         {
           "version": "0.7.1",
-          "total": 113,
+          "total": 115,
           "hosts": {
-            "github": 47,
-            "spacedock": 66
+            "github": 48,
+            "spacedock": 67
           }
         },
         {
           "version": "0.7.0",
-          "total": 96,
+          "total": 98,
           "hosts": {
-            "github": 48,
-            "spacedock": 48
+            "github": 49,
+            "spacedock": 49
           }
         },
         {
@@ -639,18 +646,18 @@
     },
     {
       "id": "CharacterManager",
-      "total": 93,
+      "total": 111,
       "hosts": {
         "github": 15,
-        "spacedock": 78
+        "spacedock": 96
       },
       "releases": [
         {
           "version": "0.4.1",
-          "total": 5,
+          "total": 23,
           "hosts": {
             "github": 2,
-            "spacedock": 3
+            "spacedock": 21
           }
         },
         {
@@ -681,46 +688,53 @@
     },
     {
       "id": "CompactHUD",
-      "total": 52,
+      "total": 66,
       "hosts": {
-        "github": 52
+        "github": 66
       },
       "releases": [
         {
-          "version": "0.1.2",
-          "total": 25,
+          "version": "0.1.3",
+          "total": 9,
           "hosts": {
-            "github": 25
+            "github": 9
+          }
+        },
+        {
+          "version": "0.1.2",
+          "total": 28,
+          "hosts": {
+            "github": 28
           }
         },
         {
           "version": "0.1.1",
-          "total": 20,
+          "total": 21,
           "hosts": {
-            "github": 20
+            "github": 21
           }
         },
         {
           "version": "0.1.0",
-          "total": 7,
+          "total": 8,
           "hosts": {
-            "github": 7
+            "github": 8
           }
         }
       ]
     },
     {
       "id": "Compendium",
-      "total": 1630,
+      "total": 1641,
       "hosts": {
-        "spacedock": 1630
+        "spacedock": 1641
       },
       "releases": [
         {
           "version": "0.12.0",
-          "total": 118,
+          "total": 129,
           "hosts": {
-            "spacedock": 118
+            "spacedock": 129
           }
         },
         {
@@ -867,97 +881,97 @@
     },
     {
       "id": "DeltaVMap",
-      "total": 8046,
+      "total": 8085,
       "hosts": {
-        "github": 7155,
-        "spacedock": 891
+        "github": 7183,
+        "spacedock": 902
       },
       "releases": [
         {
           "version": "1.5.4",
-          "total": 12,
+          "total": 39,
           "hosts": {
-            "github": 10,
-            "spacedock": 2
+            "github": 27,
+            "spacedock": 12
           }
         },
         {
           "version": "1.5.3",
-          "total": 7,
+          "total": 8,
           "hosts": {
-            "github": 6,
+            "github": 7,
             "spacedock": 1
           }
         },
         {
           "version": "1.5.2",
-          "total": 110,
+          "total": 111,
           "hosts": {
-            "github": 69,
+            "github": 70,
             "spacedock": 41
           }
         },
         {
           "version": "1.5.1",
-          "total": 95,
+          "total": 96,
           "hosts": {
-            "github": 73,
+            "github": 74,
             "spacedock": 22
           }
         },
         {
           "version": "1.5.0",
-          "total": 88,
+          "total": 89,
           "hosts": {
-            "github": 58,
+            "github": 59,
             "spacedock": 30
           }
         },
         {
           "version": "1.4.1",
-          "total": 10,
+          "total": 11,
           "hosts": {
-            "github": 7,
+            "github": 8,
             "spacedock": 3
           }
         },
         {
           "version": "1.4.0",
-          "total": 36,
+          "total": 37,
           "hosts": {
-            "github": 27,
+            "github": 28,
             "spacedock": 9
           }
         },
         {
           "version": "1.3.1",
-          "total": 36,
+          "total": 37,
           "hosts": {
-            "github": 19,
+            "github": 20,
             "spacedock": 17
           }
         },
         {
           "version": "1.3.0",
-          "total": 69,
+          "total": 70,
           "hosts": {
-            "github": 55,
+            "github": 56,
             "spacedock": 14
           }
         },
         {
           "version": "1.2.7",
-          "total": 115,
+          "total": 116,
           "hosts": {
-            "github": 80,
+            "github": 81,
             "spacedock": 35
           }
         },
         {
           "version": "1.2.6",
-          "total": 152,
+          "total": 153,
           "hosts": {
-            "github": 119,
+            "github": 120,
             "spacedock": 33
           }
         },
@@ -995,10 +1009,10 @@
         },
         {
           "version": "1.2.1",
-          "total": 118,
+          "total": 120,
           "hosts": {
-            "github": 56,
-            "spacedock": 62
+            "github": 57,
+            "spacedock": 63
           }
         },
         {
@@ -1133,16 +1147,16 @@
     },
     {
       "id": "FastAndPurrious",
-      "total": 105,
+      "total": 111,
       "hosts": {
-        "github": 105
+        "github": 111
       },
       "releases": [
         {
           "version": "0.1.13",
-          "total": 2,
+          "total": 8,
           "hosts": {
-            "github": 2
+            "github": 8
           }
         },
         {
@@ -1233,16 +1247,16 @@
     },
     {
       "id": "flight_panel",
-      "total": 10,
+      "total": 11,
       "hosts": {
-        "github": 10
+        "github": 11
       },
       "releases": [
         {
           "version": "1.0.1",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
@@ -1256,23 +1270,37 @@
     },
     {
       "id": "GEE",
-      "total": 69,
+      "total": 88,
       "hosts": {
-        "github": 69
+        "github": 88
       },
       "releases": [
         {
-          "version": "0.3.0-rc1",
-          "total": 6,
+          "version": "0.3.0",
+          "total": 9,
           "hosts": {
-            "github": 6
+            "github": 9
+          }
+        },
+        {
+          "version": "0.3.0-rc2",
+          "total": 2,
+          "hosts": {
+            "github": 2
+          }
+        },
+        {
+          "version": "0.3.0-rc1",
+          "total": 7,
+          "hosts": {
+            "github": 7
           }
         },
         {
           "version": "0.2.2",
-          "total": 6,
+          "total": 13,
           "hosts": {
-            "github": 6
+            "github": 13
           }
         },
         {
@@ -1339,10 +1367,10 @@
     },
     {
       "id": "KittenEngineerRedux",
-      "total": 4739,
+      "total": 4749,
       "hosts": {
-        "github": 180,
-        "spacedock": 4559
+        "github": 182,
+        "spacedock": 4567
       },
       "releases": [
         {
@@ -1361,10 +1389,10 @@
         },
         {
           "version": "0.5.8",
-          "total": 498,
+          "total": 508,
           "hosts": {
-            "github": 77,
-            "spacedock": 421
+            "github": 79,
+            "spacedock": 429
           }
         },
         {
@@ -1453,41 +1481,49 @@
     },
     {
       "id": "KittenExtensionsContinued",
-      "total": 377,
+      "total": 414,
       "hosts": {
-        "github": 193,
-        "spacedock": 184
+        "github": 219,
+        "spacedock": 195
       },
       "releases": [
         {
-          "version": "0.5.3",
-          "total": 163,
+          "version": "0.6.0",
+          "total": 32,
           "hosts": {
-            "github": 109,
+            "github": 21,
+            "spacedock": 11
+          }
+        },
+        {
+          "version": "0.5.3",
+          "total": 165,
+          "hosts": {
+            "github": 111,
             "spacedock": 54
           }
         },
         {
           "version": "0.5.2",
-          "total": 183,
+          "total": 184,
           "hosts": {
-            "github": 72,
+            "github": 73,
             "spacedock": 111
           }
         },
         {
           "version": "0.5.1",
-          "total": 17,
+          "total": 18,
           "hosts": {
-            "github": 9,
+            "github": 10,
             "spacedock": 8
           }
         },
         {
           "version": "0.5.0",
-          "total": 14,
+          "total": 15,
           "hosts": {
-            "github": 3,
+            "github": 4,
             "spacedock": 11
           }
         }
@@ -1517,17 +1553,33 @@
       ]
     },
     {
-      "id": "KSA_SeaDragon",
-      "total": 420,
+      "id": "KSA-Simplified-Chinese-Localization",
+      "total": 11,
       "hosts": {
-        "spacedock": 420
+        "github": 11
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "KSA_SeaDragon",
+      "total": 430,
+      "hosts": {
+        "spacedock": 430
       },
       "releases": [
         {
           "version": "0.2.3",
-          "total": 46,
+          "total": 56,
           "hosts": {
-            "spacedock": 46
+            "spacedock": 56
           }
         },
         {
@@ -1562,16 +1614,16 @@
     },
     {
       "id": "KsaBabel",
-      "total": 36,
+      "total": 40,
       "hosts": {
-        "github": 36
+        "github": 40
       },
       "releases": [
         {
           "version": "0.2.3",
-          "total": 14,
+          "total": 17,
           "hosts": {
-            "github": 14
+            "github": 17
           }
         },
         {
@@ -1583,25 +1635,25 @@
         },
         {
           "version": "0.2.1",
-          "total": 11,
+          "total": 12,
           "hosts": {
-            "github": 11
+            "github": 12
           }
         }
       ]
     },
     {
       "id": "KsaChinese",
-      "total": 63,
+      "total": 64,
       "hosts": {
-        "github": 63
+        "github": 64
       },
       "releases": [
         {
           "version": "0.1.7",
-          "total": 28,
+          "total": 29,
           "hosts": {
-            "github": 28
+            "github": 29
           }
         },
         {
@@ -1650,10 +1702,10 @@
     },
     {
       "id": "KSAero",
-      "total": 219,
+      "total": 236,
       "hosts": {
-        "github": 89,
-        "spacedock": 130
+        "github": 95,
+        "spacedock": 141
       },
       "releases": [
         {
@@ -1665,10 +1717,10 @@
         },
         {
           "version": "0.1.1",
-          "total": 100,
+          "total": 117,
           "hosts": {
-            "github": 43,
-            "spacedock": 57
+            "github": 49,
+            "spacedock": 68
           }
         },
         {
@@ -1690,18 +1742,18 @@
     },
     {
       "id": "KSAGEffects",
-      "total": 563,
+      "total": 567,
       "hosts": {
         "github": 59,
-        "spacedock": 504
+        "spacedock": 508
       },
       "releases": [
         {
           "version": "0.3.3",
-          "total": 141,
+          "total": 145,
           "hosts": {
             "github": 41,
-            "spacedock": 100
+            "spacedock": 104
           }
         },
         {
@@ -1801,39 +1853,95 @@
     },
     {
       "id": "KSAMainMenu",
-      "total": 21,
+      "total": 23,
       "hosts": {
-        "github": 21
+        "github": 23
       },
       "releases": [
         {
           "version": "0.1.0",
-          "total": 21,
+          "total": 23,
           "hosts": {
-            "github": 21
+            "github": 23
           }
         }
       ]
     },
     {
       "id": "KSAMultiplayer",
-      "total": 71,
+      "total": 114,
       "hosts": {
-        "github": 71
+        "github": 114
       },
       "releases": [
         {
-          "version": "0.11.1",
-          "total": 2,
+          "version": "0.16.0",
+          "total": 7,
           "hosts": {
-            "github": 2
+            "github": 7
+          }
+        },
+        {
+          "version": "0.15.0",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "0.14.0",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "0.13.2",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "0.13.1",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "0.13.0",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "0.12.1",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "0.12.0",
+          "total": 8,
+          "hosts": {
+            "github": 8
+          }
+        },
+        {
+          "version": "0.11.1",
+          "total": 9,
+          "hosts": {
+            "github": 9
           }
         },
         {
           "version": "0.11.0",
-          "total": 4,
+          "total": 7,
           "hosts": {
-            "github": 4
+            "github": 7
           }
         },
         {
@@ -1973,18 +2081,26 @@
     },
     {
       "id": "KSArmory",
-      "total": 6016,
+      "total": 6088,
       "hosts": {
-        "github": 4499,
-        "spacedock": 1517
+        "github": 4519,
+        "spacedock": 1569
       },
       "releases": [
         {
-          "version": "0.10.1",
-          "total": 28,
+          "version": "0.10.2",
+          "total": 13,
           "hosts": {
-            "github": 5,
-            "spacedock": 23
+            "github": 10,
+            "spacedock": 3
+          }
+        },
+        {
+          "version": "0.10.1",
+          "total": 87,
+          "hosts": {
+            "github": 15,
+            "spacedock": 72
           }
         },
         {
@@ -2527,18 +2643,18 @@
     },
     {
       "id": "KSARS",
-      "total": 302,
+      "total": 309,
       "hosts": {
-        "github": 66,
-        "spacedock": 236
+        "github": 67,
+        "spacedock": 242
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 16,
+          "total": 23,
           "hosts": {
-            "github": 9,
-            "spacedock": 7
+            "github": 10,
+            "spacedock": 13
           }
         },
         {
@@ -2598,73 +2714,73 @@
     },
     {
       "id": "KSATelemetryOverlay",
-      "total": 561,
+      "total": 582,
       "hosts": {
-        "github": 291,
-        "spacedock": 270
+        "github": 302,
+        "spacedock": 280
       },
       "releases": [
         {
           "version": "1.2.0",
-          "total": 53,
+          "total": 67,
           "hosts": {
-            "github": 28,
-            "spacedock": 25
+            "github": 32,
+            "spacedock": 35
           }
         },
         {
           "version": "1.1.3",
-          "total": 81,
+          "total": 82,
           "hosts": {
-            "github": 45,
+            "github": 46,
             "spacedock": 36
           }
         },
         {
           "version": "1.1.2",
-          "total": 98,
+          "total": 99,
           "hosts": {
-            "github": 45,
+            "github": 46,
             "spacedock": 53
           }
         },
         {
           "version": "1.1.1",
-          "total": 147,
+          "total": 148,
           "hosts": {
-            "github": 79,
+            "github": 80,
             "spacedock": 68
           }
         },
         {
           "version": "1.1.0",
-          "total": 52,
+          "total": 53,
           "hosts": {
-            "github": 33,
+            "github": 34,
             "spacedock": 19
           }
         },
         {
           "version": "1.0.4",
-          "total": 58,
+          "total": 59,
           "hosts": {
-            "github": 30,
+            "github": 31,
             "spacedock": 28
           }
         },
         {
           "version": "1.0.3",
-          "total": 21,
+          "total": 22,
           "hosts": {
-            "github": 11,
+            "github": 12,
             "spacedock": 10
           }
         },
         {
           "version": "1.0.2",
-          "total": 17,
+          "total": 18,
           "hosts": {
-            "github": 7,
+            "github": 8,
             "spacedock": 10
           }
         },
@@ -2688,18 +2804,18 @@
     },
     {
       "id": "KSP-Characters",
-      "total": 154,
+      "total": 172,
       "hosts": {
-        "github": 27,
-        "spacedock": 127
+        "github": 28,
+        "spacedock": 144
       },
       "releases": [
         {
           "version": "0.7.1",
-          "total": 6,
+          "total": 24,
           "hosts": {
-            "github": 2,
-            "spacedock": 4
+            "github": 3,
+            "spacedock": 21
           }
         },
         {
@@ -2754,17 +2870,17 @@
     },
     {
       "id": "KSP-Redux",
-      "total": 2154,
+      "total": 2170,
       "hosts": {
         "github": 97,
-        "spacedock": 2057
+        "spacedock": 2073
       },
       "releases": [
         {
           "version": "1.3.2",
-          "total": 1170,
+          "total": 1185,
           "hosts": {
-            "spacedock": 1170
+            "spacedock": 1185
           }
         },
         {
@@ -2783,9 +2899,9 @@
         },
         {
           "version": "1.2.1",
-          "total": 48,
+          "total": 49,
           "hosts": {
-            "spacedock": 48
+            "spacedock": 49
           }
         },
         {
@@ -2822,16 +2938,16 @@
     },
     {
       "id": "KSP-Redux-OPM",
-      "total": 1025,
+      "total": 1028,
       "hosts": {
-        "spacedock": 1025
+        "spacedock": 1028
       },
       "releases": [
         {
           "version": "1.0.2",
-          "total": 787,
+          "total": 790,
           "hosts": {
-            "spacedock": 787
+            "spacedock": 790
           }
         },
         {
@@ -2852,18 +2968,18 @@
     },
     {
       "id": "LonelyPlanets",
-      "total": 131,
+      "total": 137,
       "hosts": {
         "github": 21,
-        "spacedock": 110
+        "spacedock": 116
       },
       "releases": [
         {
           "version": "1.2.2",
-          "total": 131,
+          "total": 137,
           "hosts": {
             "github": 21,
-            "spacedock": 110
+            "spacedock": 116
           }
         },
         {
@@ -2916,18 +3032,18 @@
     },
     {
       "id": "MeasureTools",
-      "total": 1086,
+      "total": 1101,
       "hosts": {
-        "github": 376,
-        "spacedock": 710
+        "github": 382,
+        "spacedock": 719
       },
       "releases": [
         {
           "version": "1.1.19",
-          "total": 8,
+          "total": 18,
           "hosts": {
-            "github": 6,
-            "spacedock": 2
+            "github": 9,
+            "spacedock": 9
           }
         },
         {
@@ -2948,9 +3064,9 @@
         },
         {
           "version": "1.1.16",
-          "total": 36,
+          "total": 37,
           "hosts": {
-            "github": 20,
+            "github": 21,
             "spacedock": 16
           }
         },
@@ -3020,18 +3136,18 @@
         },
         {
           "version": "1.1.7",
-          "total": 143,
+          "total": 145,
           "hosts": {
-            "github": 43,
-            "spacedock": 100
+            "github": 44,
+            "spacedock": 101
           }
         },
         {
           "version": "1.1.6",
-          "total": 103,
+          "total": 105,
           "hosts": {
-            "github": 41,
-            "spacedock": 62
+            "github": 42,
+            "spacedock": 63
           }
         },
         {
@@ -3174,18 +3290,18 @@
     },
     {
       "id": "ModMenu",
-      "total": 2416,
+      "total": 2435,
       "hosts": {
-        "github": 530,
-        "spacedock": 1886
+        "github": 538,
+        "spacedock": 1897
       },
       "releases": [
         {
           "version": "0.2.3",
-          "total": 209,
+          "total": 228,
           "hosts": {
-            "github": 133,
-            "spacedock": 76
+            "github": 141,
+            "spacedock": 87
           }
         },
         {
@@ -3266,65 +3382,73 @@
     },
     {
       "id": "MPFX",
-      "total": 921,
+      "total": 945,
       "hosts": {
-        "github": 92,
-        "spacedock": 829
+        "github": 107,
+        "spacedock": 838
       },
       "releases": [
         {
-          "version": "0.3.7",
-          "total": 66,
+          "version": "0.3.8",
+          "total": 13,
           "hosts": {
-            "github": 18,
+            "github": 4,
+            "spacedock": 9
+          }
+        },
+        {
+          "version": "0.3.7",
+          "total": 67,
+          "hosts": {
+            "github": 19,
             "spacedock": 48
           }
         },
         {
           "version": "0.3.6",
-          "total": 69,
+          "total": 70,
           "hosts": {
-            "github": 20,
+            "github": 21,
             "spacedock": 49
           }
         },
         {
           "version": "0.3.5",
-          "total": 66,
+          "total": 67,
           "hosts": {
-            "github": 23,
+            "github": 24,
             "spacedock": 43
           }
         },
         {
           "version": "0.3.4",
-          "total": 27,
+          "total": 28,
           "hosts": {
-            "github": 11,
+            "github": 12,
             "spacedock": 16
           }
         },
         {
           "version": "0.3.3",
-          "total": 40,
+          "total": 41,
           "hosts": {
-            "github": 2,
+            "github": 3,
             "spacedock": 38
           }
         },
         {
           "version": "0.3.2",
-          "total": 130,
+          "total": 131,
           "hosts": {
-            "github": 2,
+            "github": 3,
             "spacedock": 128
           }
         },
         {
           "version": "0.3.1",
-          "total": 74,
+          "total": 75,
           "hosts": {
-            "github": 1,
+            "github": 2,
             "spacedock": 73
           }
         },
@@ -3337,33 +3461,33 @@
         },
         {
           "version": "0.2.2",
-          "total": 69,
+          "total": 70,
           "hosts": {
-            "github": 1,
+            "github": 2,
             "spacedock": 68
           }
         },
         {
           "version": "0.2.1",
-          "total": 223,
+          "total": 224,
           "hosts": {
-            "github": 9,
+            "github": 10,
             "spacedock": 214
           }
         },
         {
           "version": "0.2.0",
-          "total": 86,
+          "total": 87,
           "hosts": {
-            "github": 4,
+            "github": 5,
             "spacedock": 82
           }
         },
         {
           "version": "0.1.0",
-          "total": 32,
+          "total": 33,
           "hosts": {
-            "github": 1,
+            "github": 2,
             "spacedock": 31
           }
         }
@@ -3410,16 +3534,16 @@
     },
     {
       "id": "OhMyStars",
-      "total": 318,
+      "total": 327,
       "hosts": {
-        "spacedock": 318
+        "spacedock": 327
       },
       "releases": [
         {
           "version": "1.6.0",
-          "total": 49,
+          "total": 58,
           "hosts": {
-            "spacedock": 49
+            "spacedock": 58
           }
         },
         {
@@ -3503,65 +3627,65 @@
     },
     {
       "id": "Oxidizer",
-      "total": 76,
+      "total": 90,
       "hosts": {
-        "github": 76
+        "github": 90
       },
       "releases": [
         {
           "version": "0.11.0",
-          "total": 2,
+          "total": 9,
           "hosts": {
-            "github": 2
+            "github": 9
           }
         },
         {
           "version": "0.10.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
           "version": "0.9.1",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
           "version": "0.9.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
           "version": "0.8.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
           "version": "0.7.0",
-          "total": 6,
+          "total": 7,
           "hosts": {
-            "github": 6
+            "github": 7
           }
         },
         {
           "version": "0.6.3",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
           "version": "0.6.2",
-          "total": 5,
+          "total": 6,
           "hosts": {
-            "github": 5
+            "github": 6
           }
         },
         {
@@ -3624,16 +3748,16 @@
     },
     {
       "id": "Oxidizer.StarMap",
-      "total": 62,
+      "total": 65,
       "hosts": {
-        "github": 62
+        "github": 65
       },
       "releases": [
         {
           "version": "0.11.0",
-          "total": 2,
+          "total": 5,
           "hosts": {
-            "github": 2
+            "github": 5
           }
         },
         {
@@ -3745,32 +3869,32 @@
     },
     {
       "id": "PrincipiaKSA",
-      "total": 19,
+      "total": 24,
       "hosts": {
-        "github": 19
+        "github": 24
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 19,
+          "total": 24,
           "hosts": {
-            "github": 19
+            "github": 24
           }
         }
       ]
     },
     {
       "id": "purr2d2",
-      "total": 87,
+      "total": 93,
       "hosts": {
-        "github": 87
+        "github": 93
       },
       "releases": [
         {
           "version": "1.25.0",
-          "total": 2,
+          "total": 8,
           "hosts": {
-            "github": 2
+            "github": 8
           }
         },
         {
@@ -3938,18 +4062,18 @@
     },
     {
       "id": "RealAtmospheres",
-      "total": 520,
+      "total": 529,
       "hosts": {
-        "github": 248,
-        "spacedock": 272
+        "github": 252,
+        "spacedock": 277
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 220,
+          "total": 229,
           "hosts": {
-            "github": 113,
-            "spacedock": 107
+            "github": 117,
+            "spacedock": 112
           }
         },
         {
@@ -3988,18 +4112,18 @@
     },
     {
       "id": "RealStars",
-      "total": 329,
+      "total": 338,
       "hosts": {
-        "github": 138,
-        "spacedock": 191
+        "github": 139,
+        "spacedock": 199
       },
       "releases": [
         {
           "version": "1.2.0",
-          "total": 184,
+          "total": 193,
           "hosts": {
-            "github": 76,
-            "spacedock": 108
+            "github": 77,
+            "spacedock": 116
           }
         },
         {
@@ -4022,16 +4146,16 @@
     },
     {
       "id": "rhai_studio",
-      "total": 8,
+      "total": 9,
       "hosts": {
-        "github": 8
+        "github": 9
       },
       "releases": [
         {
           "version": "1.2.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "github": 2
+            "github": 3
           }
         },
         {
@@ -4068,12 +4192,20 @@
     },
     {
       "id": "ShaderExtensions",
-      "total": 1235,
+      "total": 1251,
       "hosts": {
-        "github": 214,
-        "spacedock": 1021
+        "github": 219,
+        "spacedock": 1032
       },
       "releases": [
+        {
+          "version": "1.2.0",
+          "total": 16,
+          "hosts": {
+            "github": 5,
+            "spacedock": 11
+          }
+        },
         {
           "version": "1.1.0",
           "total": 38,
@@ -4237,23 +4369,23 @@
     },
     {
       "id": "StarMap",
-      "total": 5749,
+      "total": 5831,
       "hosts": {
-        "github": 5749
+        "github": 5831
       },
       "releases": [
         {
           "version": "0.5.4",
-          "total": 18,
+          "total": 91,
           "hosts": {
-            "github": 18
+            "github": 91
           }
         },
         {
           "version": "0.5.3",
-          "total": 35,
+          "total": 39,
           "hosts": {
-            "github": 35
+            "github": 39
           }
         },
         {
@@ -4279,9 +4411,9 @@
         },
         {
           "version": "0.4.8",
-          "total": 391,
+          "total": 395,
           "hosts": {
-            "github": 391
+            "github": 395
           }
         },
         {
@@ -4293,9 +4425,9 @@
         },
         {
           "version": "0.4.6",
-          "total": 309,
+          "total": 310,
           "hosts": {
-            "github": 309
+            "github": 310
           }
         },
         {
@@ -4504,11 +4636,53 @@
     },
     {
       "id": "unscience",
-      "total": 141,
+      "total": 157,
       "hosts": {
-        "github": 141
+        "github": 157
       },
       "releases": [
+        {
+          "version": "1.92.0",
+          "total": 5,
+          "hosts": {
+            "github": 5
+          }
+        },
+        {
+          "version": "1.91.0-beta",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
+        {
+          "version": "1.90.0-beta",
+          "total": 2,
+          "hosts": {
+            "github": 2
+          }
+        },
+        {
+          "version": "1.88.0-beta",
+          "total": 2,
+          "hosts": {
+            "github": 2
+          }
+        },
+        {
+          "version": "1.87.0-beta",
+          "total": 2,
+          "hosts": {
+            "github": 2
+          }
+        },
+        {
+          "version": "1.86.0-beta",
+          "total": 2,
+          "hosts": {
+            "github": 2
+          }
+        },
         {
           "version": "1.81.0-beta",
           "total": 3,
@@ -4618,16 +4792,16 @@
     },
     {
       "id": "wobbly-windows",
-      "total": 22,
+      "total": 28,
       "hosts": {
-        "github": 22
+        "github": 28
       },
       "releases": [
         {
           "version": "1.7.0",
-          "total": 1,
+          "total": 7,
           "hosts": {
-            "github": 1
+            "github": 7
           }
         },
         {
