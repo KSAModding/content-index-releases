@@ -1,7 +1,7 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-08T21:14:45Z",
-  "counted_at": "2026-11-08T21:14:45Z",
+  "checked_at": "2026-11-10T00:44:39Z",
+  "counted_at": "2026-11-10T00:44:39Z",
   "listings": [
     {
       "id": "AdvancedFlightComputer",
@@ -41,7 +41,7 @@
     {
       "id": "flight_panel",
       "thread": 1571,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "GEE",
@@ -96,12 +96,12 @@
     {
       "id": "KSAMainMenu",
       "thread": 1554,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSAMultiplayer",
       "thread": 1578,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "KSArmory",
@@ -171,17 +171,17 @@
     {
       "id": "Oxidizer",
       "thread": 1559,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "Oxidizer.StarMap",
       "thread": 1559,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "PrincipiaKSA",
       "thread": 1557,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "purr2d2",
@@ -201,7 +201,7 @@
     {
       "id": "rhai_studio",
       "thread": 1575,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "ShaderExtensions",
@@ -221,7 +221,7 @@
     {
       "id": "wobbly-windows",
       "thread": 1566,
-      "in_sitemap": false
+      "in_sitemap": true
     }
   ]
 }
