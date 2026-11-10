@@ -1,0 +1,46 @@
+{
+  "spec_version": 1,
+  "id": "PrincipiaKSA",
+  "type": "mod",
+  "version": "1.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-10T18:37:43Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/parsaes80/PrincipiaKSA/releases/download/v1.1.0/PrincipiaKSA.zip",
+    "sha256": "0DE16D063C7409FCFE5409E1B2F556D43F60787451F284E4D8D5301C3D22FF70",
+    "size": 13759379,
+    "content_type": "application/zip"
+  },
+  "install_size": 13756857,
+  "install": {
+    "root": "PrincipiaKSA",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/parsaes80/PrincipiaKSA/releases/tag/v1.1.0",
+  "changelog_text": "This is major update which adds:\n-MASSIVE performance increases by giving the prediction, flight plan, and each maneuver node their own thread to use Principia. This causes 2-5x in busy scenarios.  \n-Changing the prediction limit from time to steps and tolerance to match Principia's design better. using time caused unavoidable low resolutions in certain orbits. Using the new toggles the user can choose the correct Principia simulation settings for their situation. This matches the OG KSP mod better too.\n-Consistency in Map Frames by changing all trajectories to the requested frame. In the previous release only the dim prediction line change the frame, now both dim and bright lines change frame. This causes the dim line to do its purpose which is to show  encounter paths in the selected frame.\n- Longer and more detailed \"Upcoming\" section by removing the line limit, and making the box scroll-able after 10 lines. \n- Fix ground impact markers not clearly showing what they are by adding an \"X\" marker.",
+  "listing": {
+    "name": "PrincipiaKSA",
+    "authors": [
+      "SMOKE"
+    ],
+    "abstract": "Replaces the games Kepler based gravity, with more realistic N-body Gravity.",
+    "description": "This mod replaces the game's simplified gravity model and replaces it with N-body simulation. Such a mod called Principia(https://github.com/mockingbirdnest/Principia) existed for KSP and now repo has ported it to KSA. N-body gravity works by calculating all the gravity forces acting on an object not just 2 like the default KSA one, so as a result the path of a vessel in sapce can be much more complicated and realistic than the normal game. Principia offers much more depth to game and is very fun for people who have mastered the games own physics.\n\n![text](ksa-image:OrbitlLines)",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/principiaksa.1557/",
+      "repository": "https://github.com/parsaes80/PrincipiaKSA"
+    }
+  }
+}
