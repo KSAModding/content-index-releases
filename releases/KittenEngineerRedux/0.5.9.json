@@ -1,0 +1,54 @@
+{
+  "spec_version": 1,
+  "id": "KittenEngineerRedux",
+  "type": "mod",
+  "version": "0.5.9",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-10T02:41:37Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/download/v0.5.9/KittenEngineerRedux-0.5.9.zip",
+    "sha256": "91D529D01DE6F9718A11BBC7E215ADD980F82C14113A62060BF6D7DF3B3685A6",
+    "size": 51974,
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux/download/0.5.9"
+    ]
+  },
+  "install_size": 116893,
+  "install": {
+    "root": "KittenEngineerRedux",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/tag/v0.5.9",
+  "changelog_text": "Compatibility patch for 2026.11.10.5801 and StarMap 0.5.4.",
+  "listing": {
+    "name": "Kitten Engineer Redux",
+    "authors": [
+      "BarneyTheGod"
+    ],
+    "abstract": "Utility mod for KSA that mirrors KSP's Kerbal Engineer Redux.",
+    "description": "Kitten Engineer Redux is a utility readout mod for Kitten Space Agency. It aims to mirror the KSP mod \"Kerbal Engineer Redux\" by providing the player with useful vehicle data inside of the VAB and during flight.\n\n![editor](ksa-image:editor)\n![flight-01](ksa-image:flight-01)\n![flight-02](ksa-image:flight-02)\n![flight-03](ksa-image:flight-03)",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "user-interface",
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kitten-engineer-redux-ker.443/",
+      "homepage": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux",
+      "repository": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux",
+      "spacedock": "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux",
+      "bugtracker": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/issues"
+    }
+  }
+}
