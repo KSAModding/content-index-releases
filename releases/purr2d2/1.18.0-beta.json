@@ -12,7 +12,8 @@
     "url": "https://github.com/meow-sci/purr2d2/releases/download/v1.18.0-beta/purr2d2-1.18.0-beta.zip",
     "sha256": "1CEF846A98961ED63B288624ECC86ABDEA3E79ABF60A4D1B77A1F1B4CE9493ED",
     "size": 3621943,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "unavailable_since": "2026-11-11T17:31:30Z"
   },
   "install_size": 5055468,
   "install": {
