@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "unscience",
+  "type": "mod",
+  "version": "1.103.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-11T03:36:36Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/meow-sci/unscience/releases/download/v1.103.0/unscience-1.103.0.zip",
+    "sha256": "68E3AAAF95459FBC9811487081B743ACDF1786D51CA981621E838C0E58F16975",
+    "size": 3696211,
+    "content_type": "application/zip"
+  },
+  "install_size": 6692218,
+  "install": {
+    "root": "unscience",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/unscience/releases/tag/v1.103.0",
+  "changelog_text": "- wing-walker submod (external seats)\n- you-didnt-see-anything submod (for making imgui remain visible when HUD is hidden)\n- doh click to spawn in 3d space\n- doh kitten naming fix",
+  "listing": {
+    "name": "unscience",
+    "authors": [
+      "Alex",
+      "aka tomservo"
+    ],
+    "abstract": "unscience hacks up ksa to change physics, replace colors, move parts, resize things, change effects, shaders, etc.  In general, it helps you break stuff for fun and no profit.",
+    "description": "unscience lets you do *things* to KSA\n\n![thug-life](ksa-image:thug-life_01)\n\n![garrys-torch](ksa-image:garrys-torch_01)\n\n![zippo](ksa-image:zippo_01)\n\n![godzilla1](ksa-image:godzilla_01)\n\n![godzilla2](ksa-image:godzilla_02)\n\n![free-fallin](ksa-image:free-fallin_01)",
+    "license": "MIT",
+    "tags": [
+      "parts",
+      "gameplay",
+      "user-interface",
+      "visual",
+      "audio",
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/unscience-mod.1261/",
+      "repository": "https://github.com/meow-sci/unscience",
+      "bugtracker": "https://github.com/meow-sci/unscience/issues"
+    }
+  }
+}
