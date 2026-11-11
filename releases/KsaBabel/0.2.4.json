@@ -1,0 +1,61 @@
+{
+  "spec_version": 1,
+  "id": "KsaBabel",
+  "type": "mod",
+  "version": "0.2.4",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-11T16:34:00Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/kuxiaowo/KSA-Babel/releases/download/v0.2.4/KsaBabel-0.2.4.zip",
+    "sha256": "B4E3B99BA9C7CE19B7CF4C5FFA47773CA0141109E16164E7E3E21D67DD475146",
+    "size": 2030324,
+    "content_type": "application/zip"
+  },
+  "install_size": 6026467,
+  "install": {
+    "root": "KsaBabel",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "max": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "KsaChinese",
+      "kind": "conflict",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/kuxiaowo/KSA-Babel/releases/tag/v0.2.4",
+  "changelog_text": "Stable release for **KSA 2026.11.10.5801 on Windows x64** with **StarMap 0.5.4** and the .NET 10 x64 Runtime.\n\n- Updates life support, crew condition, habitat zones, EVA supplies, game rules, editor undo/redo, part variants, HDR and the 242 lines of the 5801 changelog.\n- All nine language options were switched in a real 5801 session. Habitat zones, display settings and HUD text were checked. 467 headless checks passed.\n- New translations in the seven additional languages used local models and await independent native-speaker review. Some long HUD labels still clip.\n\n## Downloads\n\n- **Standard** `KsaBabel-0.2.4.zip`. Place the `KsaBabel` folder in the selected profile's `mods` folder and enable it with StarMap 0.5.4.\n- **Portable** `KsaBabel-0.2.4-5801-Portable.zip`. Includes StarMap and a separate launcher. Follow the bundled setup instructions.\n- Choose one package and enable one localization mod per profile. Retain your profile and settings when upgrading. Separate SHA-256 files accompany the two ZIPs.\n\n这是 5801 的正式 GitHub 发行版。七种扩展语种新增译文使用本地模型辅助，仍待独立母语审校。包内说明记录了开发验证阶段，正式发行状态以本页为准。较早游戏版本请选择对应的历史 Release。\n\n[Source PR #11](https://github.com/kuxiaowo/KSA-Babel/pull/11) · [Validation report](https://github.com/kuxiaowo/KSA-Babel/blob/v0.2.4/reports/0.2.4-5801%E9%80%82%E9%85%8D%E4%B8%8E%E9%AA%8C%E8%AF%81.md)",
+  "listing": {
+    "name": "KSA Babel / 喵语塔",
+    "authors": [
+      "kuxiaowo",
+      "KsaUiLanguages contributors"
+    ],
+    "abstract": "Nine-language UI localization for KSA build 5801; native-speaker review pending.",
+    "description": "![KSA Babel nine-language cover](ksa-image:cover)\n\nMultilingual display-layer localization for **KSA 2026.11.10.5801 on Windows x64**.\n\n**5801 update:** v0.2.4 updates life support, crew status, habitat zones, EVA supplies, game rules, editor undo/redo, part variants, HDR settings and the 242 changelog lines for build 5801. New translations in the seven additional languages used local models and await independent native-speaker review. All nine locale switches were verified in an isolated 5801 game session.\n\n**Translation review (earlier scope):** The maintainer has personally confirmed only the Simplified Chinese translation. Japanese, Russian, German, French, Italian, Spanish and Brazilian Portuguese were translated/reviewed by GPT for KSA using KSP aerospace terminology as reference; they have no independent native-speaker sign-off. Some initial Japanese translations came from the credited MIT-licensed KsaUiLanguages project. English mode displays KSA's original English text and retains the mod's added Language menu. The 11 dynamic templates support multilingual composition and original-English fallback; they are not 11 rewritten game texts.\n\n**Chinese-focused alternative:** [KSA Chinese / KSA-CHINESE](https://github.com/kuxiaowo/KSA-CHINESE), ID `KsaChinese`, offers English / Simplified Chinese. Its current release is [v0.1.8](https://github.com/kuxiaowo/KSA-CHINESE/releases/tag/v0.1.8), standard ZIP `KsaChinese-0.1.8.zip`, for the inspected Windows x64 KSA 2026.11.10.5801 build and StarMap 0.5.4. It has its own [Borea listing](https://github.com/KSAModding/content-index/blob/main/listings/KsaChinese.toml). Babel is a separate nine-language localization mod under `KsaBabel`; do not enable both in the same profile.\n\n- Translates supported UI, part and substance captions, tooltips and selected version history.\n- Includes a renamed Noto Sans SC font subset and a nine-language menu.\n- Seven additional languages each cover 5,716 reviewed source records plus 11 dynamic templates; AI review is not native-speaker approval.\n- Language preferences are saved per game profile, outside the mod files, so Borea instances remain independent.\n- Preserves technical identifiers, part/model numbers, units, placeholders and player names.\n- Refuses uninspected game/dependency hashes; untranslated text falls back to the original.\n\nThis is **partial localization**, not an official translation or a claim of complete coverage. Older version-history text, native library/error text, texture lettering and complete UI/visual coverage remain unfinished. Compatibility with other localization mods has not been established.\n\nRequires .NET 10 x64 Runtime and StarMap 0.5.4. Extract the standard `KsaBabel-0.2.4.zip` into the selected profile's `mods` folder and enable `KsaBabel`. The plugin assembly is KsaBabel.dll. Launch through StarMap/Borea.\n\nFor Borea-managed migration, remove KsaChinese from the instance while retaining profile data; disabling it alone does not resolve the catalog conflict. For manual installation, disable KsaChinese before enabling Babel; Babel refuses activation while KsaChinese is enabled. When migrating from the old portable package, first back up its Profile and move the old `<game>/Content/KsaChinese` out of Content. Do not keep both Content/KsaBabel and profile mods/KsaBabel. The standard mod ZIP does not bundle a loader or launcher.\n\nSettings use the current profile's KsaBabel/settings.json. On first startup, only if this new file does not exist, Babel imports a valid locale from the same profile's old KsaChinese/settings.json, without modifying the old file or overwriting existing new settings. No saves are automatically moved and no other profiles are searched. The portable archive is KsaBabel-0.2.4-5801-Portable.zip; its launcher is KsaBabel/KsaBabelLauncher.exe.\n\nCode and translations: MIT, including portions derived from LiX-Works/KsaUiLanguages at b504774158cc03b582a0e75bfe94330cb841f11d. Font: Noto Sans SC subset, OFL-1.1. Original credits and license texts are included.\n",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksa-babel-0-2-1-nine-language-localization-preview-for-ksa-5638.1454/",
+      "repository": "https://github.com/kuxiaowo/KSA-Babel",
+      "bugtracker": "https://github.com/kuxiaowo/KSA-Babel/issues",
+      "documentation": "https://github.com/kuxiaowo/KSA-Babel/blob/main/README-%E7%94%9F%E6%80%81%E5%AE%89%E8%A3%85.md"
+    }
+  }
+}
