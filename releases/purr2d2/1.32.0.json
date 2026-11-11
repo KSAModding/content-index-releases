@@ -26,7 +26,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/meow-sci/purr2d2/releases/tag/v1.32.0",
-  "changelog_text": "**Updating:** back up `settings.json` and `Generated/` from your existing `purr2d2/` folder, delete that old mod folder, extract the new `purr2d2/` folder, then restore your saved settings and generated content. Restart KSA after updating.\n\n## What's Changed\n* fix(slicing): support native fallback mass by @alex-sherwin in https://github.com/meow-sci/purr2d2/pull/2\n\n\n**Full Changelog**: https://github.com/meow-sci/purr2d2/compare/v1.30.0...v1.32.0",
+  "changelog_text": "- HUD has new placement options including detached windows\n- can slice new strut and other parts that currently have no mass (a bug in the current game assets)",
   "listing": {
     "name": "purr2d2",
     "authors": [
