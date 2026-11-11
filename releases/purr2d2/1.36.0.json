@@ -1,0 +1,50 @@
+{
+  "spec_version": 1,
+  "id": "purr2d2",
+  "type": "mod",
+  "version": "1.36.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-11T03:37:19Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/meow-sci/purr2d2/releases/download/v1.36.0/purr2d2-1.36.0.zip",
+    "sha256": "51BAC2DBE908E1212306F86DC71D1D5F14D2702B57362F737F52721D0B0E0417",
+    "size": 3639429,
+    "content_type": "application/zip"
+  },
+  "install_size": 5105615,
+  "install": {
+    "root": "purr2d2",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/purr2d2/releases/tag/v1.36.0",
+  "changelog_text": "- tolerate bad generated meshes at startup\n- new HUD arrangement options including detached windows\n- can slice mass-less meshes like new struts (which are currently missing mass)",
+  "listing": {
+    "name": "purr2d2",
+    "authors": [
+      "Alex",
+      "tomservo"
+    ],
+    "abstract": "BFL9K and The Furce at your fingertips",
+    "description": "A Kitten Spacy Agency mod to add:\n\n- BFL9K (Big Fucking Laser 9000)\n- The Furce\n\n# media\n\n![bfl9k_01](ksa-image:bfl9k_01)\n\n![bfl9k_02](ksa-image:bfl9k_02)\n\n![bfl9k_03](ksa-image:bfl9k_03)\n\n![blf9k_04](ksa-image:blf9k_04)\n\n![slicing_01](ksa-image:slicing_01)\n\n![the_furce_01](ksa-image:the_furce_01)\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/purr2d2n-release.1500/",
+      "homepage": "https://github.com/meow-sci/purr2d2",
+      "repository": "https://github.com/meow-sci/purr2d2",
+      "bugtracker": "https://github.com/meow-sci/purr2d2/issues"
+    }
+  }
+}
