@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/PodRacer/1.0.0",
     "sha256": "EEA83F2F6C42A9B2F1128ADEAC7A6107B74CCB5B452FF3D9497CF2D2A210D395",
     "size": 10743,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-podracer-1_0_0-aa5e2a74/PodRacer-1.0.0.zip"
+    ]
   },
   "install_size": 147974,
   "install": {
