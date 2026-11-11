@@ -1,0 +1,50 @@
+{
+  "spec_version": 1,
+  "id": "purr2d2",
+  "type": "mod",
+  "version": "1.32.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-11T02:58:05Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/meow-sci/purr2d2/releases/download/v1.32.0/purr2d2-1.32.0.zip",
+    "sha256": "62802B5F1EE00504485DAB84D323EF3C907B91B0F32B2C8A3E9AF18A5B89D2B8",
+    "size": 3638940,
+    "content_type": "application/zip"
+  },
+  "install_size": 5105103,
+  "install": {
+    "root": "purr2d2",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/purr2d2/releases/tag/v1.32.0",
+  "changelog_text": "**Updating:** back up `settings.json` and `Generated/` from your existing `purr2d2/` folder, delete that old mod folder, extract the new `purr2d2/` folder, then restore your saved settings and generated content. Restart KSA after updating.\n\n## What's Changed\n* fix(slicing): support native fallback mass by @alex-sherwin in https://github.com/meow-sci/purr2d2/pull/2\n\n\n**Full Changelog**: https://github.com/meow-sci/purr2d2/compare/v1.30.0...v1.32.0",
+  "listing": {
+    "name": "purr2d2",
+    "authors": [
+      "Alex",
+      "tomservo"
+    ],
+    "abstract": "BFL9K and The Furce at your fingertips",
+    "description": "A Kitten Spacy Agency mod to add:\n\n- BFL9K (Big Fucking Laser 9000)\n- The Furce\n\n# media\n\n![bfl9k_01](ksa-image:bfl9k_01)\n\n![bfl9k_02](ksa-image:bfl9k_02)\n\n![bfl9k_03](ksa-image:bfl9k_03)\n\n![blf9k_04](ksa-image:blf9k_04)\n\n![slicing_01](ksa-image:slicing_01)\n\n![the_furce_01](ksa-image:the_furce_01)\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/purr2d2n-release.1500/",
+      "homepage": "https://github.com/meow-sci/purr2d2",
+      "repository": "https://github.com/meow-sci/purr2d2",
+      "bugtracker": "https://github.com/meow-sci/purr2d2/issues"
+    }
+  }
+}
