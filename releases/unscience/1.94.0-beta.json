@@ -12,7 +12,8 @@
     "url": "https://github.com/meow-sci/unscience/releases/download/v1.94.0-beta/unscience-1.94.0-beta.zip",
     "sha256": "11344AD0F242C8488BF89C9626D27DF66967EFB6A9092DECDA4899C113FA143C",
     "size": 1425395,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "unavailable_since": "2026-11-12T15:55:49Z"
   },
   "install_size": 3007189,
   "install": {
