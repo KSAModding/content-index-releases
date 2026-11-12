@@ -1,0 +1,36 @@
+{
+  "spec_version": 1,
+  "id": "PodRacerII",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-12T03:10:36Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/PodRacerII/1.0.0",
+    "sha256": "B6C2289BED585A343DC2023B5B800956B3C3668627304D666D286F2E2ABE23EC",
+    "size": 13327,
+    "content_type": "application/zip"
+  },
+  "install_size": 176189,
+  "install": {
+    "root": "Pod Racer II",
+    "derived": true,
+    "folder": "Pod Racer II"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Pod Racer II",
+    "authors": [
+      "Beik"
+    ],
+    "abstract": "\"Now this is podracing!\"",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-15)",
+    "license": "CC0-1.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/PodRacerII"
+    }
+  }
+}
