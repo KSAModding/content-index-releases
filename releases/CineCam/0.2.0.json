@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "CineCam",
+  "type": "mod",
+  "version": "0.2.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-12T19:21:10Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-CineCam/releases/download/v0.2.0/CineCam-0.2.0.zip",
+    "sha256": "578A62654D75FC3282FA17E14436AAF98EEC518FAD203C107B4548DC49738808",
+    "size": 356327,
+    "content_type": "application/zip"
+  },
+  "install_size": 960853,
+  "install": {
+    "root": "CineCam",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.3",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-CineCam/releases/tag/v0.2.0",
+  "changelog_text": "## Changes\n- Quick cameras: Flyby, Chase, Orbit, Onboard and Ground tracker with one click, on the pad, in the air and in orbit.\n- Takes with a timeline: a take is a list of shots. Fly the free camera to a good place and press Add key here, or add a shot from a preset.\n- A shot can start at a time, after the shot before, or on a flight event such as lift-off, a stage or a docking.\n- Slow motion and speed keys: a take can change the sim speed on its timeline.\n- Flight recording and replay (experimental, off until you turn it on in Settings): record a flight, then play a take on it afterward and edit its shots while you watch.\n- Render to pictures: save every frame as a numbered picture, for a live take and for a replay.\n- Event log: each run writes the time of every event, with a script that turns it into markers for a video editor.\n- All of the code, the tests and the documentation of this mod were written by an AI model, which I directed and tested in the game. Please open an issue or message me on the KSA Discord if you find a problem.\n\n## Compatibility\nValidated against KSA build version **2026.11.10.5801**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\CineCam\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
+  "listing": {
+    "name": "CineCam",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "A camera mod for Kitten Space Agency: one-click quick cameras, takes with a timeline, and a flight replay to direct the cameras afterward.",
+    "description": "![A chase camera follows a rocket above the clouds](ksa-image:chase-ascent)\n\nA camera mod for Kitten Space Agency. Pick a camera with one click, or build a take with a timeline and film your flight.\n\nThis mod is written against the [StarMap loader](https://github.com/StarMapLoader/StarMap). It is tested against KSA build 2026.11.10.5801 only.\n\n## Features\n\n- **Quick cameras.** Flyby, Chase, Orbit, Onboard and Ground tracker. One click, no setup, on the pad, in the air and in orbit.\n- **Takes with a timeline.** A take is a list of shots. Fly the free camera to a good place and press Add key here, or add a shot from a preset. No numbers to type.\n- **Events.** A shot can start at a time, after the shot before, or on a flight event such as lift-off, a stage or a docking.\n- **Slow motion and speed keys.** A button sets the sim speed, and a take can change the sim speed on a timeline.\n- **Flight recording and replay (experimental).** Record a flight, then play a take on it afterward and edit its shots while you watch.\n- **Render to pictures.** Save every frame as a numbered picture, so the video has the exact speed at any render speed. This works for a live take and for a replay.\n- **Event log.** Each run writes the time of every event, with a tool that turns it into markers for a video editor.\n\n![The Editor page with a take and the timeline dock](ksa-image:editor-timeline)\n\n## Installation\n\n1. Install [StarMap](https://github.com/StarMapLoader/StarMap) 0.5.3 or later.\n2. Extract the mod into `Documents\\My Games\\Kitten Space Agency\\mods\\CineCam\\`.\n3. The game finds new mods and asks to enable them. You can also add this to `Documents\\My Games\\Kitten Space Agency\\manifest.toml`:\n\n```toml\n[[mods]]\nid = \"CineCam\"\nenabled = true\n```\n\n## Quick start\n\n1. Load a flight and select a vehicle. The mod does not work in the vehicle editor.\n2. Open the window with the **CineCam** item of the **Mods** menu, or press **Insert**.\n3. On the **Quick** page, click a camera. Click **Stop** to give the camera back.\n4. To make a take, open the **Editor** page and press **New take**. Fly the free camera to a good place, press **Add key here** and pick a shot type. Press **Save**.\n5. Press **Start take** (or **Pause** on the keyboard) to run it. Press the key again to stop it.\n6. To direct a flight afterward, turn on **Replay of recorded flights** under **Experimental** in Settings. On the Editor page choose **Record and replay**, press **Record flight**, fly, press **Stop recording**, select the recording and press **Open replay**.\n\n![A replay shot of the launch: the rocket lifts off from the pad with its engines burning, seen from the ground](ksa-image:replay-shot)\n\nThe repository has a player guide, a flight replay and render guide, and a shot file reference in its `docs` folder.\n\n## Known limits\n\n- The flight replay is experimental. It draws the recorded vehicles through patches of the game renderer, so a game update can break it. It is off until you turn it on.\n- A replay does not show audio, crew, kittens on EVA, parachute canopies, dents, plume trails, smoke and particles. For a launch video with engine sound, use a live take.\n- A replay opens only on the game build of the recording, in the same star system, with its parts installed.\n- A recording holds 20 minutes of game time at 1x speed and follows the controlled vehicle and a limited number of other vehicles.\n- The mod patches game methods that are not a public modding interface, so a game update can break a feature until the mod is updated. It writes a warning in the log on another build.\n- The import of the marker file into DaVinci Resolve has not been tested.\n\n## How this mod was made\n\nI did not write a single line of this mod myself. All of the code, the tests and the documentation were written by an AI model (Claude), which I directed and tested in the game. I do not know the codebase in detail. It has worked really well for me so far and I find it useful, so I am publishing it.\n\nIf you find a problem, please open an issue on GitHub or message me on the KSA Discord (Maxi).\n\n## Dependencies\n\n- [StarMap](https://github.com/StarMapLoader/StarMap): mod loader, required at runtime. Version 0.5.3 or later.\n\n## Build dependencies\n\nRequired only to build the mod from source.\n\n- [StarMap.API](https://github.com/StarMapLoader/StarMap) from NuGet, tested version 0.5.2.\n- [Lib.Harmony](https://www.nuget.org/packages/Lib.Harmony) from NuGet, tested version 2.4.2.\n\n## Check out my other mods\n\n- [AdvancedFlightComputer](https://github.com/Maximilian-Nesslauer/KSA-AdvancedFlightComputer) - maneuver planning, burn execution, automatic staging and closed-loop guidance ([forum thread](https://forums.ahwoo.com/threads/advanced-flight-computer.783/))\n- [DeltaVMap](https://github.com/Maximilian-Nesslauer/KSA-DeltaVMap) - interactive delta-v subway map and transfer-window planner, auto-generated from the loaded system ([forum thread](https://forums.ahwoo.com/threads/deltavmap.978/))\n- [MeasureTools](https://github.com/Maximilian-Nesslauer/KSA-MeasureTools) - click-to-measure ruler and protractor tools ([forum thread](https://forums.ahwoo.com/threads/measuretools.992/))\n",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/cinecam.1636/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-CineCam",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-CineCam/issues"
+    }
+  }
+}
