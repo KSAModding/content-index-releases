@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/PodRacerII/1.0.0",
     "sha256": "B6C2289BED585A343DC2023B5B800956B3C3668627304D666D286F2E2ABE23EC",
     "size": 13327,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-podracerii-1_0_0-1bf25a71/PodRacerII-1.0.0.zip"
+    ]
   },
   "install_size": 176189,
   "install": {
