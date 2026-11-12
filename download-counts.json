@@ -3045,16 +3045,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 12,
+      "total": 13,
       "hosts": {
-        "ksamods": 12
+        "ksamods": 13
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 12,
+          "total": 13,
           "hosts": {
-            "ksamods": 12
+            "ksamods": 13
           }
         }
       ]
@@ -3921,6 +3921,22 @@
     },
     {
       "id": "PodRacer",
+      "total": 2,
+      "hosts": {
+        "ksamods": 2
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 2,
+          "hosts": {
+            "ksamods": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "PodRacerII",
       "total": 0,
       "hosts": {
         "ksamods": 0
