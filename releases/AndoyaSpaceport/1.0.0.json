@@ -1,0 +1,54 @@
+{
+  "spec_version": 1,
+  "id": "AndoyaSpaceport",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-12T19:21:06Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-AndoyaSpaceport/releases/download/v1.0.0/AndoyaSpaceport-1.0.0.zip",
+    "sha256": "D1A1F6F8932FC4EBB4962CFDB5E2B2F00F4A59070645897074286027AE0316F6",
+    "size": 31453999,
+    "content_type": "application/zip"
+  },
+  "install_size": 33844766,
+  "install": {
+    "root": "AndoyaSpaceport",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.3",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "PurrlinePrisma",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-AndoyaSpaceport/releases/tag/v1.0.0",
+  "changelog_text": "## Changes\n- First release. Adds the launch site \"Andoya Spaceport\" on Earth; no stock launch site is changed.\n- One launch pad on a quay with a flame trench, an access tower, light masts, a tank farm, pipe racks and a hall.\n- Lamps light the pad at night, and the site casts sun shadows when the vessel shadows are on.\n- A kitten can walk the tower stairs and the open flame trench.\n\n## Compatibility\nValidated against KSA build version **2026.11.10.5801**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\AndoyaSpaceport\\`.\nRequires [StarMap](https://github.com/StarMapLoader/StarMap).",
+  "listing": {
+    "name": "Andoya Spaceport",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "A sixth launch site on Earth: a launch pad on a quay at Andoya in northern Norway, with a tower, tank farm, pipe racks, a hall, lamps at night and sun shadows.",
+    "description": "![The pad and the tank farm in low sun](ksa-image:pad-and-tanks)\n\n**Andoya Spaceport** is a launch site for Kitten Space Agency at Andoya, an island in northern Norway at 69 degrees north. It adds \"Andoya Spaceport\" to the launch site list of the vehicle editor. No stock launch site is changed.\n\n## What is in it\n\n- One launch pad on a quay, with a flame trench to the sea, rock armour and a road.\n- Access tower, light masts, pipe racks, valve skids, tank farm, containers, a hall, a trailer and a wheel loader.\n- Lamps that light the pad at night and fade in when the sun sinks below 8 degrees.\n- Sun shadows of the whole site when the vessel shadows are on in the graphics settings. The game draws no shadows for launch sites, so the mod adds them.\n- A kitten can walk the tower stairs and the open flame trench.\n\n![The site in low sun](ksa-image:site-low-sun)\n\n![Night at the site](ksa-image:night)\n\n## Launching\n\nKeep legs, fins and boosters within about 15 m of the vehicle axis; a base wider than about 28 m does not fit the pad. At 69 degrees north the sun does not rise for some weeks around the winter solstice, so a new game can start in the dark.\n\nThe layout of the pad and the tank farm follows public aerial pictures; the other sizes are estimates. The site stands about 1 km west-north-west of the real pad, because the game terrain there is a hillside.\n\n![The tank farm from above](ksa-image:tank-farm)\n\n## Requirements\n\n[StarMap](https://github.com/StarMapLoader/StarMap) is required for the lamps and the shadows. Without it the site exists, but stays dark and has no shadows.\n\nWorks well with [Prisma by Purrline Rocketworks](https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma), a small launcher that fits the pad.\n\n## Install\n\n- Borea: install Andoya Spaceport from the content list.\n- By hand: copy `AndoyaSpaceport` from the release zip into `Documents/My Games/Kitten Space Agency/mods/` and enable it.\n\nTo remove the mod, delete its folder.\n\nMade for KSA build 2026.11.10.5801.\n\nCode and game data are MIT. Meshes, textures and pictures are CC BY 4.0.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "gameplay",
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/andoya-spaceport.1635/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-AndoyaSpaceport",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-AndoyaSpaceport/issues"
+    }
+  }
+}
