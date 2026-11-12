@@ -1,0 +1,42 @@
+{
+  "spec_version": 1,
+  "id": "ExtendedPropellants",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-12T19:21:39Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-ExtendedPropellants/releases/download/v1.0.0/ExtendedPropellants-1.0.0.zip",
+    "sha256": "A0981E553DF9ADD23E422ADEC63CDFA7DEFEF061DE45DBA73F90EB25B38B8DEF",
+    "size": 12515,
+    "content_type": "application/zip"
+  },
+  "install_size": 83884,
+  "install": {
+    "root": "ExtendedPropellants",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-ExtendedPropellants/releases/tag/v1.0.0",
+  "changelog_text": "## Changes\n- First release. A data-only mod with no parts and no code.\n- Adds liquid propane (`ExtProp_C3H8`), the reaction liquid oxygen plus propane (`ExtProp_Propalox`, default mixture ratio 2.7) and a yellow and orange exhaust plume (`ExtProp_PropaloxPlume`).\n- On its own it changes nothing in the game. Other mods use it for their engines, for example Prisma by Purrline Rocketworks.\n\n## Compatibility\nValidated against KSA build version **2026.11.10.5801**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\ExtendedPropellants\\`.\nNo mod loader needed.",
+  "listing": {
+    "name": "Extended Propellants",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Adds liquid propane, the liquid oxygen and propane engine reaction and a yellow and orange exhaust plume. A data mod for other mods; it adds no parts.",
+    "description": "**Extended Propellants** is a data-only mod for Kitten Space Agency. It adds liquid propane, the reaction liquid oxygen plus propane and a yellow and orange exhaust plume. It has no parts and no code. Other mods use it for their engines, for example [Prisma by Purrline Rocketworks](https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma).\n\n![Propane engines at lift-off](ksa-image:plume)\n\n## What it adds\n\n| Id | Kind | Notes |\n| --- | --- | --- |\n| `ExtProp_C3H8` | Substance | Propane, liquid and gas. Stored at 230.04 K, density 582.0 kg/m3. |\n| `ExtProp_Propalox` | Mixture reaction | Liquid propane plus liquid oxygen, 16 mixture ratios by 14 pressures (20 kPa to 120 MPa), default mixture ratio 2.7. Shows in the engine designer as a bipropellant. |\n| `ExtProp_PropaloxPlume` | Exhaust plume | The stock `EngineAMed` plume in yellow and orange. |\n\nThe tables are computed with CoolProp and NASA CEA with the method of the stock files. The `ExtProp_` prefix keeps the Ids apart from other mods and from a later stock propane.\n\n## For mod authors\n\nUse the reaction in the `Combustor` of your engine and give the engine its own `MixtureRatio`; the default of the reaction only sets the start value in the engine designer. The tanks fill themselves from the reaction of the engine they feed, so no tank XML changes. Load order does not matter. The README in the repository has a complete example.\n\nA data-only mod cannot declare a dependency in its `mod.toml`, so list this mod as a `required` dependency in your listing in the index. Borea then installs both. Without it the game logs a content error for your engine, and the parts that use it do not load.\n\n## Install\n\n- Borea: install it from the content list, or let Borea add it for a mod that needs it.\n- By hand: copy `ExtendedPropellants` from the release zip into `Documents/My Games/Kitten Space Agency/mods/` and enable it.\n\nOn its own the mod changes nothing in the game.\n\nMade for KSA build 2026.11.10.5801.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/extended-propellants.1632/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-ExtendedPropellants",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-ExtendedPropellants/issues"
+    }
+  }
+}
