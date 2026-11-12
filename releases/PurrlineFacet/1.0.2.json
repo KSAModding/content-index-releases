@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "PurrlineFacet",
+  "type": "mod",
+  "version": "1.0.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-12T19:21:42Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFacet/releases/download/v1.0.2/PurrlineFacet-1.0.2.zip",
+    "sha256": "B4D579E31CDE183B3C26E6D2340B198DEAE4030C76DC7F5491711DAE70CE159F",
+    "size": 13248617,
+    "content_type": "application/zip"
+  },
+  "install_size": 14479643,
+  "install": {
+    "root": "PurrlineFacet",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "PurrlinePrisma",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFacet/releases/tag/v1.0.2",
+  "changelog_text": "## Changes\n- First public release. Satellite parts from the fictional rocket maker Purrline Rocketworks.\n- Rideshare: a cube satellite rack, an adapter from 1 m to 0.5 m and cube satellites in 3U, 6U and 12U.\n- Satellite and probe kit: Bus, Battery Pack, folding solar wings, RCS Pod, Eye Imager, camera, star tracker, horn and patch antennas, a deploying dish and science boom, a propellant tank and the Alcor kick engine.\n- Rack, Adapter, Bus and Battery come bare, in gold foil or in white cloth; the Imager and the tank also come with foil.\n- Materials: lighter satin aluminium, fewer black faces, a white dish, patch antenna and wing backs, more surface relief, glossy solar cells, and new gold foil and silver tank blanket from cloth simulations.\n\n## Compatibility\nValidated against KSA build version **2026.11.10.5801**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\PurrlineFacet\\`.\nNo mod loader needed.",
+  "listing": {
+    "name": "Facet by Purrline Rocketworks",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Satellite parts for small launchers: a rideshare rack with 3U, 6U and 12U cube satellites, and a kit to build small satellites and probes, with a bus, solar wings, instruments, antennas and the Alcor kick engine.",
+    "description": "![Facet cube satellites on the rack](ksa-image:hero)\n\n**Facet** is a set of satellite parts for small launchers in Kitten Space Agency, from the fictional rocket maker **Purrline Rocketworks**: a rideshare rack with cube satellites, and a kit to build small satellites and probes.\n\n## Parts\n\n- **Facet Cube Rack**: rideshare rack for cube satellites inside a fairing; bare, gold foil, white cloth.\n- **Facet Cube Adapter 1 m to 0.5 m**: adapter from 1 m to 0.5 m; bare, gold foil, white cloth.\n- **Facet Cube 3U**, **6U** and **12U**: cube satellites, two layouts each; the 12U unfolds its wings.\n- **Facet Bus**: core of a small satellite or probe; bare, gold foil, white cloth.\n- **Facet Battery Pack**: battery pack for the Bus; bare, gold foil, white cloth.\n- **Facet RCS Pod**: attitude control thrusters with their own tank.\n- **Facet Wing 2** and **Wing 3**: folding solar wings with two or three panels.\n- **Facet Eye Imager**: Earth observation telescope; bare or with foil.\n- **Facet Camera Pod**, **Star Tracker**, **Horn Antenna** and **Patch Antenna**.\n- **Facet Dish**: deploying dish antenna.\n- **Facet Science Boom**: deploying science boom.\n- **Facet Voyager Tank**: propellant tank of a small probe; bare or in silver foil.\n- **Alcor Kick Engine**: kick engine on stock MMH and NTO.\n\nSizes and texture density follow the stock parts. A cube satellite leaves the rack with its decoupler and tumbles unless something controls it. A Bus rides on a stock 0.5 m decoupler.\n\n![All parts and finishes](ksa-image:all-parts)\n\n![Facet Eye](ksa-image:eye)\n\n![Facet Voyager with the Alcor kick engine](ksa-image:voyager)\n\n![Rideshare with white cloth](ksa-image:rideshare-cloth)\n\n## Requirements\n\nNo other mod needed. Facet works with any launcher that has a fairing. [Prisma by Purrline Rocketworks](https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma) is a small launcher with a fairing for Facet.\n\n## Install\n\n- Borea: install Facet from the content list.\n- By hand: copy `PurrlineFacet` from the release zip into `Documents/My Games/Kitten Space Agency/mods/` and enable it.\n\nTo remove the mod, delete its folder. Vehicles with its parts do not load without it.\n\nMade for KSA build 2026.11.10.5801.\n\nCode and game data are MIT. Meshes, textures, logo and pictures are CC BY 4.0.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "parts"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/facet-by-purrline-rocketworks.1634/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFacet",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFacet/issues"
+    }
+  }
+}
