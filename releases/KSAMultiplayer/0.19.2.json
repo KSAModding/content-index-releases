@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "KSAMultiplayer",
+  "type": "mod",
+  "version": "0.19.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-12T10:53:04Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/LaurensDeV/KSAMultiplayer/releases/download/v0.19.2/KSAMultiplayer-0.19.2.zip",
+    "sha256": "B50FE7222AEA0CE80E7EF6E09B175F06D4F9B4E355D4FC5E6EF7B727C4F161F4",
+    "size": 157800,
+    "content_type": "application/zip"
+  },
+  "install_size": 374942,
+  "install": {
+    "root": "KSAMultiplayer",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.3",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/LaurensDeV/KSAMultiplayer/releases/tag/v0.19.2",
+  "changelog_text": "A shared world for Kitten Space Agency: several players, each in their own game, flying in\none universe kept by a dedicated server that runs on Linux with no game installed.\n\nEveryone in a world needs **KSA `2026.11.10.5801`** and a mod of this release. A game and a\nserver speaking different versions refuse each other by name rather than misread the\nbytes, and this one speaks **protocol 25**.\n\n## What's new\n\nA game with an older build of a mod than a server wants is told which\nrelease to install, in place of being told to turn on a mod that is already\non and shown the whole commit its build came from. The markers in the server\nlist are pills, and the fill of a chosen row reaches its edges.\n\nA server with no world yet, or with an empty world of its own, holds everyone\nto the KSA build of whoever is in it. Before, a second player on another\nbuild could get in during the seconds the first one's world took to arrive.\n\nNothing in the protocol changed: 0.19.0, 0.19.1 and 0.19.2 speak version 25\nand can play together.\n\n<details>\n<summary>Every change since v0.19.1</summary>\n\n- feat(mod): a mod at another version is told apart from one that is off\n- feat(server): a world with no build of its own is held to the build of whoever is in it\n</details>\n\n## Playing\n\nInstall [StarMap](https://github.com/StarMapLoader/StarMap), unzip `KSAMultiplayer-*.zip`\ninto KSA's `mods` folder and enable it. The **PLAY MULTIPLAYER** window comes up before\nanything else: pick a server from the list it shows, or type an address, and press\n**CONNECT**.\n\nThere is a server at **`mp.ksarmory.com`** to try it on.\n\nHold **Tab** for who is playing and their ping, **Enter** for a chat line. A craft someone\nelse is flying carries their name and is theirs: you can watch it, not fly it. Changing the\nsimulation speed is put to everyone first, and only whoever asked can end the warp.\n\n## Hosting\n\n```bash\ndocker run -dit --name ksamp -p 50100:50100/udp -v ksamp-world:/data \\\n    -e KSAMP_NAME=\"My server\" ghcr.io/laurensdev/ksamp-server@sha256:1fbbc8e82e360b4d6b4e48265dadc9bbb9ae87a93178c1982d7dcf4beaae597a\n```\n\nOr an executable from below, needing no .NET and no KSA:\n`ksamp-server-linux-x64.tar.gz` (with a systemd unit beside it),\n`ksamp-server-linux-arm64.tar.gz` for a Pi or an ARM VPS, or\n`ksamp-server-win-x64.zip` to run `ksamp-server.exe` on the machine you already have.\nThe server has no world until a player gives it one, and hands that world to everyone who\njoins after -- or set `empty-world` and it starts with one of its own.\n\nHosting on the same machine you play on works: the server is its own process and needs no\ngame. Whoever else joins needs the port open to them.\n\nIts commands are typed into its console, which is standard input -- hence `-it` above, and\n`docker attach ksamp` to reach it, Ctrl+P Ctrl+Q to leave it running. `clear` is the broom\nfor a world filling up with spent stages: every craft nobody is flying goes, out of every\ngame and not just out of the server, and `clear Rocket_*` narrows it. `reload` hands the\nworld out again, which takes a few seconds and no reconnection, and is the only thing that\never puts universe time back.\n\n## Upgrading a server when KSA has\n\nA world remembers the KSA build of whoever gave it to the server, and the server turns away\nanyone running a different one. So the day KSA updates, a world seeded before it refuses\n**everybody who updates** -- and nothing says so from inside the game beyond the refusal.\nEither `fresh` at the console, which throws that world away and starts an empty one, or\n`set ksa-build <the new build>` to make the operator's word the test instead of the\nworld's. A world the server started by itself records no build and turns nobody away.\n\n## State\n\nTwo games on one machine have flown in one world through it: launching, EVA, chat, the\nscoreboard, nametags, a voted time warp, and an 89-part rocket staged while the other game\nwatched and rebuilt the stage it dropped. Another player's engines are seen to burn even on\na craft this game is not simulating, 7,576 km away. What two games across the internet do\nis not known yet.",
+  "listing": {
+    "name": "KSA Multiplayer",
+    "authors": [
+      "Laurens"
+    ],
+    "abstract": "A shared world for Kitten Space Agency: several players, each in their own game, flying in one universe kept by a dedicated server. Rockets, rovers and kittens on EVA all sync.",
+    "description": "A shared world for **Kitten Space Agency**: several players, each in their own game, flying in one universe kept by a **dedicated server**. The server runs on Linux, Windows or a Raspberry Pi, needs no copy of the game, and holds the world whether anybody is playing or not.\n\nAny craft syncs: rockets, rovers, kittens walking about on EVA. You see other players fly, stage, burn and crash in real time, each craft carrying its owner's name.\n\n### Playing together\n\n- **A craft is its owner's.** You can watch one somebody else is flying, ride along with it, and see its engines burn — but not take it, board it or empty it out. When its owner leaves, it comes free.\n- **One clock.** Everybody keeps the server's time. A game that falls behind catches up on its own, and nobody is left watching a world minutes out of date.\n- **Time warp is asked, not taken.** Changing the simulation speed is put to the room first, and only whoever asked can end it. A game that cannot keep up holds the speed down for everyone, so nothing runs away from the slowest machine.\n- **Hold Tab** for who is playing and their ping, **Enter** for a chat line.\n- Launchpads are shared out, so two players launching at one site do not land on top of each other.\n\n### The server\n\nOne self-contained executable. Point it at a port and it waits; the first player to join gives it their world, and it hands that world to everyone who joins after. Or set `empty-world` and it starts with an empty one of its own, so nobody has to seed it.\n\nIt keeps the world between runs, saves periodically, and has a console: `clear` sweeps up the spent stages a shared world fills with, `reload` hands the world out again without anybody reconnecting, and `fresh` throws it away and starts over. Players can be made admins and run those commands from inside the game.\n\nThere is a server at **`mp.ksarmory.com`** to try it on.\n\n### What you need\n\nEveryone in a world needs **the same KSA build**, the same mod version, and every mod the world's craft use. The server turns away anyone who differs and says what is missing, rather than letting a mismatch corrupt the world quietly.\n\n### Honest status\n\nTwo games on one machine have flown in one world through all of this: launching, EVA, chat, nametags, a voted warp, and an 89-part rocket staged while the other game watched and rebuilt the dropped stage as its own craft. Another player's engines are seen to burn even on a craft your game is not simulating, thousands of kilometres away.\n\nWhat a dozen players across the internet do to it is not known yet. Bug reports are welcome.\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksa-multiplayer.1578/",
+      "repository": "https://github.com/LaurensDeV/KSAMultiplayer",
+      "bugtracker": "https://github.com/LaurensDeV/KSAMultiplayer/issues"
+    }
+  }
+}
