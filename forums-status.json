@@ -9,6 +9,11 @@
       "in_sitemap": true
     },
     {
+      "id": "AndoyaSpaceport",
+      "thread": 1635,
+      "in_sitemap": false
+    },
+    {
       "id": "beiks-flight-planning-essentials-pack",
       "thread": 1281,
       "in_sitemap": true
@@ -17,6 +22,11 @@
       "id": "CharacterManager",
       "thread": 1479,
       "in_sitemap": true
+    },
+    {
+      "id": "CineCam",
+      "thread": 1636,
+      "in_sitemap": false
     },
     {
       "id": "CompactHUD",
@@ -32,6 +42,11 @@
       "id": "DeltaVMap",
       "thread": 978,
       "in_sitemap": true
+    },
+    {
+      "id": "ExtendedPropellants",
+      "thread": 1632,
+      "in_sitemap": false
     },
     {
       "id": "FastAndPurrious",
@@ -187,6 +202,16 @@
       "id": "purr2d2",
       "thread": 1500,
       "in_sitemap": true
+    },
+    {
+      "id": "PurrlineFacet",
+      "thread": 1634,
+      "in_sitemap": false
+    },
+    {
+      "id": "PurrlinePrisma",
+      "thread": 1633,
+      "in_sitemap": false
     },
     {
       "id": "RealAtmospheres",
