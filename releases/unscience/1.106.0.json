@@ -21,7 +21,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/meow-sci/unscience/releases/tag/v1.106.0",
-  "changelog_text": "**Installing over an existing install:** delete the old `unscience/` folder from your mods directory before unzipping — files removed from the mod are not removed by unzipping over it.\n\n**Full Changelog**: https://github.com/meow-sci/unscience/compare/v1.105.0...v1.106.0",
+  "changelog_text": "- much lower poly/tri and texture sizes for the wing-walker chair\n- added low poly cooler, with animated lid, acts as a supply locker, two part variants: 12 meels, 2 CO2 scrubbers, 30 liters of storage\n- made the beach chair fabric texture more worn looking",
   "listing": {
     "name": "unscience",
     "authors": [
