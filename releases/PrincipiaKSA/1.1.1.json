@@ -1,0 +1,46 @@
+{
+  "spec_version": 1,
+  "id": "PrincipiaKSA",
+  "type": "mod",
+  "version": "1.1.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-13T03:38:15Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/parsaes80/PrincipiaKSA/releases/download/v1.1.1/PrincipiaKSA.zip",
+    "sha256": "017E04DA2C04A9B1F59BCDAC296D550171DDE543AA74BE4A6C61D268815EC0BC",
+    "size": 13797683,
+    "content_type": "application/zip"
+  },
+  "install_size": 13795161,
+  "install": {
+    "root": "PrincipiaKSA",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.4.8",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/parsaes80/PrincipiaKSA/releases/tag/v1.1.1",
+  "changelog_text": "Another HUGE update which adds:\n-massive stutter fixes by stopping the game from waiting on Principia while it calculates the planets. Before this, time warping or burning near an encounter could freeze the game for 100+ ms at a time. Now the game always goes first and the planets are calculated in small pieces in the background.\n-No more frozen trajectories near encounters by letting the prediction grow as the planets are calculated, instead of waiting for all of it at once. The planets are also kept calculated a year ahead in the background, so most predictions never wait at all.\n-Bringing back the time limit on predictions, now at 20 years, so a huge step count can't make Principia calculate the planets forever. The top of the PrincipiaKSA window shows the date the planets are calculated to again.\n-Much smoother maneuver node dragging by giving each node a track that covers half its orbit each way (up to 60 days). Nodes now follow the mouse instead of crawling behind it.\n-Fix maneuver nodes disappearing after encounters (like Saturn into Titan) when dragging their arrows. The node's track was drawn in the wrong frame, putting the node hundreds of millions of km away from the trajectory.\n-PrincipiaKSA window redesign to match KSA's own panels, with the same dark style, and its size and font follow the game's interface settings. Right click it for the same options as KSA's panels: Enabled, Always on top, Reset, Detached and Lock. If you hide it, you can bring it back from the HUD menu.\n-Optional terminal logging with the new \"log2terminal\" setting in settings.json (off by default). When it's off, the mod only writes to its own PrincipiaKSA.log file.\n-Better bug reports by adding detailed logs for stutters, slow predictions and maneuver nodes to PrincipiaKSA.log. If something feels slow or broken, the log now says exactly why.\n-Cleaner codebase by reorganizing the mod into one file per feature and removing repeated code, for anyone who wants to read or contribute to it.",
+  "listing": {
+    "name": "PrincipiaKSA",
+    "authors": [
+      "SMOKE"
+    ],
+    "abstract": "Replaces the games Kepler based gravity, with more realistic N-body Gravity.",
+    "description": "This mod replaces the game's simplified gravity model and replaces it with N-body simulation. Such a mod called Principia(https://github.com/mockingbirdnest/Principia) existed for KSP and now repo has ported it to KSA. N-body gravity works by calculating all the gravity forces acting on an object not just 2 like the default KSA one, so as a result the path of a vessel in sapce can be much more complicated and realistic than the normal game. This simulation demands alot of CPU power and may cause stuttering in heavy simulation moments. Principia offers much more depth to game and is very fun for people who have mastered the games own physics.\n\n![text](ksa-image:OrbitlLines)",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/principiaksa.1557/",
+      "repository": "https://github.com/parsaes80/PrincipiaKSA"
+    }
+  }
+}
