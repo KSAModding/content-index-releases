@@ -1,7 +1,7 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-12T22:46:33Z",
-  "counted_at": "2026-11-12T22:46:33Z",
+  "checked_at": "2026-11-13T22:42:43Z",
+  "counted_at": "2026-11-13T22:42:43Z",
   "listings": [
     {
       "id": "AdvancedFlightComputer",
@@ -11,7 +11,7 @@
     {
       "id": "AndoyaSpaceport",
       "thread": 1635,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "beiks-flight-planning-essentials-pack",
@@ -26,7 +26,7 @@
     {
       "id": "CineCam",
       "thread": 1636,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "CompactHUD",
@@ -46,7 +46,7 @@
     {
       "id": "ExtendedPropellants",
       "thread": 1632,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "FastAndPurrious",
@@ -211,12 +211,12 @@
     {
       "id": "PurrlineFacet",
       "thread": 1634,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "PurrlinePrisma",
       "thread": 1633,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "RealAtmospheres",
