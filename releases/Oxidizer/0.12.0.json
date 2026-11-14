@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "Oxidizer",
+  "type": "mod-loader",
+  "version": "0.12.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-14T14:10:56Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "os": [
+    "windows",
+    "linux"
+  ],
+  "download": {
+    "url": "https://github.com/SafeShows/Oxidizer/releases/download/v0.12.0/Oxidizer-0.12.0.zip",
+    "sha256": "AFE8B5E9AE4DA86DBFC894A02D01C3E38F280E77507EC993714651377DE3451D",
+    "size": 7846961,
+    "content_type": "application/zip"
+  },
+  "install_size": 26926325,
+  "install": {
+    "root": "Oxidizer",
+    "derived": false,
+    "target": "standalone"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/SafeShows/Oxidizer/releases/tag/v0.12.0",
+  "changelog_text": "### Added\n\n- Physics forces for Rust mods (`oxidizer_api::physics`, API version 6): `register_force` adds a mod's forces and torques to vehicles inside the game's physics, once or more per substep, on the game's physics worker threads. The callback gets the vehicle's state in plain data (position, velocity, attitude, atmosphere, mass, the game's own drag areas) and a key that `physics::vehicle_key` gives for a `KSA.Vehicle`. The game's `PhysicsStates.ComputeDerivatives` takes span arguments, which the generic hooks can't patch, so the bridge injects the call with a transpiler; nothing is patched until a mod registers a force. A reload removes a mod's callbacks. Example: `examples/force_rust`.\n- Data per save game, for Rust and Rhai mods: `oxidizer_api::save::{get, set}` and `save_get` / `save_set`, with the callbacks `saving` (the game is about to write a save) and `save_loaded`. Each mod's values are written into the save's own folder as `oxidizer/<mod>.json`, so they travel with the save. `oxidizer_api` 0.7.0 (API version 6) has `Mod::saving` and `Mod::save_loaded`.\n- `inspect(value)` for Rhai and the console: a game object's public properties and fields with their current values, and its first items, as JSON (Rhai Studio's INSPECT panel). Getters that throw read as null without filling the log.\n\n### Fixed\n\n- Hooking a method that a class overrides (like `KSA.UncompressedSave.Write`) failed with \"has 2 overloads\": the inherited method it replaces was counted as a second one.\n\n### Screenshots\n\n**Physics forces: a watch on the acceleration steps up by 2 g while examples/force_rust pushes**\n\n![Physics forces: a watch on the acceleration steps up by 2 g while examples/force_rust pushes](https://safeshows.github.io/Oxidizer/assets/screenshots/forces.png)\n\n**Per-save data: after loading a save, hello_rust reads back what it stored in it**\n\n![Per-save data: after loading a save, hello_rust reads back what it stored in it](https://safeshows.github.io/Oxidizer/assets/screenshots/save-data.png)\n\n**inspect(), as Rhai Studio 1.3 shows it**\n\n![inspect(), as Rhai Studio 1.3 shows it](https://safeshows.github.io/Oxidizer/assets/screenshots/inspector.png)\n\nRust mods built with `oxidizer_api` 0.7 need this Oxidizer; older mods keep working.\n\n**Full Changelog**: https://github.com/SafeShows/Oxidizer/compare/v0.11.0...v0.12.0",
+  "listing": {
+    "name": "Oxidizer",
+    "authors": [
+      "SafeShows"
+    ],
+    "abstract": "Mod loader that runs Kitten Space Agency mods written in Rust or as Rhai scripts.",
+    "description": "Oxidizer is a mod loader for Kitten Space Agency, written in Rust. It loads code mods written in Rust and mods written as Rhai scripts, so no C# is needed.\n\n![The two example mods, one in Rhai and one in Rust, drawing ImGui windows in game](ksa-image:example-mods)\n\nThis is the standalone loader: you start the game through `oxidizer.exe` (`oxidizer` on Linux) instead of the game, and no StarMap is needed. If you use StarMap or other C# mods, install `Oxidizer.StarMap` instead: the same Oxidizer as a StarMap mod, and the same mods run with both.\n\nMods can run code every frame, draw their own ImGui windows with the game's ImGui, read and change game objects, patch game methods before or after they run and change what they return, react to hotkeys, keep their own settings, and add entries to a Mods menu in the game's menu bar. **Mods > Oxidizer** shows the loaded mods, their errors and the log.\n\nRhai mods are plain `.rhai` files that need no compiling, and they reload while the game runs when you save them. Rust mods use the `oxidizer_api` crate from crates.io, and `oxidizer --bindgen` generates typed Rust bindings for the whole game, with autocomplete and compile-time checks.\n\nMods go in `Documents/My Games/Kitten Space Agency/mods/<ModName>/`. Oxidizer loads a mod when its `mod.toml` has an `[oxidizer]` section that names a `dll` or a `script`, and skips mods that are disabled in the game's manifest. The first run writes an `oxidizer.toml` next to the executable, where `game_path` points at the folder Kitten Space Agency was installed in.\n\nOxidizer runs on Windows and Linux.\n",
+    "license": "MIT",
+    "tags": [
+      "library"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/tools/oxidizer-write-ksa-mods-in-rust-or-rhai-scripts-mod-loader.1559/",
+      "repository": "https://github.com/SafeShows/Oxidizer",
+      "bugtracker": "https://github.com/SafeShows/Oxidizer/issues"
+    }
+  }
+}
