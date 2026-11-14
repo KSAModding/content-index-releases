@@ -614,16 +614,16 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 22,
+      "total": 23,
       "hosts": {
-        "ksamods": 22
+        "ksamods": 23
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 22,
+          "total": 23,
           "hosts": {
-            "ksamods": 22
+            "ksamods": 23
           }
         }
       ]
@@ -3136,16 +3136,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 19,
+      "total": 23,
       "hosts": {
-        "ksamods": 19
+        "ksamods": 23
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 19,
+          "total": 23,
           "hosts": {
-            "ksamods": 19
+            "ksamods": 23
           }
         }
       ]
@@ -4043,16 +4043,16 @@
     },
     {
       "id": "PodRacerII",
-      "total": 2,
+      "total": 3,
       "hosts": {
-        "ksamods": 2
+        "ksamods": 3
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 2,
+          "total": 3,
           "hosts": {
-            "ksamods": 2
+            "ksamods": 3
           }
         }
       ]
