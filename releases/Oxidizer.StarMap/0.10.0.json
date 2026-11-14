@@ -31,7 +31,7 @@
   },
   "dependencies": [],
   "changelog": "https://github.com/SafeShows/Oxidizer/releases/tag/v0.10.0",
-  "changelog_text": "### Added\n\n- Hot reload for Rust mods: rebuild a mod and copy its library into the mod folder while the game runs, and within about a second Oxidizer runs its `unload`, removes its hooks, event subscriptions and services, and starts the new build (`init`, then `loaded` if the game has loaded). If the new build can't load, the running one stays. Works with mods built with any `oxidizer_api` version.\n\n### Changed\n\n- Rust mods run from a copy of their library in `<documents>/oxidizer/loaded/`, so the file in the mod folder isn't locked while the game runs.",
+  "changelog_text": "### Added\n\n- Hot reload for Rust mods: rebuild a mod and copy its library into the mod folder while the game runs, and within about a second Oxidizer runs its `unload`, removes its hooks, event subscriptions and services, and starts the new build (`init`, then `loaded` if the game has loaded). If the new build can't load, the running one stays. Works with mods built with any `oxidizer_api` version.\n\n### Changed\n\n- Rust mods run from a copy of their library in `<documents>/oxidizer/loaded/`, so the file in the mod folder isn't locked while the game runs.\n\n### Screenshots\n\n**A new build copied in while the game runs: \"reloaded rust mod bus_rust\", then the new code**\n\n![A new build copied in while the game runs: \"reloaded rust mod bus_rust\", then the new code](https://safeshows.github.io/Oxidizer/assets/screenshots/hot-reload.png)",
   "listing": {
     "name": "Oxidizer (StarMap mod)",
     "authors": [
