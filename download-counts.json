@@ -3136,16 +3136,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 18,
+      "total": 19,
       "hosts": {
-        "ksamods": 18
+        "ksamods": 19
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 18,
+          "total": 19,
           "hosts": {
-            "ksamods": 18
+            "ksamods": 19
           }
         }
       ]
