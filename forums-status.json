@@ -184,6 +184,11 @@
       "in_sitemap": true
     },
     {
+      "id": "newaa",
+      "thread": 1693,
+      "in_sitemap": false
+    },
+    {
       "id": "OhMyStars",
       "thread": 1255,
       "in_sitemap": true
