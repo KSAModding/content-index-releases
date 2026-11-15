@@ -1,0 +1,50 @@
+{
+  "spec_version": 1,
+  "id": "newaa",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-15T15:57:10Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/ardenarrison/New-AA/releases/download/v1.0.0/newaa-1.0.0.zip",
+    "sha256": "33913EB297E9B2E9C848EAF41E18FF67012B0D8162D83176EA60AC69CF74BF9A",
+    "size": 31240214,
+    "content_type": "application/zip"
+  },
+  "install_size": 59832170,
+  "install": {
+    "root": "newaa",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/ardenarrison/New-AA/releases/tag/v1.0.0",
+  "changelog_text": "First release of New AA: FXAA, SMAA and DLAA (NVIDIA DLSS) anti-aliasing for Kitten Space Agency, loaded by StarMap.\n\n**Windows only for now.**\n\n## Download\n`newaa-1.0.0.zip` contains the built mod. No compiling needed.\n\n## Install\n1. Close the game and StarMap.\n2. Extract the `newaa` folder from the zip into `Documents\\My Games\\Kitten Space Agency\\mods\\`, so that `mods\\newaa\\mod.toml` exists.\n3. Make sure `Documents\\My Games\\Kitten Space Agency\\manifest.toml` contains:\n   ```toml\n   [[mods]]\n   id = \"newaa\"\n   enabled = true\n   ```\n4. Start the game through `StarMap.exe`, then pick **DLAA**, **SMAA** or **FXAA** under Settings > Display > Anti-Aliasing.\n\n## Requirements\n- DLAA: an NVIDIA RTX GPU (RTX 20-series or newer) and a current driver.\n- SMAA and FXAA: any GPU.\n\n## Powered by NVIDIA DLSS\nDLAA uses NVIDIA DLSS (via the NVIDIA NGX SDK). NVIDIA, DLSS and RTX are trademarks of NVIDIA Corporation. New AA is a free community mod and is not affiliated with or endorsed by NVIDIA or the game's developers.\n\n## Licenses\nNew AA's own code is Apache 2.0. The zip includes NVIDIA's `nvngx_dlss.dll` and NGX code in `NewAANgx.dll`, with NVIDIA's license text (`NVIDIA_DLSS_SDK_LICENSE.txt`). By using those files you agree to NVIDIA's license: do not reverse engineer them or remove their notices, do not redistribute them as a stand-alone product, and DLSS is for systems with NVIDIA GPUs only. Third-party notices are in `THIRD_PARTY_NOTICES.md`.",
+  "listing": {
+    "name": "New AA (Anti Aliasing)",
+    "authors": [
+      "Arden Arrison"
+    ],
+    "abstract": "Adds the DLAA, SMAA and FXAA options to the Kitten Space Agency (KSA) anti-aliasing settings.",
+    "description": "New AA adds three anti-aliasing options to Settings > Display > Anti-Aliasing:\n\n- **DLAA** (RTX 20 series or newer) uses AI to smooth the image. Quality: High (better than MSAA 8X in my opinion and much more performant).\n- **SMAA** uses edge detection and pattern detection to then blur the edge. Quality: Medium (better than MSAA 2X and slightly worse than MSAA 4X with almost no performance impact).\n- **FXAA** uses edge detection to then blur the edges. Quality: Low (better than nothing, with almost no performance impact).\n\nDLAA needs an NVIDIA RTX GPU and a current driver. SMAA and FXAA work on any GPU. Windows only for now.\n\n## Installation\n\n1. Install [StarMap](https://github.com/StarMapLoader/StarMap). Start Kitten Space Agency with `StarMap.exe`, and currently you need StarMap version 0.5.4.\n2. Download the latest release from [Releases](https://github.com/ardenarrison/New-AA/releases/latest).\n3. Extract the zip and place the extracted `newaa` folder into `Documents/My Games/Kitten Space Agency/mods/`. KSA then prompts you to enable the mod.\n\nIf you have any issues with the mod, post an issue on the [GitHub repository](https://github.com/ardenarrison/New-AA/issues).\n\n## Credits and licenses\n\nDLAA is powered by NVIDIA DLSS. NVIDIA, DLSS and RTX are trademarks of NVIDIA Corporation. New AA is a free community mod and is not affiliated with or endorsed by NVIDIA or the game's developers. The release includes NVIDIA's DLSS runtime and NGX code under NVIDIA's license, which is included in the download. SMAA is by Jimenez et al. (MIT) and FXAA is by Timothy Lottes. See `THIRD_PARTY_NOTICES.md` in the repository.\n",
+    "license": "Apache-2.0",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/new-aa-new-anti-aliasing-types-for-ksa.1693/",
+      "repository": "https://github.com/ardenarrison/New-AA",
+      "bugtracker": "https://github.com/ardenarrison/New-AA/issues"
+    }
+  }
+}
