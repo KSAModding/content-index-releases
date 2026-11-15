@@ -1,0 +1,36 @@
+{
+  "spec_version": 1,
+  "id": "TheHailMary",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-15T21:00:05Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/TheHailMary/1.0.0",
+    "sha256": "3C9DC4B310D6F2B54BA852514EF762E8E4C5A1925117B1EFAF9B00BBE97EAAA4",
+    "size": 31967,
+    "content_type": "application/zip"
+  },
+  "install_size": 553080,
+  "install": {
+    "root": "The Hail Mary",
+    "derived": true,
+    "folder": "The Hail Mary"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "The Hail Mary",
+    "authors": [
+      "Nova"
+    ],
+    "abstract": "The Hail Mary ship from Project Hail Mary",
+    "description": "The movie version\nHas no engines it just looks cool\nput it on display near the pad or smth idk\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-16)",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/TheHailMary"
+    }
+  }
+}
