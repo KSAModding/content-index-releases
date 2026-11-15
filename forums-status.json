@@ -64,6 +64,11 @@
       "in_sitemap": true
     },
     {
+      "id": "KITN",
+      "thread": 1683,
+      "in_sitemap": false
+    },
+    {
       "id": "KittenEngineerRedux",
       "thread": 443,
       "in_sitemap": true
