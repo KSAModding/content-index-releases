@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "KITN",
+  "type": "mod",
+  "version": "0.1.3",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-15T18:16:57Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/steve-787/KITN/releases/download/v0.1.3/KITN-0.1.3.zip",
+    "sha256": "8DD91F7617588AEEB8596A3D9A78FD5BD199C6120F97C1BA522658146FA41889",
+    "size": 330798,
+    "content_type": "application/zip"
+  },
+  "install_size": 800375,
+  "install": {
+    "root": "KITN",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/steve-787/KITN/releases/tag/v0.1.3",
+  "changelog_text": "Kitten Intelligent Trajectory Navigator for Kitten Space Agency.\n\nDownload **KITN-0.1.3.zip**. Extract its KITN folder into your KSA profile's mods folder, enable KITN in manifest.toml, and launch with StarMap 0.5.4 or newer. The archive uses Borea's standard mod layout.\n\nVersion: **0.1.3**. Commit: 8fcf50a15b204cf8d47994951cc94a8bb10e1578.\n\nSource code: https://github.com/steve-787/KITN/tree/v0.1.3\n\nThe .sha256 file contains the archive's SHA-256 checksum.\n\n**Full Changelog**: https://github.com/steve-787/KITN/compare/v0.1.2...v0.1.3",
+  "listing": {
+    "name": "KITN",
+    "authors": [
+      "steve-787"
+    ],
+    "abstract": "Automatic ascent, transfer planning, rendezvous, docking and landing for Kitten Space Agency.",
+    "description": "Kitten Intelligent Trajectory Navigator. Pick a target orbit and start KITN to automate your flight.\n\n- Ascent guidance, gravity turns and staging.\n- Transfer planning and maneuver execution.\n- Automated rendezvous and docking.\n- Return-to-pad landing.\n- Flight instruments and remote vessel control.\n\nUpdated regularly and still in development. Absolutely not stable right now. Save your game before flying.\n",
+    "license": "GPL-3.0-only",
+    "tags": [
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "homepage": "https://github.com/steve-787/KITN",
+      "sourcecode": "https://github.com/steve-787/KITN",
+      "bugtracker": "https://github.com/steve-787/KITN/issues",
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/kitn-autopilot-for-kitten-space-agency.1683/"
+    }
+  }
+}
