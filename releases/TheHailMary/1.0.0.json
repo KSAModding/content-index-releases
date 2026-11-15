@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/TheHailMary/1.0.0",
     "sha256": "3C9DC4B310D6F2B54BA852514EF762E8E4C5A1925117B1EFAF9B00BBE97EAAA4",
     "size": 31967,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-thehailmary-1_0_0-6f9a9d71/TheHailMary-1.0.0.zip"
+    ]
   },
   "install_size": 553080,
   "install": {
