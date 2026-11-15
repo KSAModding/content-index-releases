@@ -3,17 +3,17 @@
   "listings": [
     {
       "id": "AdvancedFlightComputer",
-      "total": 2750,
+      "total": 2752,
       "hosts": {
-        "github": 1509,
+        "github": 1511,
         "spacedock": 1241
       },
       "releases": [
         {
           "version": "0.15.0",
-          "total": 10,
+          "total": 12,
           "hosts": {
-            "github": 9,
+            "github": 11,
             "spacedock": 1
           }
         },
@@ -749,16 +749,23 @@
     },
     {
       "id": "CineCam",
-      "total": 24,
+      "total": 28,
       "hosts": {
-        "github": 24
+        "github": 28
       },
       "releases": [
         {
-          "version": "0.2.0",
-          "total": 24,
+          "version": "0.3.0",
+          "total": 3,
           "hosts": {
-            "github": 24
+            "github": 3
+          }
+        },
+        {
+          "version": "0.2.0",
+          "total": 25,
+          "hosts": {
+            "github": 25
           }
         }
       ]
@@ -1248,16 +1255,16 @@
     },
     {
       "id": "FastAndPurrious",
-      "total": 137,
+      "total": 138,
       "hosts": {
-        "github": 137
+        "github": 138
       },
       "releases": [
         {
           "version": "0.1.15",
-          "total": 5,
+          "total": 6,
           "hosts": {
-            "github": 5
+            "github": 6
           }
         },
         {
@@ -1482,16 +1489,16 @@
     },
     {
       "id": "KITN",
-      "total": 14,
+      "total": 16,
       "hosts": {
-        "github": 14
+        "github": 16
       },
       "releases": [
         {
           "version": "0.1.3",
-          "total": 9,
+          "total": 11,
           "hosts": {
-            "github": 9
+            "github": 11
           }
         },
         {
@@ -1512,10 +1519,10 @@
     },
     {
       "id": "KittenEngineerRedux",
-      "total": 5154,
+      "total": 5276,
       "hosts": {
         "github": 240,
-        "spacedock": 4914
+        "spacedock": 5036
       },
       "releases": [
         {
@@ -1534,10 +1541,10 @@
         },
         {
           "version": "0.5.9",
-          "total": 383,
+          "total": 505,
           "hosts": {
             "github": 50,
-            "spacedock": 333
+            "spacedock": 455
           }
         },
         {
@@ -2036,16 +2043,16 @@
     },
     {
       "id": "KSAMultiplayer",
-      "total": 189,
+      "total": 192,
       "hosts": {
-        "github": 189
+        "github": 192
       },
       "releases": [
         {
           "version": "0.20.2",
-          "total": 7,
+          "total": 10,
           "hosts": {
-            "github": 7
+            "github": 10
           }
         },
         {
@@ -3109,17 +3116,17 @@
     },
     {
       "id": "KSP-Redux",
-      "total": 2252,
+      "total": 2373,
       "hosts": {
         "github": 97,
-        "spacedock": 2155
+        "spacedock": 2276
       },
       "releases": [
         {
           "version": "1.3.2",
-          "total": 1258,
+          "total": 1379,
           "hosts": {
-            "spacedock": 1258
+            "spacedock": 1379
           }
         },
         {
@@ -3537,18 +3544,18 @@
     },
     {
       "id": "ModMenu",
-      "total": 2531,
+      "total": 2652,
       "hosts": {
         "github": 560,
-        "spacedock": 1971
+        "spacedock": 2092
       },
       "releases": [
         {
           "version": "0.2.3",
-          "total": 315,
+          "total": 436,
           "hosts": {
             "github": 160,
-            "spacedock": 155
+            "spacedock": 276
           }
         },
         {
@@ -3759,6 +3766,22 @@
           "total": 1,
           "hosts": {
             "ksamods": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "newaa",
+      "total": 4,
+      "hosts": {
+        "github": 4
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 4,
+          "hosts": {
+            "github": 4
           }
         }
       ]
@@ -4425,11 +4448,18 @@
     },
     {
       "id": "PurrlineFacet",
-      "total": 52,
+      "total": 55,
       "hosts": {
-        "github": 52
+        "github": 55
       },
       "releases": [
+        {
+          "version": "1.0.4",
+          "total": 3,
+          "hosts": {
+            "github": 3
+          }
+        },
         {
           "version": "1.0.3",
           "total": 33,
@@ -4464,16 +4494,16 @@
     },
     {
       "id": "PurrlinePrisma",
-      "total": 52,
+      "total": 53,
       "hosts": {
-        "github": 52
+        "github": 53
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 17,
+          "total": 18,
           "hosts": {
-            "github": 17
+            "github": 18
           }
         },
         {
@@ -4624,18 +4654,18 @@
     },
     {
       "id": "ShaderExtensions",
-      "total": 1309,
+      "total": 1310,
       "hosts": {
         "github": 238,
-        "spacedock": 1071
+        "spacedock": 1072
       },
       "releases": [
         {
           "version": "1.2.0",
-          "total": 44,
+          "total": 45,
           "hosts": {
             "github": 14,
-            "spacedock": 30
+            "spacedock": 31
           }
         },
         {
@@ -4801,16 +4831,16 @@
     },
     {
       "id": "StarMap",
-      "total": 5983,
+      "total": 5986,
       "hosts": {
-        "github": 5983
+        "github": 5986
       },
       "releases": [
         {
           "version": "0.5.4",
-          "total": 235,
+          "total": 237,
           "hosts": {
-            "github": 235
+            "github": 237
           }
         },
         {
@@ -4843,9 +4873,9 @@
         },
         {
           "version": "0.4.8",
-          "total": 397,
+          "total": 398,
           "hosts": {
-            "github": 397
+            "github": 398
           }
         },
         {
@@ -5062,6 +5092,36 @@
           "total": 8,
           "hosts": {
             "ksamods": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "TheHailMary",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.2.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        },
+        {
+          "version": "1.1.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        },
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
           }
         }
       ]
