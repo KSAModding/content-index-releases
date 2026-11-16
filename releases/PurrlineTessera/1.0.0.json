@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "PurrlineTessera",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-16T09:11:05Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/releases/download/v1.0.0/PurrlineTessera-1.0.0.zip",
+    "sha256": "030907CE46A9895B44197E0B14D4DBE9D93323B44B095E05C9838C31EC536FF7",
+    "size": 18518482,
+    "content_type": "application/zip"
+  },
+  "install_size": 20928332,
+  "install": {
+    "root": "PurrlineTessera",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "PurrlineFacet",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/releases/tag/v1.0.0",
+  "changelog_text": "## Changes\n- First public release. A modular lunar lander kit from the fictional rocket maker Purrline Rocketworks: build a robotic lander the size of the real ones, from a small hopper to a cargo lander. The kit has 18 parts with 38 variants; press V in the editor to change the variant of a part.\n- Structure: Hex Deck and Oct Deck, open or closed; Wall, Half and Taper panels in isogrid, skin, radiator, gold foil and silver foil looks; Solar Wall and Solar Half panels; Thrust Cone, Core Column and Deck Strut.\n- Tanks: Sphere Tank, Capsule Tank and the wide Drum Tank on Methalox, bare or in a gold or silver blanket, and the sphere also as a carbon bottle. The tanks hold the true volume of their shape.\n- Mizar and Mizar Fixed, a descent engine of 3.1 kN with a gimbal or on a fixed mount, a short and a long landing leg, and a Lattice Ramp that folds against the hull and deploys.\n- Panels snap to the deck edges with hinge stops, legs snap to the leg pads of the panels or the leg ring of the cone, and fuel passes through every joint of the fuel parts.\n- Parts carry their structure mass only, so a lander needs a stock probe core and a battery.\n\n## Compatibility\nValidated against KSA build version **2026.11.10.5801**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\PurrlineTessera\\`.\nNo mod loader needed.",
+  "listing": {
+    "name": "Tessera by Purrline Rocketworks",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "A modular lunar lander kit: decks, wall and solar panels, a thrust cone, a core column, sphere, capsule and drum tanks, the Mizar descent engine, landing legs and a lattice ramp that deploy.",
+    "description": "![A lander built from Tessera parts](ksa-image:hero)\n\n**Tessera** is a modular lunar lander kit for Kitten Space Agency, from the fictional rocket maker **Purrline Rocketworks**. Build a robotic lander the size of the real ones, from a small hopper to a cargo lander, out of decks, panels, tanks, engines and legs that snap together at their edges.\n\n## Parts\n\nThe kit has 18 parts with 38 variants.\n\n- **Tessera Hex Deck** and **Oct Deck**: the floors of a lander, with seats for tanks and engines and six or eight edges for panels; open or closed.\n- **Tessera Wall Panel**, **Half Panel** and **Taper Panel**: walls and skirts in isogrid, skin, radiator, gold foil and silver foil looks; wall and half panels have leg pads at their lower corners.\n- **Tessera Solar Wall Panel** and **Solar Half Panel**: walls of solar cells, 420 W and 210 W.\n- **Tessera Thrust Cone**, **Core Column** and **Deck Strut**: the structure under and between the decks.\n- **Tessera Sphere Tank**, **Capsule Tank** and **Drum Tank**: Methalox tanks in bare, gold blanket and silver blanket looks; the sphere also as a carbon bottle.\n- **Mizar** and **Mizar Fixed**: the descent engine, 3.1 kN, with a gimbal or on a fixed mount.\n- **Tessera Landing Leg** in a short and a long form, and the **Tessera Lattice Ramp**: they deploy from the part menu.\n\nEach part is one entry in the editor; press V to change its variant. Masses count the structure only, so add a stock probe core and a battery. The tanks hold the true volume of their shape, so a stock tank of the same size holds about four times as much.\n\n![All parts and looks](ksa-image:all-parts)\n\n![A tall hex lander](ksa-image:tall-lander)\n\n![A wide octagonal cargo lander](ksa-image:wide-lander)\n\n![Seven Mizar Fixed in a Thrust Cone, from below](ksa-image:engines-below)\n\nThe landers in the pictures were built in the editor from these parts; the mod contains no vehicle files. Some of them carry payload parts of Facet by Purrline Rocketworks.\n\n## Requirements\n\nNo other mod needed.\n\n## Install\n\n- Borea: install Tessera from the content list.\n- By hand: copy `PurrlineTessera` from the release zip into `Documents/My Games/Kitten Space Agency/mods/` and enable it.\n\nTo remove the mod, delete its folder. Vehicles with its parts do not load without it.\n\nMade for KSA build 2026.11.10.5801.\n\nCode and game data are MIT. Meshes, textures, logo and pictures are CC BY 4.0.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "parts"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/tessera-by-purrline-rocketworks.1698/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/issues"
+    }
+  }
+}
