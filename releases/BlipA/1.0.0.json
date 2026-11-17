@@ -1,0 +1,36 @@
+{
+  "spec_version": 1,
+  "id": "BlipA",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T05:38:39Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/BlipA/1.0.0",
+    "sha256": "53715CDE731B901C09B9E07CA1A2064DC891DF6C58D50C02D19C9FF9C9C3F249",
+    "size": 180811,
+    "content_type": "application/zip"
+  },
+  "install_size": 4349154,
+  "install": {
+    "root": "Blip-A",
+    "derived": true,
+    "folder": "Blip-A"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Blip-A V1",
+    "authors": [
+      "Nova"
+    ],
+    "abstract": "Blip-A from Project Hail Mary",
+    "description": "Movie version, not to scale with the hail mary ship i made.",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/BlipA"
+    }
+  }
+}
