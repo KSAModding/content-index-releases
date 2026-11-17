@@ -649,16 +649,23 @@
     },
     {
       "id": "airplane",
-      "total": 0,
+      "total": 3,
       "hosts": {
-        "ksamods": 0
+        "ksamods": 3
       },
       "releases": [
         {
-          "version": "1.0.0",
-          "total": 0,
+          "version": "1.0.1",
+          "total": 2,
           "hosts": {
-            "ksamods": 0
+            "ksamods": 2
+          }
+        },
+        {
+          "version": "1.0.0",
+          "total": 1,
+          "hosts": {
+            "ksamods": 1
           }
         }
       ]
@@ -720,16 +727,16 @@
     },
     {
       "id": "BlipA",
-      "total": 0,
+      "total": 2,
       "hosts": {
-        "ksamods": 0
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 0,
+          "total": 2,
           "hosts": {
-            "ksamods": 0
+            "ksamods": 2
           }
         }
       ]
@@ -1451,6 +1458,22 @@
       ]
     },
     {
+      "id": "fighterjettest",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        }
+      ]
+    },
+    {
       "id": "flight_panel",
       "total": 16,
       "hosts": {
@@ -1566,6 +1589,22 @@
           "total": 11,
           "hosts": {
             "ksamods": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "hangglider",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
           }
         }
       ]
@@ -3373,16 +3412,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 30,
+      "total": 32,
       "hosts": {
-        "ksamods": 30
+        "ksamods": 32
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 30,
+          "total": 32,
           "hosts": {
-            "ksamods": 30
+            "ksamods": 32
           }
         }
       ]
