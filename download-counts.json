@@ -696,6 +696,22 @@
       ]
     },
     {
+      "id": "BlipA",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        }
+      ]
+    },
+    {
       "id": "Boatmobile",
       "total": 3,
       "hosts": {
@@ -4248,16 +4264,16 @@
     },
     {
       "id": "PodRacerII",
-      "total": 13,
+      "total": 15,
       "hosts": {
-        "ksamods": 13
+        "ksamods": 15
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 13,
+          "total": 15,
           "hosts": {
-            "ksamods": 13
+            "ksamods": 15
           }
         }
       ]
