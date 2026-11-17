@@ -12,7 +12,10 @@
     "url": "https://github.com/Jared-Melchers/LonelyPlanets/releases/download/1.2.4/LonelyPlanets.zip",
     "sha256": "169F03E4475AADBCD9FE6AFA9E2F9654C8E9D1F81E9757E1F371D018E95009F3",
     "size": 22748028,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://spacedock.info/mod/4671/Lonely%20Planets/download/1.2.4"
+    ]
   },
   "install_size": 23740693,
   "install": {
