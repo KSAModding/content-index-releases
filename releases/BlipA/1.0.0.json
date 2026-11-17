@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/BlipA/1.0.0",
     "sha256": "53715CDE731B901C09B9E07CA1A2064DC891DF6C58D50C02D19C9FF9C9C3F249",
     "size": 180811,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-blipa-1_0_0-d8d61bc8/BlipA-1.0.0.zip"
+    ]
   },
   "install_size": 4349154,
   "install": {
