@@ -1,0 +1,50 @@
+{
+  "spec_version": 1,
+  "id": "newaa",
+  "type": "mod",
+  "version": "1.2.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T01:06:04Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/ardenarrison/New-AA/releases/download/v1.2.0/newaa-1.2.0.zip",
+    "sha256": "641208CD0B759AB070303E7C387852A9292B0F2F68120F44A96D592095FD695C",
+    "size": 63374542,
+    "content_type": "application/zip"
+  },
+  "install_size": 96040931,
+  "install": {
+    "root": "newaa",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/ardenarrison/New-AA/releases/tag/v1.2.0",
+  "changelog_text": "New AA 1.2 adds **TAA**, New AA's own temporal anti-aliasing for any GPU, and an **experimental Linux build** for the game's native Linux version.\n\n## What's new\n- **TAA** in Settings > Display > Anti-Aliasing. It uses the same jittered camera, motion vectors (camera, vehicles and celestial bodies), history resets on camera jumps and orbit-line overlay as DLAA and FSR Native AA, with New AA's own resolve. It needs no SDK or runtime and works on any GPU. Dim stars are kept instead of being erased. It is a little softer than DLAA or FSR Native AA, and geometry thinner than a pixel can look broken up.\n- **Experimental Linux build** (`newaa-1.2.0-linux-x64-experimental.zip`) with FXAA, SMAA, TAA and DLAA. FSR Native AA is Windows only, because AMD ships its FSR runtime for Windows only, so Linux doesn't offer it.\n- Fix: NGX's log folder now follows the game's profile folder, so it works in Borea instances.\n\n## Download\n- **Windows:** `newaa-1.2.0.zip`\n- **Linux (experimental):** `newaa-1.2.0-linux-x64-experimental.zip`, for the game's native Linux build. If you play the Windows build through Proton or Wine, use the Windows zip.\n\nBoth contain the built mod. No compiling needed.\n\n## Install (Windows)\n1. Close the game and StarMap.\n2. Extract the `newaa` folder from the zip into `Documents\\My Games\\Kitten Space Agency\\mods\\`, so that `mods\\newaa\\mod.toml` exists. If an older New AA is installed, replace its folder.\n3. Make sure `Documents\\My Games\\Kitten Space Agency\\manifest.toml` contains:\n   ```toml\n   [[mods]]\n   id = \"newaa\"\n   enabled = true\n   ```\n4. Start the game through `StarMap.exe`, then pick **DLAA**, **FSR Native AA**, **TAA**, **SMAA** or **FXAA** under Settings > Display > Anti-Aliasing.\n\n## Install (Linux, experimental)\nThis build has not been tested in the game on Linux yet. Its native DLSS plugin was tested under .NET 10 on Linux (loading, path handling, and NGX finding the DLSS runtime), but not with the game itself.\n1. Close the game.\n2. Extract the `newaa` folder from the zip into `~/Documents/My Games/Kitten Space Agency/mods/`, so that `mods/newaa/mod.toml` exists. The game uses your Documents folder as XDG names it, which can be translated.\n3. Add the same `[[mods]]` entry to `~/Documents/My Games/Kitten Space Agency/manifest.toml`.\n4. Start the game through StarMap (Borea runs it with `dotnet StarMap.dll` on Linux), then pick **DLAA**, **TAA**, **SMAA** or **FXAA**.\n\nIf it doesn't work, please open an issue with your distribution, GPU, driver version and the newest game log from `~/Documents/My Games/Kitten Space Agency/logs/`. For DLAA, also include `~/Documents/My Games/Kitten Space Agency/NewAA/ngx/ngx_log.txt`.\n\n## Requirements\n- DLAA: an NVIDIA RTX GPU (RTX 20-series or newer) and a current driver. On Linux it needs NVIDIA's own driver, which provides NGX (`libnvidia-ngx.so.1`) and `nvidia-smi`.\n- FSR Native AA (Windows): an NVIDIA, AMD or Intel GPU that AMD's FSR runtime supports.\n- TAA, SMAA and FXAA: any GPU.\n\n## Powered by NVIDIA DLSS and AMD FSR\nDLAA uses NVIDIA DLSS (via the NVIDIA NGX SDK). FSR Native AA uses AMD FSR (AMD FSR SDK 2.4.0). NVIDIA, DLSS and RTX are trademarks of NVIDIA Corporation. AMD, FidelityFX, FSR and Radeon are trademarks of Advanced Micro Devices, Inc. New AA is a free community mod and is not affiliated with or endorsed by NVIDIA, AMD or the game's developers.\n\n## Licenses\nNew AA's own code is Apache 2.0.\n\nBoth zips include NVIDIA software with NVIDIA's license text (`NVIDIA_DLSS_SDK_LICENSE.txt`):\n- the DLSS runtime: `nvngx_dlss.dll` on Windows, `libnvidia-ngx-dlss.so.310.9.1` on Linux;\n- NGX code in `NewAANgx.dll` / `libNewAANgx.so`.\n\nBy using those files you agree to NVIDIA's license: do not reverse engineer them or remove their notices, do not redistribute them as a stand-alone product, and DLSS is for systems with NVIDIA GPUs only.\n\nThe Windows zip also includes AMD's signed `amd_fidelityfx_loader_vk.dll` and `amd_fidelityfx_upscaler_vk.dll`, unmodified, under the MIT license (`AMD_FSR_SDK_LICENSE.txt`).\n\n`libNewAANgx.so` contains GCC's libstdc++ and libgcc (GPL 3 with the GCC Runtime Library Exception). Third-party notices are in `THIRD_PARTY_NOTICES.md`.",
+  "listing": {
+    "name": "New AA (Anti Aliasing)",
+    "authors": [
+      "Arden Arrison"
+    ],
+    "abstract": "Adds the DLAA, FSR Native AA, SMAA and FXAA options to the Kitten Space Agency (KSA) anti-aliasing settings.",
+    "description": "New AA adds four anti-aliasing options to Settings > Display > Anti-Aliasing:\n\n- **DLAA** (RTX 20 series or newer) uses AI to smooth the image. Quality: High (better than MSAA 8X in my opinion and much more performant).\n- **FSR Native AA** (new in 1.1) uses AMD FSR at native resolution to smooth the image over several frames. Quality: High (almost as good as DLAA, and it also works on GPUs that cannot run DLAA, such as the GTX 10 series).\n- **SMAA** uses edge detection and pattern detection to then blur the edge. Quality: Medium (better than MSAA 2X and slightly worse than MSAA 4X with almost no performance impact).\n- **FXAA** uses edge detection to then blur the edges. Quality: Low (better than nothing, with almost no performance impact).\n\nDLAA needs an NVIDIA RTX GPU and a current driver. FSR Native AA works on NVIDIA, AMD and Intel GPUs that AMD's FSR runtime supports. SMAA and FXAA work on any GPU. Windows only for now.\n\n## Installation\n\n1. Install [StarMap](https://github.com/StarMapLoader/StarMap). Start Kitten Space Agency with `StarMap.exe`, and currently you need StarMap version 0.5.4.\n2. Download the latest release from [Releases](https://github.com/ardenarrison/New-AA/releases/latest).\n3. Extract the zip and place the extracted `newaa` folder into `Documents/My Games/Kitten Space Agency/mods/`. KSA then prompts you to enable the mod.\n\nIf you have any issues with the mod, post an issue on the [GitHub repository](https://github.com/ardenarrison/New-AA/issues).\n\n## Credits and licenses\n\nDLAA is powered by NVIDIA DLSS and FSR Native AA by AMD FSR. NVIDIA, DLSS and RTX are trademarks of NVIDIA Corporation. AMD, FidelityFX, FSR and Radeon are trademarks of Advanced Micro Devices, Inc. New AA is a free community mod and is not affiliated with or endorsed by NVIDIA, AMD or the game's developers. The release includes NVIDIA's DLSS runtime and NGX code under NVIDIA's license, and AMD's FSR SDK 2.4.0 runtime under the MIT license; both licenses are included in the download. SMAA is by Jimenez et al. (MIT) and FXAA is by Timothy Lottes. See `THIRD_PARTY_NOTICES.md` in the repository.\n",
+    "license": "Apache-2.0",
+    "tags": [
+      "visual"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/new-aa-new-anti-aliasing-types-for-ksa.1693/",
+      "repository": "https://github.com/ardenarrison/New-AA",
+      "bugtracker": "https://github.com/ardenarrison/New-AA/issues"
+    }
+  }
+}
