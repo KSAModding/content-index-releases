@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/fighterjettest/1.0.0",
     "sha256": "8163D07B2F882B5EC4DB6751A174C28651B518594629C0FF7F74E273E5BAD85F",
     "size": 5233,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-fighterjettest-1_0_0-7abf6f4d/fighterjettest-1.0.0.zip"
+    ]
   },
   "install_size": 51203,
   "install": {
