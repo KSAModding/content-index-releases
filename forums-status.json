@@ -64,6 +64,11 @@
       "in_sitemap": true
     },
     {
+      "id": "inf_fuel",
+      "thread": 1715,
+      "in_sitemap": false
+    },
+    {
       "id": "KITN",
       "thread": 1683,
       "in_sitemap": true
