@@ -1,0 +1,42 @@
+{
+  "spec_version": 1,
+  "id": "hangglider",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T18:25:33Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/hangglider/1.0.0",
+    "sha256": "D2B44EA85677CE5087E3B19278C4568337B4ADF321EC0C17757C11203CC76DF1",
+    "size": 6175,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-hangglider-1_0_0-d35494b9/hangglider-1.0.0.zip"
+    ]
+  },
+  "install_size": 66419,
+  "install": {
+    "root": "hangglider",
+    "derived": true,
+    "folder": "hangglider"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Pararocket",
+    "authors": [
+      "LefTab"
+    ],
+    "abstract": "A paraglider, with a rocket attached!",
+    "description": "Works surprisingly well.\nTurn by rolling with Q and E, then pitching with W and S\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-27)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "aircraft"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/hangglider"
+    }
+  }
+}
