@@ -1,0 +1,39 @@
+{
+  "spec_version": 1,
+  "id": "fighterjettest",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T16:45:19Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/fighterjettest/1.0.0",
+    "sha256": "8163D07B2F882B5EC4DB6751A174C28651B518594629C0FF7F74E273E5BAD85F",
+    "size": 5233,
+    "content_type": "application/zip"
+  },
+  "install_size": 51203,
+  "install": {
+    "root": "fighterjet test",
+    "derived": true,
+    "folder": "fighterjet test"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Jet",
+    "authors": [
+      "LefTab"
+    ],
+    "abstract": "Looks cool, doesn't fly great but it is functional",
+    "description": "More throttle means more control, but be sure to keep it under the g-limit!\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-25)\n\n![Screenshot 2](ksa-image:screenshot-26)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "aircraft"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/fighterjettest"
+    }
+  }
+}
