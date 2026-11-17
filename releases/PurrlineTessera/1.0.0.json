@@ -8,6 +8,8 @@
   "release_date": "2026-11-16T09:11:05Z",
   "game_min": "2026.11.10.5801",
   "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/releases/download/v1.0.0/PurrlineTessera-1.0.0.zip",
     "sha256": "030907CE46A9895B44197E0B14D4DBE9D93323B44B095E05C9838C31EC536FF7",
