@@ -8,6 +8,8 @@
   "release_date": "2026-11-15T22:48:58Z",
   "game_min": "2026.11.10.5801",
   "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFacet/releases/download/v1.0.4/PurrlineFacet-1.0.4.zip",
     "sha256": "2CB6EA2F07CCC0EA793885EC1CCFB9748DEEEB991068998F4F41333E3BCB11AD",
