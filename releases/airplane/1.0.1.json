@@ -1,0 +1,42 @@
+{
+  "spec_version": 1,
+  "id": "airplane",
+  "type": "vehicle",
+  "version": "1.0.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T13:03:55Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/airplane/1.0.1",
+    "sha256": "ABA1E615CDCA7A0D62B1E239B2CAA84ABADB77EBF1FECDBFF5133EE2AE53A8A7",
+    "size": 6241,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-airplane-1_0_1-07fd422a/airplane-1.0.1.zip"
+    ]
+  },
+  "install_size": 76764,
+  "install": {
+    "root": "airplane",
+    "derived": true,
+    "folder": "airplane"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "airplane",
+    "authors": [
+      "LefTab"
+    ],
+    "abstract": "Functional aircraft for KSA",
+    "description": "It has little fuel but it does appear to work pretty wel!\nManeuvers by engine gimbal so it needs thrust to work.\n\nGive full throttle and activate the stage. Fly vertically until your high enough and enjoy!\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-24)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "aircraft"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/airplane"
+    }
+  }
+}
