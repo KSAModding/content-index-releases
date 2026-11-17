@@ -1,0 +1,64 @@
+{
+  "spec_version": 1,
+  "id": "PurrlinePrisma",
+  "type": "mod",
+  "version": "1.1.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T10:02:21Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma/releases/download/v1.1.2/PurrlinePrisma-1.1.2.zip",
+    "sha256": "BE71162E054FD3377348862BC4CE9A2608BC9893A52E89A7F8DBAA354EFD2876",
+    "size": 36464718,
+    "content_type": "application/zip"
+  },
+  "install_size": 37573306,
+  "install": {
+    "root": "PurrlinePrisma",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "ExtendedPropellants",
+      "kind": "required",
+      "min": "1.0.0",
+      "source": "authored"
+    },
+    {
+      "id": "PurrlineFairings",
+      "kind": "suggests",
+      "source": "authored"
+    },
+    {
+      "id": "AndoyaSpaceport",
+      "kind": "suggests",
+      "source": "authored"
+    },
+    {
+      "id": "PurrlineFacet",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma/releases/tag/v1.1.2",
+  "changelog_text": "## Changes\n- Prisma loads again on KSA 2026.11.16.5901. The game moved the minimum throttle and the minimum pulse time of an engine from the combustion chamber to the rocket, so the Altair, the Altair Vac, the engine bay and the upper stage did not load with 1.1.1. The values are the same as before.\n- The game corrected the density of MMH, so each RCS tank of the upper stage now holds about 37 kg instead of 27 kg.\n- Part Ids, shapes, colliders, masses and the 2 m fairing are unchanged, so saved vehicles load as before.\n\n## Compatibility\nValidated against KSA build version **2026.11.16.5901**. Needs this build or newer; on 2026.11.10.5801 use the previous version.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\PurrlinePrisma\\`.\nNo mod loader needed. Requires [Extended Propellants](https://github.com/Maximilian-Nesslauer/KSA-ExtendedPropellants).",
+  "listing": {
+    "name": "Prisma by Purrline Rocketworks",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "A two-stage small satellite launcher kit with a nine-engine first stage, an upper stage, a fairing and a launch ground set, built to fit beside the stock parts.",
+    "description": "![Prisma on the pad](ksa-image:pad-hero)\n\n**Prisma** is a two-stage small satellite launcher for Kitten Space Agency, from the fictional rocket maker **Purrline Rocketworks**. It is inspired by Spectrum from Isar Aerospace.\n\nThe rocket is about 28 m tall. Sizes and texture density follow the stock parts, so Prisma mixes with stock tanks and engines. The engines burn liquid oxygen and propane.\n\n## Parts\n\n- **Fairing Half 2 m Medium**: fairing half, 6.10 m long; place two; white or black carbon (press V).\n- **Fairing Base 2 m**: fairing base ring with the 1 m payload adapter.\n- **Prisma Payload Mass Simulator (1 t)**: 1000 kg dummy payload for test flights.\n- **Prisma Stage 2**: upper stage with a tank, an Altair Vac and four RCS blocks.\n- **Prisma Interstage**: interstage with its own decoupler; the Altair Vac sits inside.\n- **Prisma Stage 1 Tank**: the 2 m first stage tank.\n- **Altair Engine Bay**: nine Altair engines, each with its own gimbal.\n- **Altair**: single sea level engine.\n- **Altair Vac**: single vacuum engine with the long nozzle.\n- **Prisma Hold-down Ring**: holds the rocket on the pad and releases at lift-off.\n- **Prisma Strongback**: tower beside the rocket; stays on the pad.\n\nThe fairing is the 2 m fairing of Fairings by Purrline Rocketworks, with a quilted acoustic blanket inside. Prisma contains it, so you do not need Fairings for it, and you can install both mods together.\n\n![All parts](ksa-image:all-parts)\n\n![The engine bay](ksa-image:engine-bay)\n\n![Ascent at dusk](ksa-image:ascent-dusk)\n\n![Prisma in orbit](ksa-image:in-orbit)\n\n## Requirements\n\n[Extended Propellants](https://github.com/Maximilian-Nesslauer/KSA-ExtendedPropellants) is required. Without it the engines do not load.\n\nWorks well with [Andoya Spaceport](https://github.com/Maximilian-Nesslauer/KSA-AndoyaSpaceport) (a pad for Prisma), [Facet](https://github.com/Maximilian-Nesslauer/KSA-PurrlineFacet) (satellites for the fairing) and [Fairings by Purrline Rocketworks](https://github.com/Maximilian-Nesslauer/KSA-PurrlineFairings) (3 m fairings and hammerhead bases).\n\n## Install\n\n- Borea: install Prisma from the content list. Borea adds Extended Propellants.\n- By hand: copy `PurrlinePrisma` and `ExtendedPropellants` from the release zips into `Documents/My Games/Kitten Space Agency/mods/` and enable both. If you also use Fairings by Purrline Rocketworks and have Prisma 1.0.0, update Prisma first: Prisma 1.0.0 and Fairings together do not load the fairing.\n\nTo remove the mod, delete its folder. Vehicles with its parts do not load without it.\n\nMade for KSA build 2026.11.16.5901.\n\nCode and game data are MIT. Meshes, textures, logo and pictures are CC BY 4.0.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "parts"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/prisma-by-purrline-rocketworks.1633/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma/issues"
+    }
+  }
+}
