@@ -1,0 +1,43 @@
+{
+  "spec_version": 1,
+  "id": "LonelyPlanets",
+  "type": "mod",
+  "version": "1.2.4",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-17T11:21:43Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://github.com/Jared-Melchers/LonelyPlanets/releases/download/1.2.4/LonelyPlanets.zip",
+    "sha256": "169F03E4475AADBCD9FE6AFA9E2F9654C8E9D1F81E9757E1F371D018E95009F3",
+    "size": 22748028,
+    "content_type": "application/zip"
+  },
+  "install_size": 23740693,
+  "install": {
+    "root": "LonelyPlanets",
+    "derived": true
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/Jared-Melchers/LonelyPlanets/releases/tag/1.2.4",
+  "changelog_text": "I did not intend for this release to only feature 'Jupiter Only', but on the 1-year anniversary of the original Jupiter Only mod (the precursor to Lonely Planets), I suppose it's quite fitting. Hopefully I will have the other planets back up and running soon.",
+  "listing": {
+    "name": "Lonely Planets",
+    "authors": [
+      "Jared-Melchers"
+    ],
+    "abstract": "A mod for Kitten Space Agency that allows users to select only one planet to load.",
+    "description": "# Lonely Planets\nIf you do not have sufficient VRAM to load the full Solar System, now you can select individual planets to load.  \nCurrently only Jupiter is available, Saturn, Mars and Venus are in the files, but do not work in the current version of KSA.\n\n# Current Issues\nAs mentioned above Saturn, Mars and Venus do not currently load. In addition the vehicle creator does not work in Jupiter Only, the game must be loaded in 'Testing' mode (rather than 'Sandbox'). Conversely the mod interferes with 'Testing' mode for Earth Only. \n\n# License\n© 2026 Jared Melchers  \n  \nThis work is licensed under Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International. For the full text of the license see LICENSE.txt\n",
+    "license": "CC-BY-NC-SA-4.0",
+    "tags": [
+      "celestial"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/lonely-planets-1-2-2.483/",
+      "repository": "https://github.com/Jared-Melchers/LonelyPlanets",
+      "spacedock": "https://spacedock.info/mod/4671/Lonely%20Planets",
+      "bugtracker": "https://github.com/Jared-Melchers/LonelyPlanets/issues"
+    }
+  }
+}
