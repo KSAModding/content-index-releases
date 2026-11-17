@@ -8,6 +8,8 @@
   "release_date": "2026-11-12T19:21:10Z",
   "game_min": "2026.11.10.5801",
   "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-CineCam/releases/download/v0.2.0/CineCam-0.2.0.zip",
     "sha256": "578A62654D75FC3282FA17E14436AAF98EEC518FAD203C107B4548DC49738808",
