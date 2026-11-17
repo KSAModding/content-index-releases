@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/airplane/1.0.0",
     "sha256": "ABA1E615CDCA7A0D62B1E239B2CAA84ABADB77EBF1FECDBFF5133EE2AE53A8A7",
     "size": 6241,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-airplane-1_0_0-1173415e/airplane-1.0.0.zip"
+    ]
   },
   "install_size": 76764,
   "install": {
