@@ -8,6 +8,8 @@
   "release_date": "2026-11-15T17:01:29Z",
   "game_min": "2026.11.10.5801",
   "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
   "download": {
     "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlinePrisma/releases/download/v1.1.0/PurrlinePrisma-1.1.0.zip",
     "sha256": "800420C9BD360BA24BA4E80D2C8F3374CC37FC023C67CD79FC4C0346643755EE",
