@@ -8,6 +8,11 @@
   "release_date": "2026-11-09T15:33:52Z",
   "game_min": "2026.11.10.5801",
   "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
+  "os": [
+    "windows"
+  ],
   "download": {
     "url": "https://github.com/fchvvjchvccj-cmyk/KSA-Chinese-Localization/releases/download/v1.0.0/KSA-Simplified-Chinese-Localization-1.0.0.zip",
     "sha256": "8D28CD35590BD4385898531E260744B81C0127DA0EBE2BED592A3A7710E97165",
