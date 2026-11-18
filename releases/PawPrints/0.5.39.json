@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "PawPrints",
+  "type": "mod",
+  "version": "0.5.39",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-18T21:02:45Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "game_max": "2026.11.16.5901",
+  "game_max_revision": 5901,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/DymndLab/PawPrints/releases/download/v0.5.39/PawPrints-0.5.39.zip",
+    "sha256": "289232BBE14C922E6D80282222E22C2202E1BF315D60D9D61D613FDD8C34985F",
+    "size": 632596,
+    "content_type": "application/zip"
+  },
+  "install_size": 1477687,
+  "install": {
+    "root": "PawPrints",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "max": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/DymndLab/PawPrints/releases/tag/v0.5.39",
+  "changelog_text": "# PawPrints 0.5.39\n\nNormal release for Borea's default Stable channel. This is the exact same tested package as v0.5.39-preview.1, with unchanged runtime and ZIP checksum; only release metadata and the download filename changed. PawPrints remains under active development, with the tested scope and limitations documented below.\n\nUpdated for KSA 5901: engine ratings, main-nozzle gimbal selection and propellant labels now use the game's rocket/core API. The exact game-build guard remains enforced. Drawing, performance and pose scenarios plus focused editor and Borea-profile export checks passed on the supported build. See [verification and remaining coverage](https://github.com/DymndLab/PawPrints/blob/v0.5.39/docs/ksa-5901-testing.md).\n\nThe print workspace keeps native editor resources and staging panels out of the drawing, restores focus after resizing, and yields to native settings and save/load dialogs.\n\nCompany logos accept PNG files with transparency. Windows handles PNG decoding; the mod includes its own image resampling and PNG export.\n\nCreate blueprint-style PNG drawings of your KSA craft in the Vehicle Editor.\n\n- Arrange orthographic, projected, isometric and exploded views.\n- Add part labels, flagnotes, dimensions, formatted text and performance blocks.\n- Customize the title block, company logo, signoffs and revision.\n- Choose Blue, White, Cream or Charcoal paper, with optional grids, zones and wear.\n- Pose moving parts in the drawing without changing the live craft.\n- Add kitten and banana scale references.\n- Remember export-folder and company preferences between sessions.\n\nLoad a craft, then use **Editor > Open PawPrint Editor** or **Ctrl+Alt+P**.\n\nRequires Windows x64, KSA **2026.11.16.5901** and StarMap **0.5.4**. Rendering runs locally without Blender, an AI API or a companion application.\n\nThis is a development preview. Save PNG before loading another craft, leaving the Vehicle Editor or ending the game: editable sheets are not saved across those transitions. Back to editor keeps the sheet while the same craft stays open. Large craft and high-resolution drawings can use substantial memory. Third-party part compatibility and display scaling may vary.\n\nSee [installation instructions](https://github.com/DymndLab/PawPrints/blob/v0.5.39/INSTALL.md) and [report issues](https://github.com/DymndLab/PawPrints/issues) with reproduction steps and your game/mod versions.\n\n\nRuntime ZIP SHA-256: `289232bbe14c922e6d80282222e22c2202e1bf315d60d9d61d613fdd8c34985f`.",
+  "listing": {
+    "name": "PawPrints",
+    "authors": [
+      "Dymnd"
+    ],
+    "abstract": "Create blueprint-style craft drawings inside Kitten Space Agency, with projected and exploded views, annotations, and performance blocks.",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/pawprints-technical-drawings-creation-for-ksa-craft.1726/",
+      "repository": "https://github.com/DymndLab/PawPrints",
+      "bugtracker": "https://github.com/DymndLab/PawPrints/issues"
+    }
+  }
+}
