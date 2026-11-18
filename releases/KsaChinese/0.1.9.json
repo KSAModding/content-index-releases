@@ -1,0 +1,55 @@
+{
+  "spec_version": 1,
+  "id": "KsaChinese",
+  "type": "mod",
+  "version": "0.1.9",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-18T00:33:12Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "game_max": "2026.11.16.5901",
+  "game_max_revision": 5901,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/kuxiaowo/KSA-CHINESE/releases/download/v0.1.9/KsaChinese-0.1.9.zip",
+    "sha256": "B85D1B43350E9E1923497E26E4C19B0A9E6D5047AB7C0EEB5875F07D3F3E7326",
+    "size": 716381,
+    "content_type": "application/zip"
+  },
+  "install_size": 1837865,
+  "install": {
+    "root": "KsaChinese",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "max": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/kuxiaowo/KSA-CHINESE/releases/tag/v0.1.9",
+  "changelog_text": "适用于 Windows x64 版 KSA 2026.11.16.5901、StarMap 0.5.4 和 .NET 10 x64 Runtime。\n\n本版更新了生命保障与物资转移窗口、任务和乘员计划、发射前物资检查、乘员倒计时、探测器电源与风暴待机、部件名称及 5901 的 311 行更新日志。在独立游戏档案中验证了中英文切换、载具切换、任务与发射警告。\n\n已有 StarMap 或使用 Borea 时选择 KsaChinese-0.1.9.zip。便携版 KsaChinese-0.1.9-5901-Portable.zip 自带启动器。每个档案只启用一种语言模组。\n\n| 安装包 | SHA-256 |\n| --- | --- |\n| KsaChinese-0.1.9.zip | b85d1b43350e9e1923497e26e4c19b0a9e6d5047ab7c0eeb5875f07d3f3e7326 |\n| KsaChinese-0.1.9-5901-Portable.zip | d3ebaef076985f24c6146e68cc1c197e187dc91c92ae007dc98ab560f3a782c2 |\n\n[5901 适配与验证](https://github.com/kuxiaowo/KSA-CHINESE/blob/v0.1.9/reports/0.1.9-5901适配与验证.md)",
+  "listing": {
+    "name": "KSA Chinese / 简体中文",
+    "authors": [
+      "kuxiaowo",
+      "KsaUiLanguages contributors"
+    ],
+    "abstract": "KSA 5901 简体中文界面、部件名称与提示，支持中英切换。Partial Simplified Chinese UI, part names and tooltips for KSA 5901, with an English / 简体中文 switch.",
+    "description": "作者 / Author: [kuxiaowo](https://github.com/kuxiaowo)\n\n## 中文\n\n为 **Windows x64 上的 KSA 2026.11.16.5901** 提供简体中文本地化，支持在 **English / 简体中文** 之间切换。\n\nv0.1.9 5901 适配重做的生命保障窗口、物资转移、任务和乘员计划、物资装载与发射警告、乘员倒计时和探测器电源。更新日志包含 311 行正文。\n\n- 翻译已支持的界面、部件与物质名称、提示，以及部分更新记录。\n- 包含独立命名的 Noto Sans SC 字体子集；语言选择按游戏档案保存，Borea 各实例互不影响。\n- 保留技术标识、部件型号与编号、单位、占位符和玩家名称；未翻译的内容保留原文。\n- 游戏或依赖文件的哈希未经检查时，汉化插件会拒绝启用。\n\n**当前为部分本地化，由社区维护。** 旧版更新正文、原生库与异常文字、贴图印字，以及部分界面和视觉检查仍未完成；尚未验证与其他本地化模组共存。\n\n需要 **.NET 10 x64 Runtime 和 StarMap 0.5.4**。可通过 Borea 安装，或将标准 ZIP 中的 `KsaChinese` 文件夹解压到所选档案的 `mods` 目录，启用后通过 StarMap/Borea 启动。\n\n从旧便携包迁移时，先备份其 Profile，再将旧 `<game>/Content/KsaChinese` 移出 Content；同一实例不要保留两个相同模组 ID 的副本。标准模组包不包含加载器或启动器。\n\n## English\n\nPartial Simplified Chinese localization for **KSA 2026.11.16.5901 on Windows x64**, with an **English / 简体中文** switch.\n\nv0.1.9. The 5901 update covers the Life Support window, supply transfer, mission and crew planning, provisioning and launch warnings, the Crew Clock, and probe power and storm standby. The build includes the 311 changelog lines.\n\n- Translates supported UI, part and substance captions, tooltips and selected version history.\n- Includes a renamed Noto Sans SC font subset.\n- Language preferences are saved per game profile, outside the mod files, so Borea instances remain independent.\n- Preserves technical identifiers, part/model numbers, units, placeholders and player names.\n- Refuses uninspected game/dependency hashes; untranslated text falls back to the original.\n\nThis is **partial, community-maintained localization**. Older version-history text, native library/error text, texture lettering and complete UI/visual coverage remain unfinished. Compatibility with other localization mods has not been established.\n\nRequires .NET 10 x64 Runtime and StarMap 0.5.4. Install through Borea, or extract the standard ZIP into the selected profile's `mods` folder and enable `KsaChinese`. Launch through StarMap/Borea.\n\nWhen migrating from the portable package, first back up its Profile and move the old `<game>/Content/KsaChinese` out of Content. Do not keep two copies with the same mod id. The standard mod ZIP does not bundle a loader or launcher.\n\n## 来源与许可 / Credits and licenses\n\n代码与译文 / Code and translations: MIT, including portions derived from [LiX-Works/KsaUiLanguages](https://github.com/LiX-Works/KsaUiLanguages) at b504774158cc03b582a0e75bfe94330cb841f11d. 字体 / Font: Noto Sans SC subset, OFL-1.1. Original credits and license texts are included.\n",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksa-chinese-0-1-6-simplified-chinese-ui-for-ksa-5638.1440/",
+      "repository": "https://github.com/kuxiaowo/KSA-CHINESE",
+      "bugtracker": "https://github.com/kuxiaowo/KSA-CHINESE/issues",
+      "documentation": "https://github.com/kuxiaowo/KSA-CHINESE/blob/main/README-%E7%94%9F%E6%80%81%E5%AE%89%E8%A3%85.md"
+    }
+  }
+}
