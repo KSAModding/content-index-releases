@@ -1,0 +1,61 @@
+{
+  "spec_version": 1,
+  "id": "KsaBabel",
+  "type": "mod",
+  "version": "0.2.5",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-18T00:33:11Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "game_max": "2026.11.16.5901",
+  "game_max_revision": 5901,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/kuxiaowo/KSA-Babel/releases/download/v0.2.5/KsaBabel-0.2.5.zip",
+    "sha256": "2F85E31D16CDE317F1E7296305E9F581ADE6C641F3D2F41A5390C1C7929E561A",
+    "size": 2391060,
+    "content_type": "application/zip"
+  },
+  "install_size": 7132511,
+  "install": {
+    "root": "KsaBabel",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "max": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "KsaChinese",
+      "kind": "conflict",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/kuxiaowo/KSA-Babel/releases/tag/v0.2.5",
+  "changelog_text": "KSA Babel 0.2.5 targets Kitten Space Agency 2026.11.16.5901 on Windows x64 with StarMap 0.5.4 and .NET 10 x64 Runtime.\n\nThis update covers Life Support, supply transfer, mission and crew planning, launch warnings, Crew Clock, probe power, part names and the 5901 changelog. All nine locales were switched in an isolated game profile. Independent native review of the seven additional languages is pending.\n\nUse KsaBabel-0.2.5.zip with an existing StarMap installation. The portable alternative KsaBabel-0.2.5-5901-Portable.zip includes the launcher. Enable only one localization mod per profile.\n\n| Asset | SHA-256 |\n| --- | --- |\n| KsaBabel-0.2.5.zip | 2f85e31d16cde317f1e7296305e9f581ade6c641f3d2f41a5390c1c7929e561a |\n| KsaBabel-0.2.5-5901-Portable.zip | 2cc7952cbbf3b7820b9456eabec8c0d618f8c66f078ebc7d0fc68ca2fe5ad55d |",
+  "listing": {
+    "name": "KSA Babel / 喵语塔",
+    "authors": [
+      "kuxiaowo",
+      "KsaUiLanguages contributors"
+    ],
+    "abstract": "Nine-language UI localization for KSA build 5901; native-speaker review pending.",
+    "description": "![KSA Babel nine-language cover](ksa-image:cover)\n\nMultilingual display-layer localization for **KSA 2026.11.16.5901 on Windows x64**.\n\nThe 5901 update covers the Life Support window, supply transfer, mission and crew planning, provisioning and launch warnings, the Crew Clock, and probe power and storm standby. The build includes the 311 changelog lines. Seven additional locales await independent native-speaker review.\n\n**Translation review (earlier scope):** The maintainer has personally confirmed only the Simplified Chinese translation. Japanese, Russian, German, French, Italian, Spanish and Brazilian Portuguese were translated/reviewed by GPT for KSA using KSP aerospace terminology as reference; they have no independent native-speaker sign-off. Some initial Japanese translations came from the credited MIT-licensed KsaUiLanguages project. English mode displays KSA's original English text and retains the mod's added Language menu. The 11 dynamic templates support multilingual composition and original-English fallback; they are not 11 rewritten game texts.\n\n**Chinese-focused alternative:** [KSA Chinese / KSA-CHINESE](https://github.com/kuxiaowo/KSA-CHINESE), ID `KsaChinese`, offers English / Simplified Chinese. It has its own [Borea listing](https://github.com/KSAModding/content-index/blob/main/listings/KsaChinese.toml). Babel is a separate nine-language localization mod under `KsaBabel`; do not enable both in the same profile.\n\n- Translates supported UI, part and substance captions, tooltips and selected version history.\n- Includes a renamed Noto Sans SC font subset and a nine-language menu.\n- Seven additional languages include locale decisions for the current Chinese scope and 11 dynamic templates.\n- Language preferences are saved per game profile, outside the mod files, so Borea instances remain independent.\n- Preserves technical identifiers, part/model numbers, units, placeholders and player names.\n- Refuses uninspected game/dependency hashes; untranslated text falls back to the original.\n\nThis is **partial localization**, not an official translation or a claim of complete coverage. Older version-history text, native library/error text, texture lettering and complete UI/visual coverage remain unfinished. Compatibility with other localization mods has not been established.\n\nRequires .NET 10 x64 Runtime and StarMap 0.5.4. Extract the standard `KsaBabel-0.2.5.zip` into the selected profile's `mods` folder and enable `KsaBabel`. The plugin assembly is KsaBabel.dll. Launch through StarMap/Borea.\n\nFor Borea-managed migration, remove KsaChinese from the instance while retaining profile data; disabling it alone does not resolve the catalog conflict. For manual installation, disable KsaChinese before enabling Babel; Babel refuses activation while KsaChinese is enabled. When migrating from the old portable package, first back up its Profile and move the old `<game>/Content/KsaChinese` out of Content. Do not keep both Content/KsaBabel and profile mods/KsaBabel. The standard mod ZIP does not bundle a loader or launcher.\n\nSettings use the current profile's KsaBabel/settings.json. On first startup, only if this new file does not exist, Babel imports a valid locale from the same profile's old KsaChinese/settings.json, without modifying the old file or overwriting existing new settings. No saves are automatically moved and no other profiles are searched. The portable archive is KsaBabel-0.2.5-5901-Portable.zip; its launcher is KsaBabel/KsaBabelLauncher.exe.\n\nCode and translations: MIT, including portions derived from LiX-Works/KsaUiLanguages at b504774158cc03b582a0e75bfe94330cb841f11d. Font: Noto Sans SC subset, OFL-1.1. Original credits and license texts are included.\n",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/ksa-babel-0-2-1-nine-language-localization-preview-for-ksa-5638.1454/",
+      "repository": "https://github.com/kuxiaowo/KSA-Babel",
+      "bugtracker": "https://github.com/kuxiaowo/KSA-Babel/issues",
+      "documentation": "https://github.com/kuxiaowo/KSA-Babel/blob/main/README-%E7%94%9F%E6%80%81%E5%AE%89%E8%A3%85.md"
+    }
+  }
+}
