@@ -1,0 +1,48 @@
+{
+  "spec_version": 1,
+  "id": "PurrlineTessera",
+  "type": "mod",
+  "version": "1.1.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-18T08:03:07Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/releases/download/v1.1.1/PurrlineTessera-1.1.1.zip",
+    "sha256": "C67AB3C830F5A9CEC55FA2FBC5599E86D21D63BA9226F425367BCD8129841BF5",
+    "size": 22657484,
+    "content_type": "application/zip"
+  },
+  "install_size": 25247942,
+  "install": {
+    "root": "PurrlineTessera",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "PurrlineFacet",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/releases/tag/v1.1.1",
+  "changelog_text": "## Changes\n\n- The Floodlight lights a wider area around the lander. The softer central beam reduces glare on nearby surfaces and has a shorter reach.\n- The eight lamp lenses are easier to distinguish when the light is on.\n\n## Compatibility\n\nValidated against KSA build version **2026.11.16.5901**.\n\n## Installation\n\nExtract the archive into `Documents\\My Games\\Kitten Space Agency\\mods\\` so that it contains the `PurrlineTessera` folder.",
+  "listing": {
+    "name": "Tessera by Purrline Rocketworks",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "A modular lunar lander kit: decks, wall and solar panels, a thrust cone, a core column, sphere, capsule and drum tanks, the Mizar descent engine, landing legs and a lattice ramp that deploy.",
+    "description": "![A lander built from Tessera parts](ksa-image:hero)\n\n**Tessera** is a modular lunar lander kit for Kitten Space Agency, from the fictional rocket maker **Purrline Rocketworks**. Build a robotic hopper, a cargo lander or a lander for two kittens from decks, panels, tanks, engines and legs that snap together at their edges.\n\n## Parts\n\nThe kit has 21 editor entries.\n\n- **Tessera Hex Deck** and **Oct Deck**: the floors of a lander, with seats for tanks and engines and six or eight edges for panels; open or closed.\n- **Tessera Wall Panel**, **Half Panel** and **Taper Panel**: walls and skirts in isogrid, skin, radiator, gold foil and silver foil looks; wall and half panels have leg pads at their lower corners.\n- **Tessera Solar Wall Panel** and **Solar Half Panel**: walls of solar cells, 420 W and 210 W.\n- **Tessera Thrust Cone**, **Core Column** and **Deck Strut**: the structure under and between the decks.\n- **Tessera Sphere Tank**, **Capsule Tank** and **Drum Tank**: Methalox tanks in bare, gold blanket and silver blanket looks; the sphere also as a carbon bottle.\n- **Mizar** and **Mizar Fixed**: the descent engine, 3.1 kN, with a gimbal or on a fixed mount.\n- **Tessera Landing Leg** in a short and a long form, and the **Tessera Lattice Ramp**: they deploy from the part menu.\n- **Tessera Avionics Box**: uncrewed control with a battery, a power switch and radiation protection.\n- **Tessera Floodlight**: surface-mounted light with a switch and a 90-degree tilt range.\n- **Tessera Crew Cabin**: two seats, an interior, EVA exits and radiation shielding.\n\nPress V to change the variant of a part that has more than one look. Use the Avionics Box for an uncrewed build or assign crew to the cabin. The tanks hold the true volume of their shape, so a stock tank of the same size holds about four times as much.\n\n![Original parts and looks](ksa-image:all-parts)\n\n![A tall hex lander](ksa-image:tall-lander)\n\n![A wide octagonal cargo lander](ksa-image:wide-lander)\n\n![Seven Mizar Fixed in a Thrust Cone, from below](ksa-image:engines-below)\n\nThe landers in the pictures were built in the editor from these parts; the mod contains no vehicle files. Some of them carry payload parts of Facet by Purrline Rocketworks.\n\n## Requirements\n\nNo other mod needed.\n\n## Install\n\n- Borea: install Tessera from the content list.\n- By hand: copy `PurrlineTessera` from the release zip into `Documents/My Games/Kitten Space Agency/mods/` and enable it.\n\nTo remove the mod, delete its folder. Vehicles with its parts do not load without it.\n\nMade for KSA build 2026.11.16.5901.\n\nCode and game data are MIT. Meshes, textures, logo and pictures are CC BY 4.0.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "parts"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/tessera-by-purrline-rocketworks.1698/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineTessera/issues"
+    }
+  }
+}
