@@ -1510,16 +1510,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 5,
+      "total": 6,
       "hosts": {
-        "ksamods": 5
+        "ksamods": 6
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 5,
+          "total": 6,
           "hosts": {
-            "ksamods": 5
+            "ksamods": 6
           }
         }
       ]
@@ -5483,16 +5483,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 10,
+      "total": 11,
       "hosts": {
-        "ksamods": 10
+        "ksamods": 11
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 9,
+          "total": 10,
           "hosts": {
-            "ksamods": 9
+            "ksamods": 10
           }
         },
         {
