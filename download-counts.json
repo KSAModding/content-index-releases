@@ -1517,16 +1517,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 8,
+      "total": 10,
       "hosts": {
-        "ksamods": 8
+        "ksamods": 10
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 8,
+          "total": 10,
           "hosts": {
-            "ksamods": 8
+            "ksamods": 10
           }
         }
       ]
