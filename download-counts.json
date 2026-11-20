@@ -1671,16 +1671,16 @@
     },
     {
       "id": "hangglider",
-      "total": 6,
+      "total": 7,
       "hosts": {
-        "ksamods": 6
+        "ksamods": 7
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 6,
+          "total": 7,
           "hosts": {
-            "ksamods": 6
+            "ksamods": 7
           }
         }
       ]
@@ -5627,16 +5627,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 15,
+      "total": 17,
       "hosts": {
-        "ksamods": 15
+        "ksamods": 17
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 14,
+          "total": 16,
           "hosts": {
-            "ksamods": 14
+            "ksamods": 16
           }
         },
         {
