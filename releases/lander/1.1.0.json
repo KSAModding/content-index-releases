@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "lander",
+  "type": "vehicle",
+  "version": "1.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-20T02:38:08Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/lander/1.1.0",
+    "sha256": "8373D83AF0D5FDAED165F8BE9A0840F5630757DB5B58A3DF74FB1390DDBD190F",
+    "size": 7339,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-lander-1_1_0-ff3e396c/lander-1.1.0.zip"
+    ]
+  },
+  "install_size": 74833,
+  "install": {
+    "root": "lander",
+    "derived": true,
+    "folder": "lander"
+  },
+  "dependencies": [
+    {
+      "id": "PurrlineFacet",
+      "kind": "required",
+      "min": "1.1.0",
+      "source": "authored"
+    },
+    {
+      "id": "PurrlineTessera",
+      "kind": "required",
+      "min": "1.1.1",
+      "source": "authored"
+    }
+  ],
+  "listing": {
+    "name": "lander",
+    "authors": [
+      "just a normal Expie"
+    ],
+    "abstract": "lunar lander with a cargo bay",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-28)\n\n![Screenshot 2](ksa-image:screenshot-29)\n\n![Screenshot 3](ksa-image:screenshot-30)\n\n![Screenshot 4](ksa-image:screenshot-31)",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/lander"
+    }
+  }
+}
