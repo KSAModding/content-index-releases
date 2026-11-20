@@ -1,12 +1,12 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-19T23:38:30Z",
-  "counted_at": "2026-11-19T23:38:30Z",
+  "checked_at": "2026-11-20T23:11:25Z",
+  "counted_at": "2026-11-20T23:11:25Z",
   "listings": [
     {
       "id": "AccelerationAbsorbers",
       "thread": 1743,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "AdvancedFlightComputer",
@@ -216,7 +216,7 @@
     {
       "id": "PawPrints",
       "thread": 1726,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "PrincipiaKSA",
