@@ -1,0 +1,51 @@
+{
+  "spec_version": 1,
+  "id": "CharacterManager",
+  "type": "mod",
+  "version": "0.5.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-21T19:29:35Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://spacedock.info/mod/4757/Character%20Manager/download/0.5.0",
+    "sha256": "7B5B3ADCF0C8EB370FBBCE48B3281D1F5C0B3DE378875D9C9940FA8A7953A170",
+    "size": 36037,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://github.com/paulo-santana/KSA-Character-Manager/releases/download/v0.5.0/CharacterManager-v0.5.0.zip"
+    ]
+  },
+  "install_size": 77873,
+  "install": {
+    "root": "CharacterManager",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.2",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4757/Character%20Manager",
+  "changelog_text": "**KSP's faces, seated idles and floating pose. For KSA 2026.11.18 and later.**\n\n- **Works on the 2026.11.18 game update.** 0.4.1 stops working there: the game changed the signature of `AnimatedRenderable.SetAnimation`, and the seated idle schedule broke. This version is built against the new game.\n\n**Expressions:** a character can declare a face blend, the same blend of face clips KSP's Kerbals use, driven by three numbers: Expression, Variance and SecondaryVariance. Character Manager then runs KSP's own logic for the expression, so a Kerbal looks excited weightless and in free fall, and worried at high g, at speed and while spinning; each Kerbal's courage and stupidity change how much. There is no such stat in KSA, so both come from a hash of the Kerbal's name. A Kerbal on a jetpack cheers, and one standing still has a calm face. View > Mods > Expression has a mode (off, manual sliders, like KSP), the numbers for each Kerbal and the idle timing.\n\n**Head layer:** a character can also declare a head blend that turns the head the way KSP's head layer does: slow looking around while idle, quick looks and shakes when excited or afraid. It only runs for a seated Kerbal.\n\n**Seated idles:** a seated Kerbal who is calm or cheerful plays one of its idle clips now and then, picked and timed like KSP's, instead of the game's one clip every 45 to 75 seconds. They wait while time is warped, and stop when the Kerbal gets frightened. A Kerbal who floats in orbit keeps its cheerful face while it fidgets.\n\n**Floating:** a character can have its own pose for floating with RCS off, and clips for the arms moving when RCS is turned on or off while floating.\n\n- With [KSP Characters](https://github.com/paulo-santana/KSA-KSP-Characters) 0.8.0 or later, the Kerbals get all of this from KSP's own clips.\n- Differences from KSP: the g-force counts whenever the vehicle is off the ground (KSP counts it only while descending, which made Kerbals in a steady orbit flicker between awe and calm), and idle checks default to every second.\n\n**For mod authors:** the new tags go in `CharacterManager.xml`: `CharacterManager.FaceBlend` and `CharacterManager.HeadBlend` in a `CharacterExpressions` block, and `CharacterManager.MMUFloatAnim`, `MMUFloatRcsOnAnim` and `MMUFloatRcsOffAnim` in `CharacterMMUAnimations`. The seated idles use the game's own seated idle fields. See the README.\n\nBuilt against KSA 2026.11.10.5801 and StarMap 0.5.2.",
+  "listing": {
+    "name": "Character Manager",
+    "authors": [
+      "paulo-santana"
+    ],
+    "abstract": "Choose which character mods your crew roster draws from, and give recruits the names and fixed crew their mod provides.",
+    "description": "Choose which character mods your crew roster draws from, and give recruits the names and fixed crew their mod provides.\n\n**It does nothing on its own.** It manages the characters that other mods add, such as KSP Characters, and works with any character mod.\n\nOpen it in game from **View > Mods > Characters**. The features, and the format for character mod authors, are in the [README](https://github.com/paulo-santana/KSA-Character-Manager#readme).\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/character-manager.1479/",
+      "repository": "https://github.com/paulo-santana/KSA-Character-Manager",
+      "spacedock": "https://spacedock.info/mod/4757/Character%20Manager",
+      "bugtracker": "https://github.com/paulo-santana/KSA-Character-Manager/issues"
+    }
+  }
+}
