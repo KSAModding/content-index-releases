@@ -689,16 +689,16 @@
     },
     {
       "id": "airplane",
-      "total": 10,
+      "total": 12,
       "hosts": {
-        "ksamods": 10
+        "ksamods": 12
       },
       "releases": [
         {
           "version": "1.0.1",
-          "total": 9,
+          "total": 11,
           "hosts": {
-            "ksamods": 9
+            "ksamods": 11
           }
         },
         {
@@ -1535,16 +1535,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 12,
+      "total": 13,
       "hosts": {
-        "ksamods": 12
+        "ksamods": 13
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 12,
+          "total": 13,
           "hosts": {
-            "ksamods": 12
+            "ksamods": 13
           }
         }
       ]
@@ -3573,16 +3573,16 @@
     },
     {
       "id": "lander",
-      "total": 1,
+      "total": 2,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 2
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 1,
+          "total": 2,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 2
           }
         }
       ]
