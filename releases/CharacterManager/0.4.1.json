@@ -8,6 +8,8 @@
   "release_date": "2026-11-08T12:39:35Z",
   "game_min": "2026.11.10.5801",
   "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
   "download": {
     "url": "https://spacedock.info/mod/4757/Character%20Manager/download/0.4.1",
     "sha256": "3B90978BB26846B0A65147A27CD2D7887577B6C40F14E4E9D3779BCF1FE60E65",
