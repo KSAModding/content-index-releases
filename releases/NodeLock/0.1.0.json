@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "NodeLock",
+  "type": "mod",
+  "version": "0.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-22T06:25:13Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "game_max": "2026.11.16.5901",
+  "game_max_revision": 5901,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/DymndLab/NodeLock/releases/download/v0.1.0/NodeLock-0.1.0.zip",
+    "sha256": "FE01F1B5085CD8B22246B03691E3EF59E7875FDB176C457A879107CE613F3182",
+    "size": 29207,
+    "content_type": "application/zip"
+  },
+  "install_size": 61189,
+  "install": {
+    "root": "NodeLock",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "PurrlineTessera",
+      "kind": "optional",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/DymndLab/NodeLock/releases/tag/v0.1.0",
+  "changelog_text": "# NodeLock 0.1.0\n\nLock a destination attachment node with **Tab**, rotate with **WASD/QE** (**Shift** for fine rotation), then click to attach. Tap **Tab** again to unlock.\n\nIncludes bay connector adjustments for radial batteries, stock spherical RCS tanks and Tessera spheres. PurrlineTessera is optional. Load NodeLock after Core and PurrlineTessera if installed; disable separate BatteryBayCompat/TankBayCompat copies.\n\nRequires **KSA 2026.11.16.5901** and **StarMap 0.5.4+**. Windows supported; Linux/macOS unverified. Inheritance is experimental. Carried subassemblies and general surface/edge attachment are unsupported.\n\n[Usage and installation](https://github.com/DymndLab/NodeLock#readme) · [Issues](https://github.com/DymndLab/NodeLock/issues)\n\nMIT license.",
+  "listing": {
+    "name": "NodeLock",
+    "authors": [
+      "Dymnd"
+    ],
+    "abstract": "Lock attachment nodes while placing parts, with battery and tank bay compatibility included.",
+    "description": "Tap Tab over a yellow attachment node to lock it, rotate with WASD/QE, then click to attach. Tab unlocks. Includes battery and spherical tank bay connector adjustments. Load after PurrlineTessera if installed. Inheritance is experimental.",
+    "license": "MIT",
+    "tags": [
+      "editor"
+    ],
+    "links": {
+      "repository": "https://github.com/DymndLab/NodeLock",
+      "bugtracker": "https://github.com/DymndLab/NodeLock/issues",
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/nodelock-attachment-node-tool-for-ksa.1771/"
+    }
+  }
+}
