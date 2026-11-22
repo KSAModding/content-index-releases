@@ -796,16 +796,16 @@
     },
     {
       "id": "BlipA",
-      "total": 7,
+      "total": 8,
       "hosts": {
-        "ksamods": 7
+        "ksamods": 8
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 7,
+          "total": 8,
           "hosts": {
-            "ksamods": 7
+            "ksamods": 8
           }
         }
       ]
@@ -1557,16 +1557,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 16,
+      "total": 17,
       "hosts": {
-        "ksamods": 16
+        "ksamods": 17
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 16,
+          "total": 17,
           "hosts": {
-            "ksamods": 16
+            "ksamods": 17
           }
         }
       ]
@@ -5692,16 +5692,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 19,
+      "total": 20,
       "hosts": {
-        "ksamods": 19
+        "ksamods": 20
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 18,
+          "total": 19,
           "hosts": {
-            "ksamods": 18
+            "ksamods": 19
           }
         },
         {
