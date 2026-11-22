@@ -1,0 +1,46 @@
+{
+  "spec_version": 1,
+  "id": "PrincipiaKSA",
+  "type": "mod",
+  "version": "1.2.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-22T02:49:16Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/parsaes80/PrincipiaKSA/releases/download/v1.2.0/PrincipiaKSA.zip",
+    "sha256": "7B86B36AB0AE9FC19CCF2EEA377F27666B9137EDC0F98F25C49D3C5E5F7715C4",
+    "size": 23336778,
+    "content_type": "application/zip"
+  },
+  "install_size": 23333960,
+  "install": {
+    "root": "PrincipiaKSA",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.0",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/parsaes80/PrincipiaKSA/releases/tag/v1.2.0",
+  "changelog_text": "ITS LAGRANGING TIME.  This update **Requires StarMap 0.5.0 or later** and adds:\n\n-Lagrange points by showing L1–L5 markers in the Two body frame, where they stand still. \n-macOS support for Apple Silicon Macs, contributed by renancamm (#1). The same package now runs on Linux, Windows and Apple Silicon. \n-A new \"Centred on\" option for the Two body frame (renamed from \"Two-body rotating\"). It keeps the centre body fixed while the frame still turns towards the other body, so orbits around a moon stay centred on it, and with the Sun as the second body, a sun-synchronous orbit's plane stands still, these features were in Principia KSP and now have been added here.\n-Ascending and descending node markers (aN/dN) when you have a target, on the n-body prediction and flight plan, with the inclination to the target's orbit on hover. Right-clicking near one offers \"At Ascending/Descending Node\" at the n-body time.\n-PrincipiaKSA moves to StarMap's own \"Mods\" menu in the top bar, instead of the HUD menu.",
+  "listing": {
+    "name": "PrincipiaKSA",
+    "authors": [
+      "SMOKE"
+    ],
+    "abstract": "Replaces the games Kepler based gravity, with more realistic N-body Gravity.",
+    "description": "This mod replaces the game's simplified gravity model and replaces it with N-body simulation. Such a mod called Principia(https://github.com/mockingbirdnest/Principia) existed for KSP and now repo has ported it to KSA. N-body gravity works by calculating all the gravity forces acting on an object not just 2 like the default KSA one, so as a result the path of a vessel in sapce can be much more complicated and realistic than the normal game. This simulation demands alot of CPU power and may cause stuttering in heavy simulation moments. Principia offers much more depth to game and is very fun for people who have mastered the games own physics.\n\n![text](ksa-image:OrbitlLines)",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/principiaksa.1557/",
+      "repository": "https://github.com/parsaes80/PrincipiaKSA"
+    }
+  }
+}
