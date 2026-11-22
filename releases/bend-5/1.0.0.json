@@ -1,0 +1,39 @@
+{
+  "spec_version": 1,
+  "id": "bend-5",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-22T21:05:30Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/bend-5/1.0.0",
+    "sha256": "B2A6A55D0B89802A08F7BCE8270023F266057B9740EBF444216E60E7282060A5",
+    "size": 14751,
+    "content_type": "application/zip"
+  },
+  "install_size": 227382,
+  "install": {
+    "root": "bender-1h",
+    "derived": true,
+    "folder": "bender-1h"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "BEND-5",
+    "authors": [
+      "tomservo"
+    ],
+    "abstract": "REMEMBER ME",
+    "description": "REMEMBER ME.\n\nAlso be sure to turn off the mouth engine if you want to lift off from Luna surface.  Beware.\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-32)\n\n![Screenshot 2](ksa-image:screenshot-33)",
+    "license": "CC0-1.0",
+    "tags": [
+      "bender"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/bend-5"
+    }
+  }
+}
