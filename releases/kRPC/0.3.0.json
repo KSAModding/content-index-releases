@@ -1,0 +1,49 @@
+{
+  "spec_version": 1,
+  "id": "kRPC",
+  "type": "mod",
+  "version": "0.3.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-22T11:01:51Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://github.com/krpc/krpc/releases/download/ksa-v0.3.0/krpc-ksa-0.3.0.zip",
+    "sha256": "66AEE79B0B97E0447C2272A0877FEFF1649CB416E5A4C59CAC4F53EAAE1E3628",
+    "size": 38520466,
+    "content_type": "application/zip"
+  },
+  "install_size": 89556135,
+  "install": {
+    "root": "kRPC",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/krpc/krpc/releases/tag/ksa-v0.3.0",
+  "changelog_text": "## Changes\n\n- Mod\n  - **Breaking:** Use the kRPC 0.8 protocol, so clients and client stubs need kRPC 0.8 (#1399)\n  - **Breaking:** Rename the server settings in `kRPC/settings.toml`, with one port per server\n    (#1399)\n  - **Breaking:** Keep the settings in `kRPC/settings.toml` in the game's user folder, so they\n    apply to every save and are kept when the mod updates (#1399)\n  - Create the settings file with the defaults when it is missing, and replace settings in it\n    that are not valid with their defaults (#1399)\n  - Run on Apple silicon Macs, including the gRPC and serial servers (#1399)\n  - Budget the server's time per frame, and choose the rate control settings from a preset in\n    the server window (#1399)\n  - Name a server added in the server window \"Server\", \"Server 2\" and so on (#1399)\n  - Remember which servers are expanded in the server window (#1399)\n  - Show the number of connected clients beside each server in the server window (#1399)\n  - Add RTS/CTS flow control to serial servers, set in the server window (#1399)\n  - Add JSON over HTTP servers to the server window (#1399)\n  - Set the origins whose web pages may connect to a WebSockets or HTTP server in the server\n    window (#1399)\n  - Fix serial servers failing to start on Linux and macOS, with the native serial port library\n    not found (#1399)\n  - Support KSA v2026.11.16.5901 (#1401)\n  - Move the kRPC menu to a `kRPC` item in the game's Mods menu, which opens the server window\n    (#1400)\n  - Fix every call failing with no vehicle under control, e.g. after the vehicle is destroyed\n    (#1407)\n\n- Crew and life support\n  - Add life support: the supplies of a vehicle and its habitat zones, how long they last,\n    and moving meals and canisters between habitats (#1400)\n  - Add `KSA.LifeSupportEnabled` and `KSA.RadiationEnabled` (#1400)\n  - Add the condition and cause of death of kittens, and whether a vehicle can be flown (#1400)\n  - **Breaking:** Move a kitten in `Seat.Kitten` only within its habitat zone, and refuse an\n    incapacitated or retired kitten (#1400)\n  - Refuse `Kitten.GoOnEva` for a kitten too weak to go, or without supplies for its suit, and\n    add `Kitten.CanGoOnEva` and `Kitten.CanBoard` (#1400)\n  - Add the life support of a kitten's suit, and taking and stowing supplies on EVA (#1400)\n  - Add `DockingPort.HatchOpen` (#1400)\n  - Add `Vehicle.CrewEvents` and `NextCrewEvent`, each kitten's most urgent coming event, as\n    the game's crew clock shows them (#1402)\n  - Add the time until a kitten's condition worsens, it gets radiation sickness, or it takes a\n    lethal dose (#1402)\n  - Add the habitat zones linked through closed hatches, and the hatches to open (#1402)\n  - Add `Vehicle.Mission`, the mission planned in the editor, with the times of its legs (#1402)\n  - Add whether a habitat zone's supplies last the mission, and the kittens planned for each leg\n    (#1402)\n- Engines and mass properties\n  - Add solid rocket motors to `Engine`, with their grain mass, and the chamber pressure of\n    every engine (#1402)\n  - Add the thrust and specific impulse of an engine at a given pressure, and its maximum\n    thrust (#1402)\n  - Fix `Engine.Thrust` and `Vehicle.Thrust` to include solid rocket motors, which fire\n    whatever the throttle (#1402)\n  - Add the dry mass, inertia, RCS torque and accelerations of a vehicle (#1402)\n- Control and power\n  - Add `Vehicle.ControlState`, the reason a vehicle cannot be flown (#1402)\n  - Add the power switch of a probe core: its mode, storm standby and power status (#1402)\n  - Add `Part.PowerForecast`, the charge, draw and time left of a part's electrical circuit\n    (#1402)\n  - Add the radiation dose, health and reboots of a probe core's avionics (#1402)\n\n- Flight and orbits\n  - **Breaking:** Return the scale height at sea level from `Body.ScaleHeight` (#1400)\n  - Add the air temperature, speed of sound, Mach number and breathable air to `Flight` (#1400)\n  - Add the temperature, speed of sound, oxygen fraction and molar mass of an atmosphere to\n    `Body` (#1400)\n  - Add the depth, submerged portion and buoyant force of a vehicle to `Flight` (#1402)\n  - Add the aerodynamic force, torque, lift and drag on a vehicle to `Flight`, and the force at\n    another position and velocity (#1402)\n  - Add `Orbit.SpeedAt`, `MeanAnomalyAtUT`, `EccentricAnomalyAtUT`, `TrueAnomalyAtRadius`,\n    `SemiLatusRectum` and `SpecificAngularMomentum` (#1402)\n  - Add creating an orbit from its elements, or from a position and velocity (#1402)\n  - Move a burn by setting `Burn.UT`, and add `Burn.BurnVector` and `RemainingBurnVector`\n    (#1402)\n\n- Parts\n  - Add `KSA.RaycastDistance` and `KSA.RaycastPart`, to find the parts along a ray (#1402)\n  - Add `Part.Highlight`, to highlight a part in one of the game's colors (#1402)\n\n- Radiation and space weather\n  - Add the radiation shielding of a part, its cover by the vehicle's tanks, and the dose rate\n    behind them (#1402)\n  - Add the solar wind and radiation storm at a vehicle, and the coronal mass ejections heading\n    for it, with their forecast arrival (#1402)\n  - Add the geomagnetic storm of a body, and the activity and recent coronal mass ejections of\n    a star (#1402)\n\n- kFS\n  - Add a `KFS` service, to build, load, start and stop programs on kFS, the game's prototype\n    flight software (#1403)\n  - Add reading and writing a program's global variables, and its log and trace channels (#1403)\n  - Refuse changes to `AutoPilot` while a kFS program controls the vehicle (#1403)\n\n- Game\n  - Stop a warp in progress when `KSA.SimulationSpeed` is set (#1402)\n\n- Clients\n  - Add stubs and documentation for the JavaScript client (#1399)\n  - Add documentation for calling the server over HTTP, with its API reference (#1404)\n  - Add a WebSockets server on port 50001 to the default settings, for the JavaScript client\n    (#1399)\n- Release\n  - Move the example scripts out of the release archive, into the tutorials in the\n    documentation (#1399)",
+  "listing": {
+    "name": "kRPC",
+    "authors": [
+      "djungelorm"
+    ],
+    "abstract": "Control the game from your own scripts, written in Python, C#, C++, C, Java, Lua and more.",
+    "description": "kRPC lets you control Kitten Space Agency from scripts running outside the game. A server mod inside the game exposes the game's API, and your scripts call it over a network connection, from the same computer or another one.\n\nThis Python script launches a rocket straight up, and cuts the engine at 10 km:\n\n```python\nimport krpc\n\nconn = krpc.connect(name=\"Launch\")\nvehicle = conn.ksa.launch_vehicle(\"Rocket\", \"CCSFS LC-39A\")\nflight = vehicle.flight\n\nvehicle.auto_pilot.target_pitch_and_heading(90, 90)\nvehicle.auto_pilot.engage()\nvehicle.control.throttle = 1\nvehicle.control.activate_next_sequence()\nvehicle.control.engine_on = True\n\nevent = conn.add_event(lambda: flight.mean_altitude > 10000)\nwith event.condition:\n    event.wait()\nvehicle.control.engine_on = False\n```\n\n**Features**\n\n- Client libraries for Python, C#, C++, C, Java and Lua, the same ones kRPC uses for Kerbal Space Program\n- A gRPC server, to generate a client for many other languages\n- APIs covering vehicles, parts, engines, crew, flight data, orbits, burns, reference frames, auto-pilot, and more\n- Streams and events, for efficient telemetry and waiting\n- Server side functions that run your code inside the game\n- APIs for saving and loading, the camera, on-screen messages, and drawing lines and user interface windows in the game\n\nkRPC for KSA is experimental, and its API may change between releases.\n\n- [Documentation](https://krpc.github.io/krpc/experimental/ksa/)\n- [Source](https://github.com/krpc/krpc)\n- [Issues](https://github.com/krpc/krpc/issues)",
+    "license": "LGPL-3.0-or-later",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/krpc-v0-1-0-control-ksa-with-scripts-in-python-c-c-c-java-lua-and-more.1462/",
+      "homepage": "https://krpc.github.io/krpc/experimental/ksa/index.html",
+      "repository": "https://github.com/krpc/krpc",
+      "spacedock": "https://spacedock.info/mod/4747/kRPC",
+      "bugtracker": "https://github.com/krpc/krpc/issues"
+    }
+  }
+}
