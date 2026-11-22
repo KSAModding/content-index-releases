@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/bend-5/1.0.0",
     "sha256": "B2A6A55D0B89802A08F7BCE8270023F266057B9740EBF444216E60E7282060A5",
     "size": 14751,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-bend-5-1_0_0-1fe3f3b7/bend-5-1.0.0.zip"
+    ]
   },
   "install_size": 227382,
   "install": {
