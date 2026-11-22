@@ -12,7 +12,8 @@
     "url": "https://github.com/meow-sci/unscience/releases/download/v1.76.0/unscience-1.76.0.zip",
     "sha256": "C52447EEF6DEB9BC4980842C95F4290B522B840B52AE94A95EA1B6FF422021A6",
     "size": 1322109,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "unavailable_since": "2026-11-22T10:56:46Z"
   },
   "install_size": 2800298,
   "install": {
