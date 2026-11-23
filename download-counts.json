@@ -718,16 +718,16 @@
     },
     {
       "id": "airplane",
-      "total": 16,
+      "total": 17,
       "hosts": {
-        "ksamods": 16
+        "ksamods": 17
       },
       "releases": [
         {
           "version": "1.0.1",
-          "total": 15,
+          "total": 16,
           "hosts": {
-            "ksamods": 15
+            "ksamods": 16
           }
         },
         {
@@ -794,16 +794,32 @@
     },
     {
       "id": "ArgiziontMKI",
-      "total": 23,
+      "total": 24,
       "hosts": {
-        "ksamods": 23
+        "ksamods": 24
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 23,
+          "total": 24,
           "hosts": {
-            "ksamods": 23
+            "ksamods": 24
+          }
+        }
+      ]
+    },
+    {
+      "id": "bend-5",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
           }
         }
       ]
@@ -1579,16 +1595,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 19,
+      "total": 20,
       "hosts": {
-        "ksamods": 19
+        "ksamods": 20
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 19,
+          "total": 20,
           "hosts": {
-            "ksamods": 19
+            "ksamods": 20
           }
         }
       ]
@@ -3732,16 +3748,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 45,
+      "total": 48,
       "hosts": {
-        "ksamods": 45
+        "ksamods": 48
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 45,
+          "total": 48,
           "hosts": {
-            "ksamods": 45
+            "ksamods": 48
           }
         }
       ]
@@ -5781,16 +5797,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 21,
+      "total": 23,
       "hosts": {
-        "ksamods": 21
+        "ksamods": 23
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 20,
+          "total": 22,
           "hosts": {
-            "ksamods": 20
+            "ksamods": 22
           }
         },
         {
