@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/Ringwingshuttle/1.0.0",
     "sha256": "3A38A213C5D9F2B7375A1FA27A5860C338AC0B64E9F69F8F256D27BE1C62DEC8",
     "size": 13777,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-ringwingshuttle-1_0_0-fd359d8f/Ringwingshuttle-1.0.0.zip"
+    ]
   },
   "install_size": 172466,
   "install": {
