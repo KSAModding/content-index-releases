@@ -733,16 +733,16 @@
     },
     {
       "id": "airplane",
-      "total": 17,
+      "total": 18,
       "hosts": {
-        "ksamods": 17
+        "ksamods": 18
       },
       "releases": [
         {
           "version": "1.0.1",
-          "total": 16,
+          "total": 17,
           "hosts": {
-            "ksamods": 16
+            "ksamods": 17
           }
         },
         {
@@ -1610,16 +1610,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 20,
+      "total": 21,
       "hosts": {
-        "ksamods": 20
+        "ksamods": 21
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 20,
+          "total": 21,
           "hosts": {
-            "ksamods": 20
+            "ksamods": 21
           }
         }
       ]
@@ -1746,16 +1746,16 @@
     },
     {
       "id": "hangglider",
-      "total": 9,
+      "total": 10,
       "hosts": {
-        "ksamods": 9
+        "ksamods": 10
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 9,
+          "total": 10,
           "hosts": {
-            "ksamods": 9
+            "ksamods": 10
           }
         }
       ]
@@ -3749,16 +3749,16 @@
     },
     {
       "id": "lander",
-      "total": 5,
+      "total": 7,
       "hosts": {
-        "ksamods": 5
+        "ksamods": 7
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 5,
+          "total": 7,
           "hosts": {
-            "ksamods": 5
+            "ksamods": 7
           }
         }
       ]
@@ -3798,16 +3798,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 48,
+      "total": 51,
       "hosts": {
-        "ksamods": 48
+        "ksamods": 51
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 48,
+          "total": 51,
           "hosts": {
-            "ksamods": 48
+            "ksamods": 51
           }
         }
       ]
@@ -4838,16 +4838,16 @@
     },
     {
       "id": "PodRacerII",
-      "total": 18,
+      "total": 19,
       "hosts": {
-        "ksamods": 18
+        "ksamods": 19
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 18,
+          "total": 19,
           "hosts": {
-            "ksamods": 18
+            "ksamods": 19
           }
         }
       ]
