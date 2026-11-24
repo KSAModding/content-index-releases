@@ -1,0 +1,51 @@
+{
+  "spec_version": 1,
+  "id": "CharacterManager",
+  "type": "mod",
+  "version": "0.5.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-24T23:03:28Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://spacedock.info/mod/4757/Character%20Manager/download/0.5.1",
+    "sha256": "78400560CED926360AB7F75012C9CB1C75EAF65A0DDF35C1789E2D531D2685F2",
+    "size": 36051,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://github.com/paulo-santana/KSA-Character-Manager/releases/download/v0.5.1/CharacterManager-v0.5.1.zip"
+    ]
+  },
+  "install_size": 77873,
+  "install": {
+    "root": "CharacterManager",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.2",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://spacedock.info/mod/4757/Character%20Manager",
+  "changelog_text": "**Fixes the crash of 0.5.0 on KSA 2026.11.16.5901 and later.**\n\n- **0.5.0 crashed the game on 2026.11.16.5901 and later** (seen on 2026.11.25.5949) as soon as a Kerbal sat in a seat: `Method not found: AnimatedRenderable.SetAnimation(IAnimation, Single)`. The release was built against the game files of 2026.11.10.5801, where `SetAnimation` has two parameters; the newer builds have a third. This version is built against 2026.11.25.5949, so it runs on 2026.11.16.5901 and later, and no longer on 5801.\n- Nothing else changes from 0.5.0.\n\nBuilt against KSA 2026.11.25.5949 and StarMap 0.5.2.",
+  "listing": {
+    "name": "Character Manager",
+    "authors": [
+      "paulo-santana"
+    ],
+    "abstract": "Choose which character mods your crew roster draws from, and give recruits the names and fixed crew their mod provides.",
+    "description": "Choose which character mods your crew roster draws from, and give recruits the names and fixed crew their mod provides.\n\n**It does nothing on its own.** It manages the characters that other mods add, such as KSP Characters, and works with any character mod.\n\nOpen it in game from **View > Mods > Characters**. The features, and the format for character mod authors, are in the [README](https://github.com/paulo-santana/KSA-Character-Manager#readme).\n",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/character-manager.1479/",
+      "repository": "https://github.com/paulo-santana/KSA-Character-Manager",
+      "spacedock": "https://spacedock.info/mod/4757/Character%20Manager",
+      "bugtracker": "https://github.com/paulo-santana/KSA-Character-Manager/issues"
+    }
+  }
+}
