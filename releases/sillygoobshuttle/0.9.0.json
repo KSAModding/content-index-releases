@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/sillygoobshuttle/0.9.0",
     "sha256": "CA613ABC8814156069DD6BD266C5481DE5C816D7100BB8B91D7C18E80B2B6961",
     "size": 36212,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-sillygoobshuttle-0_9_0-15afd9c0/sillygoobshuttle-0.9.0.zip"
+    ]
   },
   "install_size": 579808,
   "install": {
