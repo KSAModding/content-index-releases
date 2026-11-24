@@ -49,8 +49,6 @@ JOBS = (
     # The tool reads the forum at most once in 20 hours, so two runs a day keep
     # the read daily.
     Job("forums-status.yml", "due-forums-status", timedelta(hours=12)),
-    # Three unanswered polls open the issue, so one check per three polls.
-    Job("watchdog.yml", "due-watchdog", timedelta(hours=3)),
     # The examples job asks the real release hosts.
     Job("checks.yml", "due-checks", timedelta(days=7)),
 )

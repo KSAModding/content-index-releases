@@ -70,7 +70,7 @@ jobs:
 
       # An unanswered poll stays a green run, so this step is what tells it apart.
       # tools/watchdog.py reads it off the run: skipped means the server answered.
-      # Keep its name in step with the --unanswered-step of watchdog.yml.
+      # Keep its name in step with the --unanswered-step of the last step.
       - name: Master server did not answer
         if: steps.poll.outputs.answered != 'true'
         run: echo "::warning title=Master server did not answer::The poll got no answer, so no build was added this run."
@@ -93,3 +93,24 @@ jobs:
           done
           echo "could not push after three attempts; the next poll adds the build again"
           exit 1
+
+      # A run that ended green says nothing about the master server, so this
+      # reads which of the earlier polls got an answer. A poll fails now and
+      # then, so only several in a row open the issue. It reads only the polls
+      # the watcher started, because a build added by hand is no poll, and only
+      # runs that have ended, so this run counts from the next poll on.
+      - name: Check when the master server last answered a poll
+        if: ${{ !cancelled() && github.event_name == 'repository_dispatch' }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          arguments=(
+            --repository "$REPOSITORY"
+            --workflow game-versions.yml
+            --event repository_dispatch
+            --unanswered-step "Master server did not answer"
+            --unanswered-polls 3
+          )
+          python3 tools/watchdog.py "${arguments[@]}"

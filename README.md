@@ -51,7 +51,7 @@ When the master server does not answer, a steward adds a build by starting `game
 
 A poll the master server does not answer ends green and changes nothing, because a single failed poll is normal.
 The workflow then runs its `Master server did not answer` step, which is skipped in a run that got an answer.
-When three polls in a row got no answer, the watchdog opens an issue, as described under [When no tick ran at all](#when-no-tick-ran-at-all).
+When three polls in a row got no answer, the last step of the workflow opens an issue, as described under [When no tick ran at all](#when-no-tick-ran-at-all).
 
 ## Download counts
 
@@ -266,23 +266,23 @@ python3 tools/watch.py --authored ../content-index --dry-run
 
 ### When no tick ran at all
 
-When `.github/workflows/watchdog.yml` is started by hand, it asks when the watcher last succeeded on its schedule, and opens one issue here once that is more than 180 minutes ago.
+No workflow checks the watcher's schedule, because the watcher is the one clock of this repository, and a check that the watcher starts always finds a fresh tick.
+`tools/watchdog.py` asks when the watcher last succeeded on its schedule. A steward can run it by hand, and with a token it opens one issue here once that is more than 180 minutes ago.
 Only a scheduled run counts, because a hand dispatch and the merge dispatch both succeed while the schedule is still dropped.
-The issue is kept current and closes itself when a scheduled run succeeds, so the watchdog holds no state.
-The runs that the watcher starts do not do this check, because they always find a fresh tick.
+The issue is kept current and closes itself when a scheduled run succeeds, so the tool holds no state.
 
 ```text
 python3 tools/watchdog.py --dry-run
 ```
 
-The same workflow checks the master server in a second step.
+The last step of `game-versions.yml` checks the master server with the same tool.
 It reads the recent runs of `game-versions.yml` and takes the runs in which `Master server did not answer` was skipped as the polls that got an answer.
 It opens one issue here once three polls in a row got no answer, and closes it when a poll does.
-It counts only the polls the watcher started, and polls and not time, because the polls come only with the watcher's ticks, so a stretch with no poll neither opens nor closes the issue.
+It counts only the polls the watcher started that have ended, and polls and not time, because the polls come only with the watcher's ticks, so a stretch with no poll neither opens nor closes the issue.
 A run from before that step existed counts as answered.
 
 ```text
-python3 tools/watchdog.py --workflow game-versions.yml --unanswered-step "Master server did not answer" --unanswered-polls 3 --dry-run
+python3 tools/watchdog.py --workflow game-versions.yml --event repository_dispatch --unanswered-step "Master server did not answer" --unanswered-polls 3 --dry-run
 ```
 
 ## One schedule
@@ -298,7 +298,6 @@ The run list is the whole state, and a cancelled run does not count.
 | `snapshot.yml` | 6 hours, counted from any run, because every push and merge builds it | `due-snapshot` |
 | `download-counts.yml` | 6 hours | `due-download-counts` |
 | `forums-status.yml` | 12 hours | `due-forums-status` |
-| `watchdog.yml` | 3 hours | `due-watchdog` |
 | `checks.yml`, the examples job | 7 days | `due-checks` |
 
 Each of these workflows has a concurrency group of its own, because in a shared group a pending run cancels the pending run of another workflow.
