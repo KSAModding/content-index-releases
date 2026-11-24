@@ -3,12 +3,11 @@
 name: forums status
 
 on:
-  schedule:
-    # Several slots because GitHub drops scheduled runs. The tool reads the forum at most once in 20 hours.
-    - cron: "27 5,11,17,23 * * *"
-  # Follows a changed links.forums and drops removed listings without asking the forum.
+  # index-changed follows a changed links.forums and drops removed listings
+  # without asking the forum. The watcher sends due-forums-status every 12 hours
+  # (tools/dispatch_due.py), and the tool reads the forum at most once in 20 hours.
   repository_dispatch:
-    types: [index-changed]
+    types: [index-changed, due-forums-status]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -20,8 +19,10 @@ permissions:
   contents: read
 
 concurrency:
-  # The watcher's group, so this run and the watcher never push to main at the same time.
-  group: watcher
+  # A group of its own, because in a shared group a pending run cancels the
+  # pending run of another workflow. A push that races the watcher's rebases,
+  # and the two never conflict, because each commits only its own file.
+  group: forums-status
   cancel-in-progress: false
 
 jobs:
@@ -68,12 +69,12 @@ jobs:
         id: refresh
         env:
           GITHUB_TOKEN: ${{ steps.issues-token.outputs.token }}
-          EVENT: ${{ github.event_name }}
+          ACTION: ${{ github.event.action }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           arguments=(--authored .authored)
-          if [ "$EVENT" = "repository_dispatch" ]; then
+          if [ "$ACTION" = "index-changed" ]; then
             arguments+=(--no-read)
           fi
           if [ "$DRY_RUN" = "true" ]; then

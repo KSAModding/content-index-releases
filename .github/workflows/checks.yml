@@ -10,22 +10,25 @@ on:
     types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
-  schedule:
-    # The examples job talks to real release hosts. It runs on its own clock,
-    # not in front of a pull request.
-    - cron: "37 6 * * 1"
+  # The examples job talks to real release hosts. It runs once a week when the
+  # watcher sends due-checks (tools/dispatch_due.py), not in front of a pull request.
+  repository_dispatch:
+    types: [due-checks]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: checks-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  # The event is part of the group, so the weekly run and a push to main do not cancel each other.
+  group: checks-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
   tests:
     name: tests
+    # The weekly run is for the examples, and every push already runs the tests.
+    if: github.event_name != 'repository_dispatch'
     # A fixed image, so a change of the latest label does not change the job.
     runs-on: ubuntu-24.04
     steps:
@@ -51,7 +54,7 @@ jobs:
 
   examples:
     name: examples
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'repository_dispatch' || github.event_name == 'workflow_dispatch'
     # A fixed image, so a change of the latest label does not change the job.
     runs-on: ubuntu-24.04
     steps:

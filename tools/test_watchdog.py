@@ -138,7 +138,7 @@ class AGapIsReported(unittest.TestCase):
             lines.clear()
             api = StubApi({"/actions/workflows": run_list(240), "/issues": []})
             Watchdog(api, options, log=lines.append).run()
-            self.assertIn("past the 45", lines[0])
+            self.assertIn("past the 180", lines[0])
 
     def test_a_gap_that_is_already_reported_is_edited(self):
         api = StubApi(
@@ -477,10 +477,9 @@ class ThePollWorkflowKeepsTheMarker(unittest.TestCase):
     """The step the watchdog reads has to exist under the name it is given."""
 
     def test_the_step_the_watchdog_reads_is_in_the_poll_workflow(self):
-        text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
-        found = re.search(r'--unanswered-step "([^"]+)"', text)
-        assert found, "watchdog.yml no longer passes the marker step"
         poll = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        found = re.search(r'--unanswered-step "([^"]+)"', poll)
+        assert found, "game-versions.yml no longer passes the marker step"
         self.assertIn(f"- name: {found.group(1)}\n        if: steps.poll.outputs.answered != 'true'", poll)
 
     def test_an_answered_poll_is_what_the_poll_step_reports(self):
@@ -542,18 +541,15 @@ class TheCommandLineChoosesTheCheck(unittest.TestCase):
 
 
 def poll_check_step():
-    """The text of the step of watchdog.yml that runs the poll check."""
-    text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
+    """The text of the step of game-versions.yml that runs the poll check."""
+    text = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
     return text.split("- name: Check when the master server last answered a poll\n", 1)[1]
 
 
 def reported_polls():
-    """The count of unanswered polls the watchdog workflow reports at."""
-    found = re.search(
-        r"UNANSWERED_POLLS: \$\{\{ inputs\.unanswered_polls \|\| '(\d+)' \}\}",
-        poll_check_step(),
-    )
-    assert found, "watchdog.yml no longer passes a default count of polls"
+    """The count of unanswered polls the poll workflow reports at."""
+    found = re.search(r"--unanswered-polls (\d+)\n", poll_check_step())
+    assert found, "game-versions.yml no longer passes a count of polls"
     return int(found.group(1))
 
 
@@ -563,21 +559,11 @@ class TheWorkflowRunsThePollCheck(unittest.TestCase):
     def test_the_check_watches_the_poll_workflow(self):
         self.assertIn("--workflow game-versions.yml\n", poll_check_step())
 
-    def test_the_first_check_does_not_stop_the_second(self):
-        self.assertTrue(poll_check_step().startswith("        if: ${{ !cancelled() }}\n"))
-
-    def test_the_count_reaches_the_tool(self):
-        self.assertIn('--unanswered-polls "$UNANSWERED_POLLS"', poll_check_step())
+    def test_a_failed_commit_does_not_stop_the_check(self):
+        self.assertTrue(poll_check_step().startswith("        if: ${{ !cancelled() && "))
 
     def test_the_workflow_reports_at_the_count_the_tool_defaults_to(self):
         self.assertEqual(reported_polls(), parse_arguments([]).unanswered_polls)
-
-    def test_a_hand_dispatch_offers_the_same_count(self):
-        text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
-        inputs = text.split("  unanswered_polls:\n", 1)[1].split("dry_run:", 1)[0]
-        found = re.search(r'default: "(\d+)"', inputs)
-        assert found, "watchdog.yml no longer offers a count of polls"
-        self.assertEqual(int(found.group(1)), reported_polls())
 
     def test_the_default_needs_more_than_one_failed_poll(self):
         # A poll fails now and then, and one failed poll must report nothing.
@@ -589,7 +575,7 @@ class TheArguments(unittest.TestCase):
         options = parse_arguments([])
         self.assertEqual(options.workflow, "watcher.yml")
         self.assertEqual(options.event, "schedule")
-        self.assertEqual(options.stale_minutes, 45)
+        self.assertEqual(options.stale_minutes, 180)
 
     def test_the_default_label_is_one_this_repository_defines(self):
         # An undefined label is created on the spot by an actor with push
@@ -615,53 +601,18 @@ class TheArguments(unittest.TestCase):
 WORKFLOWS = Path(__file__).resolve().parent.parent / ".github" / "workflows"
 
 
-def fire_minutes(workflow):
-    """Every minute of the hour a workflow's schedule entries fire at."""
-    text = (WORKFLOWS / workflow).read_text(encoding="utf-8")
-    schedule = text.split("on:", 1)[1].split("jobs:", 1)[0]
-    minutes = []
-    for entry in re.findall(r'- cron: "([^"]+)"', schedule):
-        field = entry.split()[0]
-        minutes += [int(part) for part in field.split(",")]
-    return sorted(minutes)
-
-
-def longest_gap(minutes):
-    """The longest wait between two fires, across the turn of the hour."""
-    wrapped = minutes + [minutes[0] + 60]
-    return max(second - first for first, second in zip(wrapped, wrapped[1:]))
-
-
-def reported_age():
-    """The age the watchdog workflow reports a gap at."""
-    text = (WORKFLOWS / "watchdog.yml").read_text(encoding="utf-8")
-    found = re.search(r"STALE_MINUTES: \$\{\{ inputs\.stale_minutes \|\| '(\d+)' \}\}", text)
-    assert found, "watchdog.yml no longer passes a default stale age"
-    return int(found.group(1))
-
-
 class TheSchedules(unittest.TestCase):
-    """The tuning the two workflows carry, which no other test reaches."""
+    """The tuning the workflows carry, which no other test reaches."""
 
     def test_the_watcher_ticks_every_ten_minutes_off_the_hour(self):
-        minutes = fire_minutes("watcher.yml")
-        self.assertEqual(minutes, [4, 14, 24, 34, 44, 54])
-        self.assertEqual(longest_gap(minutes), 10)
+        text = (WORKFLOWS / "watcher.yml").read_text(encoding="utf-8")
+        schedule = text.split("on:", 1)[1].split("jobs:", 1)[0]
+        self.assertEqual(re.findall(r'- cron: "([^"]+)"', schedule), ["4,14,24,34,44,54 * * * *"])
 
-    def test_a_gap_is_reported_before_it_reaches_an_hour(self):
-        # A gap is only seen at a sample, so what stays invisible is the
-        # reported age plus the sample interval, and the issue asks for an
-        # outage of an hour to be visible.
-        sample = longest_gap(fire_minutes("watchdog.yml"))
-        self.assertLessEqual(sample + reported_age(), 60)
-
-    def test_the_workflow_reports_at_the_age_the_tool_defaults_to(self):
-        # The workflow always passes --stale-minutes, so its number is the one
-        # that runs and the default below it is only for a hand run.
-        self.assertEqual(reported_age(), parse_arguments([]).stale_minutes)
-
-    def test_the_watchdog_samples_off_the_hour_too(self):
-        self.assertNotIn(0, fire_minutes("watchdog.yml"))
+    def test_the_polls_the_check_counts_are_the_ones_the_watcher_starts(self):
+        text = (WORKFLOWS / "game-versions.yml").read_text(encoding="utf-8")
+        step = text.split("--workflow game-versions.yml", 1)[1].split("--unanswered-step", 1)[0]
+        self.assertIn("--event repository_dispatch", step)
 
 
 if __name__ == "__main__":

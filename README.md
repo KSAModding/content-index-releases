@@ -43,7 +43,7 @@ Vehicles and saves are in files of their own next to it, see [The snapshot](#the
 
 `game-versions.json` is what an authored month bound such as `2026.7` resolves against, and the snapshot ships it so a client needs no separate request.
 
-It is seeded from `Content/Versions/`, the dated history every installed copy of the game already carries, and kept current by an hourly poll of the master server.
+It is seeded from `Content/Versions/`, the dated history every installed copy of the game already carries, and kept current by an hourly poll of the master server, which the watcher starts (see [One schedule](#one-schedule)).
 
 That poll only ever sees the build that is current when it runs, so a build superseded within the hour can be missing from it. The copy on your own disk stays the complete source.
 
@@ -51,15 +51,15 @@ When the master server does not answer, a steward adds a build by starting `game
 
 A poll the master server does not answer ends green and changes nothing, because a single failed poll is normal.
 The workflow then runs its `Master server did not answer` step, which is skipped in a run that got an answer.
-When three polls in a row got no answer, the watchdog opens an issue, as described under [When no tick ran at all](#when-no-tick-ran-at-all).
+When three polls in a row got no answer, the last step of the workflow opens an issue, as described under [When no tick ran at all](#when-no-tick-ran-at-all).
 
 ## Download counts
 
 `download-counts.json` holds the download counts GitHub and SpaceDock report for each listing and release version, as [RFC 0052](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0052-static-download-counts.md) defines them.
 Mods, mod loaders, vehicles and saves are counted, all of them in its `listings` array, and a listing without `[releases]` has no counts.
 A release counts the downloads of its archive for every platform together with those of its platform archives.
-`.github/workflows/download-counts.yml` refreshes it about once a day as the org App.
-Every 6 hours, a second pass of the same workflow asks the share hosts only and keeps every GitHub and SpaceDock count as it is (`--share-hosts-only`).
+`.github/workflows/download-counts.yml` runs every 6 hours as the org App.
+A run asks every host when the last full refresh is 20 hours old or more, and otherwise asks the share hosts only and keeps every GitHub and SpaceDock count as it is (`--share-hosts-only`).
 Each pass commits the document only when a count changed.
 A host that does not answer keeps its last known values, and a value never observed stays absent, not zero.
 A listing on a share host (RFC 0094) is counted under the host's key in `hosts.toml`, from the `download_count` of each asset in the host's `storage` repository; the host's own counter is never read, so a host cannot raise a count.
@@ -80,7 +80,7 @@ python3 tools/download_counts.py --authored ../content-index --dry-run
 ## Forums status
 
 `forums-status.json` holds, for each listing, pack, vehicle and save with `links.forums`, whether its forums thread still exists, as [RFC 0110](https://github.com/KSAModding/content-manager-design/blob/main/rfcs/0110-gone-forums-thread.md) defines it.
-`.github/workflows/forums-status.yml` runs `tools/forums_status.py` as the org App, and the tool reads the forum at most once in 20 hours, with the User-Agent `Borea-Index/1.0 (+https://github.com/KSAModding/Borea)`, as Ahwoo allowed.
+`.github/workflows/forums-status.yml` runs `tools/forums_status.py` as the org App every 12 hours, and the tool reads the forum at most once in 20 hours, with the User-Agent `Borea-Index/1.0 (+https://github.com/KSAModding/Borea)`, as Ahwoo allowed.
 It reads the sitemap, and every sitemap a sitemap index names, and it reads a listed thread that the sitemap lacks once in that run.
 The sitemap can name a thread as `/threads/<slug>.<id>/` or under its forum as `/forums/<path>/<slug>.<id>/`, so it is matched with the same rule as `links.forums`.
 A 200, or a 301 that ends in 200, keeps the listing, Ahwoo's 404 page for a thread that does not exist counts as gone, and every other answer changes nothing.
@@ -103,7 +103,8 @@ Add `--read` only for a deliberate test of the forum.
 
 ## The watcher
 
-`.github/workflows/watcher.yml` runs every ten minutes as the org App, at minute 4 and not on the hour, because GitHub drops a scheduled run when it has no room and has least room on the hour.
+`.github/workflows/watcher.yml` is scheduled every ten minutes as the org App, at minute 4 and not on the hour, because GitHub drops a scheduled run when it has no room and has least room on the hour.
+GitHub starts about one of these runs an hour, see [One schedule](#one-schedule).
 A merge in the authored half starts a tick too, through the `index-changed` dispatch it already sends, so a changed listing is stamped at once.
 A new release on a listing that did not change still waits for the schedule.
 
@@ -175,6 +176,7 @@ There is no queue. What is stamped here is the whole of the watcher's state, whi
 | `tools/stamp_release.py` | Authored document plus release archive in, release file out. The one place a release file is derived, shared with the release pull request checks so the two paths cannot disagree. Needs no token. |
 | `tools/hosts.py` | The release hosts, GitHub, SpaceDock and the share hosts of `hosts.toml`, behind one interface. GitHub and a share host are polled conditionally against a stored ETag, so an unchanged listing costs no rate limit at all. |
 | `tools/watch.py` | One tick: scan, stamp, commit, append a mirror that only appeared later, mark a release that is gone from its host, apply a listing edit to the newest release, keep one error issue per listing current on the authored repository, and sweep its open pull requests. |
+| `tools/dispatch_due.py` | The last step of a tick: starts each other job of this repository whose interval has passed, read from the run list. |
 | `tools/watchdog.py` | When the watcher last succeeded on its schedule, and when the master server last answered a poll. Keeps one issue current on this repository for each. |
 | `tools/verify_examples.py` | Re-derives the design repository's hand-stamped `examples/` from their release hosts and diffs. |
 | `tools/build_snapshot.py` | Both halves of the index plus the game release list, as the snapshot documents clients fetch: the main document and a file for each type of `TYPE_FILES`. Needs no token. |
@@ -264,22 +266,45 @@ python3 tools/watch.py --authored ../content-index --dry-run
 
 ### When no tick ran at all
 
-`.github/workflows/watchdog.yml` asks every fifteen minutes when the watcher last succeeded on its schedule, and opens one issue here once that is more than 45 minutes ago.
+No workflow checks the watcher's schedule, because the watcher is the one clock of this repository, and a check that the watcher starts always finds a fresh tick.
+`tools/watchdog.py` asks when the watcher last succeeded on its schedule. A steward can run it by hand, and with a token it opens one issue here once that is more than 180 minutes ago.
 Only a scheduled run counts, because a hand dispatch and the merge dispatch both succeed while the schedule is still dropped.
-The issue is kept current and closes itself when a scheduled run succeeds, so the watchdog holds no state.
+The issue is kept current and closes itself when a scheduled run succeeds, so the tool holds no state.
 
 ```text
 python3 tools/watchdog.py --dry-run
 ```
 
-The same workflow checks the master server in a second step.
+The last step of `game-versions.yml` checks the master server with the same tool.
 It reads the recent runs of `game-versions.yml` and takes the runs in which `Master server did not answer` was skipped as the polls that got an answer.
 It opens one issue here once three polls in a row got no answer, and closes it when a poll does.
-It counts polls and not time, because GitHub starts that schedule hours apart, so a stretch with no poll neither opens nor closes the issue.
+It counts only the polls the watcher started that have ended, and polls and not time, because the polls come only with the watcher's ticks, so a stretch with no poll neither opens nor closes the issue.
 A run from before that step existed counts as answered.
 
 ```text
-python3 tools/watchdog.py --workflow game-versions.yml --unanswered-step "Master server did not answer" --unanswered-polls 3 --dry-run
+python3 tools/watchdog.py --workflow game-versions.yml --event repository_dispatch --unanswered-step "Master server did not answer" --unanswered-polls 3 --dry-run
+```
+
+## One schedule
+
+GitHub starts only about one scheduled run an hour in this repository, and gives these runs in turn to every schedule entry, whatever the entry's cron says.
+Each schedule entry besides the watcher's would take ticks from the watcher, so the watcher is the one workflow with a schedule.
+The last step of each tick, `tools/dispatch_due.py`, starts each other job whose last run by the clock is at least its interval ago, with a `repository_dispatch` whose type names that job only.
+The run list is the whole state, and a cancelled run does not count.
+
+| Workflow | Interval | Dispatch type |
+|---|---|---|
+| `game-versions.yml` | 1 hour | `due-game-versions` |
+| `snapshot.yml` | 6 hours, counted from any run, because every push and merge builds it | `due-snapshot` |
+| `download-counts.yml` | 6 hours | `due-download-counts` |
+| `forums-status.yml` | 12 hours | `due-forums-status` |
+| `checks.yml`, the examples job | 7 days | `due-checks` |
+
+Each of these workflows has a concurrency group of its own, because in a shared group a pending run cancels the pending run of another workflow.
+They push only their own file, so a push that races another rebases and never conflicts.
+
+```text
+python3 tools/dispatch_due.py --dry-run
 ```
 
 ## The snapshot
