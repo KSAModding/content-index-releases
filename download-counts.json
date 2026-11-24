@@ -848,16 +848,16 @@
     },
     {
       "id": "BlipA",
-      "total": 8,
+      "total": 9,
       "hosts": {
-        "ksamods": 8
+        "ksamods": 9
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 8,
+          "total": 9,
           "hosts": {
-            "ksamods": 8
+            "ksamods": 9
           }
         }
       ]
@@ -3854,16 +3854,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 51,
+      "total": 52,
       "hosts": {
-        "ksamods": 51
+        "ksamods": 52
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 51,
+          "total": 52,
           "hosts": {
-            "ksamods": 51
+            "ksamods": 52
           }
         }
       ]
@@ -4894,16 +4894,16 @@
     },
     {
       "id": "PodRacerII",
-      "total": 19,
+      "total": 20,
       "hosts": {
-        "ksamods": 19
+        "ksamods": 20
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 19,
+          "total": 20,
           "hosts": {
-            "ksamods": 19
+            "ksamods": 20
           }
         }
       ]
@@ -5476,6 +5476,22 @@
       ]
     },
     {
+      "id": "Ringwingshuttle",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        }
+      ]
+    },
+    {
       "id": "SaveSharingTest",
       "total": 0,
       "hosts": {
@@ -5678,16 +5694,16 @@
     },
     {
       "id": "sillygoobshuttle",
-      "total": 1,
+      "total": 3,
       "hosts": {
-        "ksamods": 1
+        "ksamods": 3
       },
       "releases": [
         {
           "version": "0.9.0",
-          "total": 1,
+          "total": 3,
           "hosts": {
-            "ksamods": 1
+            "ksamods": 3
           }
         }
       ]
