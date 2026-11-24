@@ -5621,6 +5621,22 @@
       ]
     },
     {
+      "id": "sillygoobshuttle",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
+        {
+          "version": "0.9.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        }
+      ]
+    },
+    {
       "id": "StarMap",
       "total": 6224,
       "hosts": {
