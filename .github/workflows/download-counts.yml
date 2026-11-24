@@ -2,14 +2,11 @@
 name: download counts
 
 on:
-  schedule:
-    # Several slots because GitHub drops scheduled runs. The age check below keeps it to one refresh a day.
-    - cron: "9 4,10,16,22 * * *"
-    # The share host pass on its own slots, so a share host count is at most 6 hours old.
-    - cron: "39 1,7,13,19 * * *"
-  # Drops the counts of deleted listings without asking a host.
+  # index-changed drops the counts of deleted listings without asking a host.
+  # The watcher sends due-download-counts every 6 hours (tools/dispatch_due.py),
+  # and the age check below makes one of these runs a day a full refresh.
   repository_dispatch:
-    types: [index-changed]
+    types: [index-changed, due-download-counts]
   workflow_dispatch:
     inputs:
       dry_run:
@@ -25,8 +22,10 @@ permissions:
   contents: read
 
 concurrency:
-  # The watcher's group, so the two never push to main at the same time.
-  group: watcher
+  # A group of its own, because in a shared group a pending run cancels the
+  # pending run of another workflow. A push that races the watcher's rebases,
+  # and the two never conflict, because each commits only its own file.
+  group: download-counts
   cancel-in-progress: false
 
 jobs:
@@ -58,23 +57,21 @@ jobs:
         id: mode
         env:
           EVENT: ${{ github.event_name }}
-          SCHEDULE: ${{ github.event.schedule }}
+          ACTION: ${{ github.event.action }}
           SHARE_HOSTS_ONLY: ${{ inputs.share_hosts_only }}
         run: |
           set -euo pipefail
           mode=refresh
-          if [ "$EVENT" = "repository_dispatch" ]; then
+          if [ "$EVENT" = "repository_dispatch" ] && [ "$ACTION" = "index-changed" ]; then
             mode=prune
           elif [ "$EVENT" = "workflow_dispatch" ] && [ "$SHARE_HOSTS_ONLY" = "true" ]; then
             mode=share
-          elif [ "$EVENT" = "schedule" ] && [ "$SCHEDULE" = "39 1,7,13,19 * * *" ]; then
-            mode=share
-          elif [ "$EVENT" = "schedule" ]; then
+          elif [ "$EVENT" = "repository_dispatch" ]; then
             # Only a full refresh sets the age, because the share host pass commits the same file.
             last="$(git log -1 --format=%ct --fixed-strings --grep="Refresh the download counts" -- download-counts.json)"
             if [ -n "$last" ] && [ "$(( $(date +%s) - last ))" -lt "$(( 20 * 3600 ))" ]; then
-              echo "the counts were committed less than 20 hours ago, so this run asks no host"
-              mode=skip
+              echo "the counts were committed less than 20 hours ago, so this run asks the share hosts only"
+              mode=share
             fi
           fi
           echo "mode=$mode" >> "$GITHUB_OUTPUT"

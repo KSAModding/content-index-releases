@@ -12,6 +12,9 @@ on:
   schedule:
     # Ten minutes is a tuning parameter and needs no RFC to change. GitHub's
     # floor is five. The times sit off the hour, where runs are dropped worst.
+    # GitHub starts only about one scheduled run an hour in this repository and
+    # gives these runs in turn to every schedule entry, so this is the one entry,
+    # and the last step of a tick starts the other jobs.
     - cron: "4,14,24,34,44,54 * * * *"
   repository_dispatch:
     # The authored half already sends this on every merge, and it names no
@@ -162,3 +165,18 @@ jobs:
         with:
           path: .watcher
           key: watcher-${{ github.run_id }}
+
+      # Each other job starts only when its interval has passed, and also after
+      # a failed tick, because those jobs do not depend on the tick.
+      - name: Start the jobs that are due
+        if: ${{ !cancelled() }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          arguments=(--repository "${{ github.repository }}")
+          if [ "$DRY_RUN" = "true" ]; then
+            arguments+=(--dry-run)
+          fi
+          python3 tools/dispatch_due.py "${arguments[@]}"

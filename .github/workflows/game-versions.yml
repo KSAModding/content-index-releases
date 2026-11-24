@@ -3,8 +3,10 @@
 name: game versions
 
 on:
-  schedule:
-    - cron: "23 * * * *"
+  # The watcher starts the hourly poll, because a schedule entry of its own
+  # would take ticks from the watcher (tools/dispatch_due.py).
+  repository_dispatch:
+    types: [due-game-versions]
   workflow_dispatch:
     inputs:
       build:
@@ -81,4 +83,13 @@ jobs:
           git config user.email "${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com"
           git add game-versions.json
           git commit -m "Add game build ${{ steps.poll.outputs.added }}"
-          git push
+          # The watcher starts this run together with others that push their own
+          # files, so a rejected push rebases and never conflicts.
+          for attempt in 1 2 3; do
+            if git push; then
+              exit 0
+            fi
+            git pull --rebase
+          done
+          echo "could not push after three attempts; the next poll adds the build again"
+          exit 1

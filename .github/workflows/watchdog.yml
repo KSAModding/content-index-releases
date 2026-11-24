@@ -1,20 +1,20 @@
-# Report when GitHub has not started the watcher for a long time. A dropped
-# scheduled run is otherwise silent, because nothing fails and only the run list
-# shows it. The same check reports a master server that has not answered several
-# game versions polls in a row, which is silent too because that poll stays green.
+# Report a master server that has not answered several game versions polls in
+# a row, which is silent because that poll stays green. Started by hand, it also
+# reports when GitHub has not started the watcher for a long time.
 name: watchdog
 
 on:
-  schedule:
-    # A gap is only seen at a sample, so fifteen minutes against the 45 below
-    # keeps the longest invisible one under an hour.
-    - cron: "7,22,37,52 * * * *"
+  # The watcher starts this run every 3 hours (tools/dispatch_due.py). A run the
+  # watcher starts always finds a fresh tick, so that run does not check the
+  # watcher's schedule.
+  repository_dispatch:
+    types: [due-watchdog]
   workflow_dispatch:
     inputs:
       stale_minutes:
         description: "Report when the watcher last started a successful scheduled run longer ago than this."
         required: false
-        default: "45"
+        default: "180"
       unanswered_polls:
         description: "Report when this many polls of the master server in a row got no answer."
         required: false
@@ -55,10 +55,11 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Check when the watcher last started a successful scheduled run
+        if: github.event_name == 'workflow_dispatch'
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           REPOSITORY: ${{ github.repository }}
-          STALE_MINUTES: ${{ inputs.stale_minutes || '45' }}
+          STALE_MINUTES: ${{ inputs.stale_minutes || '180' }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
@@ -76,7 +77,8 @@ jobs:
       # An unanswered poll of the game versions workflow ends green, so this
       # reads which of its runs got an answer. A poll fails now and then, so only
       # several in a row are reported. This counts polls and not time, because
-      # GitHub starts that schedule hours apart.
+      # the polls come only with the watcher's ticks. A poll by the clock is a
+      # run the watcher started, and a build added by hand is no poll.
       - name: Check when the master server last answered a poll
         if: ${{ !cancelled() }}
         env:
@@ -90,6 +92,7 @@ jobs:
           arguments=(
             --repository "$REPOSITORY"
             --workflow game-versions.yml
+            --event repository_dispatch
             --unanswered-step "Master server did not answer"
             --unanswered-polls "$UNANSWERED_POLLS"
           )

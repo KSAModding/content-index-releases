@@ -15,10 +15,9 @@ on:
       - tools/authored.py
       - tools/stamp_release.py
       - .github/workflows/snapshot.yml
+  # due-snapshot is the backstop the watcher starts (tools/dispatch_due.py).
   repository_dispatch:
-    types: [index-changed]
-  schedule:
-    - cron: "41 * * * *"
+    types: [index-changed, due-snapshot]
   workflow_dispatch:
 
 permissions:

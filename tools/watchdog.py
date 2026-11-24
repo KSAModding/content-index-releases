@@ -52,8 +52,11 @@ class Watchdog:
         self.options = options
         self.log = log
         self.marker = MARKER.format(workflow=options.workflow)
-        # "schedule" is the API name, "scheduled" reads better in a report.
-        self.described_event = {"schedule": "scheduled"}.get(options.event, options.event) or "any"
+        # The API names of the events, as they read better in a report.
+        self.described_event = {
+            "schedule": "scheduled",
+            "repository_dispatch": "dispatched",
+        }.get(options.event, options.event) or "any"
 
     def successful_runs(self, per_page):
         """The newest successful runs of the watched workflow, newest first.
@@ -340,10 +343,10 @@ def parse_arguments(argv):
         help="only a run this event started counts as a tick. Empty means any event",
     )
     parser.add_argument(
-        "--stale-minutes", type=int, default=45,
-        help="how old the last successful run may be before it is reported. The check "
-        "samples on its own schedule, so the longest gap that stays invisible is this "
-        "plus that interval. Not used with --unanswered-step",
+        "--stale-minutes", type=int, default=180,
+        help="how old the last successful run may be before it is reported. GitHub starts "
+        "the watcher about once an hour, so a shorter age reports every normal gap. Not "
+        "used with --unanswered-step",
     )
     parser.add_argument(
         "--unanswered-step", default="",
