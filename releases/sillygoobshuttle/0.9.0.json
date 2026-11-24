@@ -1,0 +1,41 @@
+{
+  "spec_version": 1,
+  "id": "sillygoobshuttle",
+  "type": "vehicle",
+  "version": "0.9.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-24T09:30:00Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/sillygoobshuttle/0.9.0",
+    "sha256": "CA613ABC8814156069DD6BD266C5481DE5C816D7100BB8B91D7C18E80B2B6961",
+    "size": 36212,
+    "content_type": "application/zip"
+  },
+  "install_size": 579808,
+  "install": {
+    "root": "Shuttle",
+    "derived": true,
+    "folder": "Shuttle"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Silly Shuttle V1",
+    "authors": [
+      "squirrel"
+    ],
+    "abstract": "Kitten Space Shuttle + Launchpad",
+    "description": "A rather capable space-station building shuttle, for all your exploration needs. Carries 4 crew, (two nestled inside the forward cargo bay) and an external APAS-95 docking port.\n\nComes with a launchpad! There is a second engine on the fuel tank for stability, which must be turned off at about 120km or it will spin uncontrollably. OMS pods are just RCS thrusters, and be sure to deplete your hypergolics to about 4 tons of MMH to reenter safely. Use RCS to guide you back down towards the base. Theres no landing gear yet so once you hit about 10km altitude and are under 200 mps pitch up and deploy your parachutes. good luck",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "shuttle",
+      "station",
+      "columbia"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/sillygoobshuttle"
+    }
+  }
+}
