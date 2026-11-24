@@ -1,7 +1,7 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-22T22:34:18Z",
-  "counted_at": "2026-11-22T22:34:18Z",
+  "checked_at": "2026-11-24T03:22:44Z",
+  "counted_at": "2026-11-24T03:22:44Z",
   "listings": [
     {
       "id": "AccelerationAbsorbers",
@@ -201,7 +201,7 @@
     {
       "id": "NodeLock",
       "thread": 1771,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "OhMyStars",
