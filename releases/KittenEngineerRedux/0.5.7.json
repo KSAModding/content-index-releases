@@ -12,7 +12,10 @@
     "url": "https://github.com/BarneyCompiler/Kitten-Engineer-Redux/releases/download/v0.5.7/KittenEngineerRedux-0.5.7.zip",
     "sha256": "AF93ECB82FE38291E571BDF488E372BBC389AC16C90AB19D0F524908CADA0301",
     "size": 51868,
-    "content_type": "application/x-zip-compressed"
+    "content_type": "application/x-zip-compressed",
+    "mirrors": [
+      "https://github.com/barneythegod07/Kitten-Engineer-Redux/releases/download/v0.5.7/KittenEngineerRedux-0.5.7.zip"
+    ]
   },
   "install_size": 116764,
   "install": {
