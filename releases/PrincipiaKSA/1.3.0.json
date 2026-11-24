@@ -1,0 +1,46 @@
+{
+  "spec_version": 1,
+  "id": "PrincipiaKSA",
+  "type": "mod",
+  "version": "1.3.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-24T20:08:39Z",
+  "game_min": "2026.10.25.5707",
+  "game_min_revision": 5707,
+  "download": {
+    "url": "https://github.com/parsaes80/PrincipiaKSA/releases/download/v1.3.0/PrincipiaKSA.zip",
+    "sha256": "F1DCEEE40FA6A931A5902400076C43AFE14C9B44B028B5CA31C6EFC8AC6D33B9",
+    "size": 23350602,
+    "content_type": "application/zip"
+  },
+  "install_size": 23347784,
+  "install": {
+    "root": "PrincipiaKSA",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.0",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/parsaes80/PrincipiaKSA/releases/tag/v1.3.0",
+  "changelog_text": "Frames, Frames, Frames! Your game will be running so smoothly ... oh wait wrong frames. This update adds Maneuvering Plotting Frames!  Stop the KSP Principia PTSD flashbacks they are actually intuitive now. \n\nFrom now on a node's prograde, normal and outward arrows now follow the trajectory as it's drawn in the selected frame, and KSA's burn editor, HUD burn panel and burn buttons show and set Δv along those same axes. Meaning that when using a node in a frame that KSA doesn't account for, like the two-body frame, feels alot more natural and you won't wonder why the prograde, normal and outward arrows are not pointing towards the trajectory.\n\nAlso:\n-Steadier Δv numbers on maneuver nodes in rotating frames (no more flickering between 0.000000 and -0.000000).\n-Fix maneuver nodes disappearing when dragged close to the vessel and given Δv. This was the long-standing \"divide by zero\" bug, finally found with the new logging.\n-Fix node drags getting stuck at the vessel. Nodes now stop a minute ahead, so they stay draggable.\n-Warp to the next event now stops at the n-body sphere crossing instead of KSA's conic.\n-Better logs for burns that can't be planned, showing the exact step that failed.\n-Works on KSA 2026.11.16. Still needs StarMap 0.5.0 or later.",
+  "listing": {
+    "name": "PrincipiaKSA",
+    "authors": [
+      "SMOKE"
+    ],
+    "abstract": "Replaces the games Kepler based gravity, with more realistic N-body Gravity.",
+    "description": "This mod replaces the game's simplified gravity model and replaces it with N-body simulation. Such a mod called Principia(https://github.com/mockingbirdnest/Principia) existed for KSP and now repo has ported it to KSA. N-body gravity works by calculating all the gravity forces acting on an object not just 2 like the default KSA one, so as a result the path of a vessel in sapce can be much more complicated and realistic than the normal game. This simulation demands alot of CPU power and may cause stuttering in heavy simulation moments. Principia offers much more depth to game and is very fun for people who have mastered the games own physics.\n\n![text](ksa-image:OrbitlLines)",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/principiaksa.1557/",
+      "repository": "https://github.com/parsaes80/PrincipiaKSA"
+    }
+  }
+}
