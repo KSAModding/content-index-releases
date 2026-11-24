@@ -6,8 +6,10 @@
   "version_scheme": "semver",
   "release_status": "stable",
   "release_date": "2026-11-21T19:29:35Z",
-  "game_min": "2026.11.16.5901",
-  "game_min_revision": 5901,
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "game_max": "2026.11.10.5801",
+  "game_max_revision": 5801,
   "download": {
     "url": "https://spacedock.info/mod/4757/Character%20Manager/download/0.5.0",
     "sha256": "7B5B3ADCF0C8EB370FBBCE48B3281D1F5C0B3DE378875D9C9940FA8A7953A170",
