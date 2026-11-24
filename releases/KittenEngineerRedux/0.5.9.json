@@ -14,7 +14,8 @@
     "size": 51974,
     "content_type": "application/x-zip-compressed",
     "mirrors": [
-      "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux/download/0.5.9"
+      "https://spacedock.info/mod/4043/Kitten%20Engineer%20Redux/download/0.5.9",
+      "https://github.com/barneythegod07/Kitten-Engineer-Redux/releases/download/v0.5.9/KittenEngineerRedux-0.5.9.zip"
     ]
   },
   "install_size": 116893,
