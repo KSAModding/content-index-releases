@@ -1,0 +1,58 @@
+{
+  "spec_version": 1,
+  "id": "NodeLock",
+  "type": "mod",
+  "version": "0.1.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-25T19:44:06Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "game_max": "2026.11.25.5949",
+  "game_max_revision": 5949,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/DymndLab/NodeLock/releases/download/v0.1.1/NodeLock-0.1.1.zip",
+    "sha256": "D10D9C53EA1D8849EC356339A901E3EBC15896F85576187993BD3B4BE24C4CE4",
+    "size": 29238,
+    "content_type": "application/zip"
+  },
+  "install_size": 61270,
+  "install": {
+    "root": "NodeLock",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [
+    {
+      "id": "PurrlineTessera",
+      "kind": "optional",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/DymndLab/NodeLock/releases/tag/v0.1.1",
+  "changelog_text": "Updated for KSA Build v2026.11.25.5949. Requires Windows and StarMap 0.5.4 or later.\n\nThe editor smoke test passed in Borea. Includes the battery and tank bay compatibility patches.",
+  "listing": {
+    "name": "NodeLock",
+    "authors": [
+      "Dymnd"
+    ],
+    "abstract": "Lock attachment nodes while placing parts, with battery and tank bay compatibility included.",
+    "description": "Keep a part snapped to the attachment node you choose while rotating it into place. Hover over a node and tap Tab to lock it, rotate with WASD/QE, then click to attach. Tap Tab again to unlock. Includes bay compatibility for radial batteries and spherical tanks.",
+    "license": "MIT",
+    "tags": [
+      "editor"
+    ],
+    "links": {
+      "repository": "https://github.com/DymndLab/NodeLock",
+      "bugtracker": "https://github.com/DymndLab/NodeLock/issues",
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/nodelock-attachment-node-tool-for-ksa.1771/"
+    }
+  }
+}
