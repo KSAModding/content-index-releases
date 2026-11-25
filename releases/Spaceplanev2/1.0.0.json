@@ -1,0 +1,44 @@
+{
+  "spec_version": 1,
+  "id": "Spaceplanev2",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-25T13:13:48Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/Spaceplanev2/1.0.0",
+    "sha256": "0ED6FB0B069C450A90DCD53BA2C5CB55AD727E08EE70D39F356036FC744F4E02",
+    "size": 14533,
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-spaceplanev2-1_0_0-2908e7f1/Spaceplanev2-1.0.0.zip"
+    ]
+  },
+  "install_size": 184133,
+  "install": {
+    "root": "Spaceplane v2",
+    "derived": true,
+    "folder": "Spaceplane v2"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Spaceplane v2",
+    "authors": [
+      "LefTab"
+    ],
+    "abstract": "New wing improves atmospheric flight",
+    "description": "This wing removes the need for timewarp to control the attitude! The old design needed at least x2 timewarp which either changes the flight physics or makes the rcs more powerful, or something else? Either way, this one seems to work better.\n\nFeatures room for 2 kittens, a docking port, solar panels, parachutes, and plenty of rcs propellant for your orbital maneuvering needs.\nAlso has a probe core.\n\nINSTRUCTIONS:\n\nGoes to orbit as any normal rocket.\nReenter by burning your RCS retrograde, then align for reentry using OVEL OUT with ROLL set to NORM.\nYou'll start losing speed at about ~75 km altitude. At round ~30 km you can start gliding around by switching to SURF RATE\nFly around as you please, and use the drogue and main chutes to land, preferably in water (landing on land might cause unscheduled disassembly)\n\nI find docking is easiest when controlling from the docking port by right clicking, then using the docking camera.\n\n## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-44)\n\n![Screenshot 2](ksa-image:screenshot-45)\n\n![Screenshot 3](ksa-image:screenshot-46)\n\n![Screenshot 4](ksa-image:screenshot-47)\n\n![Screenshot 5](ksa-image:screenshot-48)\n\n![Screenshot 6](ksa-image:screenshot-49)",
+    "license": "CC-BY-4.0",
+    "tags": [
+      "aircraft",
+      "spaceplane",
+      "shuttle"
+    ],
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/Spaceplanev2"
+    }
+  }
+}
