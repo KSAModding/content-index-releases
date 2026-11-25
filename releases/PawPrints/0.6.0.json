@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "PawPrints",
+  "type": "mod",
+  "version": "0.6.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-25T22:38:05Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "game_max": "2026.11.25.5949",
+  "game_max_revision": 5949,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/DymndLab/PawPrints/releases/download/v0.6.0/PawPrints-0.6.0.zip",
+    "sha256": "8F1BFC0353ED7520158A3E16D33D0B27CA342E6EC85A735E99AF241BB9421EAE",
+    "size": 1847639,
+    "content_type": "application/zip"
+  },
+  "install_size": 3024733,
+  "install": {
+    "root": "PawPrints",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "max": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/DymndLab/PawPrints/releases/tag/v0.6.0",
+  "changelog_text": "Supports Windows x64 with KSA 2026.11.25.5949 and StarMap 0.5.4. Native Linux testing is pending.\n\n- Start with a blank sheet, a template, or a drag-and-drop grid with linked first- or third-angle projections.\n- Save and reopen editable drawings, and import or export preferences between profiles.\n- Re-root exploded views around a subassembly. Place a kitten or banana at a drawing view's scale and orientation.\n- Add lettering rubs, tears and coffee rings to the sheet. Preview the final 4K PNG and check its file size before saving.\n\nLoad a craft in the Vehicle Editor and choose **Editor → Open PawPrint Editor**, or press **Ctrl+Alt+P**.",
+  "listing": {
+    "name": "PawPrints",
+    "authors": [
+      "Dymnd"
+    ],
+    "abstract": "Create blueprint-style craft drawings inside Kitten Space Agency, with projected and exploded views, annotations, and performance blocks.",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/pawprints-technical-drawings-creation-for-ksa-craft.1726/",
+      "repository": "https://github.com/DymndLab/PawPrints",
+      "bugtracker": "https://github.com/DymndLab/PawPrints/issues"
+    }
+  }
+}
