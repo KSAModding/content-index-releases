@@ -1,0 +1,49 @@
+{
+  "spec_version": 1,
+  "id": "wobbly-windows",
+  "type": "mod",
+  "version": "1.10.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-25T20:22:34Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/meow-sci/wobbly-windows/releases/download/v1.10.0/wobbly-windows-1.10.0.zip",
+    "sha256": "737AEC7F506BEA6C1639D3E731E1B063C9ACF7D15729B86A3AB72CEC00DAE2A5",
+    "size": 24912,
+    "content_type": "application/zip"
+  },
+  "install_size": 46901,
+  "install": {
+    "root": "wobbly-windows",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/meow-sci/wobbly-windows/releases/tag/v1.10.0",
+  "changelog_text": "**Updating:** back up `settings.json` from your existing `wobbly-windows/` folder, delete that old mod folder, extract the new `wobbly-windows/` folder, then restore your saved settings. Restart KSA after updating.\n\n**Full Changelog**: https://github.com/meow-sci/wobbly-windows/compare/v1.9.0...v1.10.0",
+  "listing": {
+    "name": "Wobbly Windows",
+    "authors": [
+      "Alex",
+      "tomservo"
+    ],
+    "abstract": "wobbly wobble wobble",
+    "description": "wobbly wobble wobble\n\n![wobbly_01](ksa-image:wobbly_01)\n\n![wobbly_02](ksa-image:wobbly_02)\n\n![wobbly_03](ksa-image:wobbly_03)",
+    "license": "MIT",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/wobbly-windows.1566/",
+      "homepage": "https://github.com/meow-sci/wobbly-windows",
+      "repository": "https://github.com/meow-sci/wobbly-windows",
+      "bugtracker": "https://github.com/meow-sci/wobbly-windows/issues"
+    }
+  }
+}
