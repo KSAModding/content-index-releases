@@ -1,0 +1,54 @@
+{
+  "spec_version": 1,
+  "id": "PurrlineFairings",
+  "type": "mod",
+  "version": "1.0.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-25T11:24:27Z",
+  "game_min": "2026.11.10.5801",
+  "game_min_revision": 5801,
+  "download": {
+    "url": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFairings/releases/download/v1.0.2/PurrlineFairings-1.0.2.zip",
+    "sha256": "0CFB6BF2648C7A8D8561F2EB83185EEAACDB4AB2A42D1A5A7DF86A54B12E3362",
+    "size": 25125411,
+    "content_type": "application/zip"
+  },
+  "install_size": 25856656,
+  "install": {
+    "root": "PurrlineFairings",
+    "derived": true
+  },
+  "dependencies": [
+    {
+      "id": "PurrlinePrisma",
+      "kind": "conflict",
+      "max": "1.0.0",
+      "source": "authored"
+    },
+    {
+      "id": "PurrlineFacet",
+      "kind": "suggests",
+      "source": "authored"
+    }
+  ],
+  "changelog": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFairings/releases/tag/v1.0.2",
+  "changelog_text": "## Changes\n- Marks the mod as compatible with KSA 2026.11.25.5949. No functional changes.\n\n## Compatibility\nValidated against KSA build version **2026.11.25.5949**.\n\n## Installation\nExtract into `Documents\\My Games\\Kitten Space Agency\\mods\\PurrlineFairings\\`. No mod loader is needed.",
+  "listing": {
+    "name": "Fairings by Purrline Rocketworks",
+    "authors": [
+      "Maxi"
+    ],
+    "abstract": "Payload fairings in 2 m and 3 m with three lengths each, white or black carbon, with bases for 2 m and 3 m stacks and hammerhead bases from 2 m to 3 m and from 3 m to 4 m.",
+    "description": "![The fairing family in orbit](ksa-image:family)\n\n**Fairings** is a set of payload fairings for Kitten Space Agency, from the fictional rocket maker **Purrline Rocketworks**. The sizes fit the stock 2 m and 3 m tanks, and the hammerhead bases put a wider fairing on a narrower stage.\n\n## Parts\n\n- **Fairing Half 2 m Short**, **Medium** and **Long**: fairing halves of 4.55, 6.10 and 7.65 m; place two.\n- **Fairing Half 3 m Short**, **Medium** and **Long**: fairing halves of 7.60, 9.15 and 12.25 m.\n- **Fairing Base 2 m** and **Fairing Base 3 m**: base rings with a payload adapter.\n- **Fairing Base 2 m to 3 m** and **Fairing Base 3 m to 4 m**: hammerhead bases; a 3 m half at scale 1.33 makes the 4 m fairing.\n\nEvery half and both hammerhead bases come in white paint or black carbon (press V on a placed part). The halves fall away to show their quilted acoustic blankets. Attach radial equipment to the payload or base, because the editor no longer snaps it to a fairing half. With the scale tool of the editor the 2 m set also makes a 1 m fairing.\n\n![All parts and both looks](ksa-image:all-parts)\n\n![The acoustic blanket inside the halves](ksa-image:interior)\n\n![The hammerhead bases](ksa-image:hammerheads)\n\n## Prisma\n\nThe 2 m medium half and the 2 m base were the fairing of Prisma by Purrline Rocketworks 1.0.0 and keep their part Ids, so saved Prisma vehicles load with their fairing. Prisma 1.1.0 and later contain the same 2 m fairing, so you can install Prisma and Fairings together, in any mod order. Update Prisma to 1.1.0 or later before you enable Fairings: Prisma 1.0.0 contains the same fairing parts in an older form, and with both enabled the fairing does not load.\n\n## Install\n\n- Borea: install Fairings from the content list.\n- By hand: copy `PurrlineFairings` from the release zip into `Documents/My Games/Kitten Space Agency/mods/` and enable it.\n\nTo remove the mod, delete its folder. Vehicles with its parts do not load without it.\n\nValidated against KSA build 2026.11.16.5901.\n\nCode and game data are MIT. Meshes, textures, logo and pictures are CC BY 4.0.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "parts"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/fairings-by-purrline-rocketworks.1679/",
+      "repository": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFairings",
+      "bugtracker": "https://github.com/Maximilian-Nesslauer/KSA-PurrlineFairings/issues"
+    }
+  }
+}
