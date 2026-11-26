@@ -1,0 +1,53 @@
+{
+  "spec_version": 1,
+  "id": "PawPrints",
+  "type": "mod",
+  "version": "0.6.2",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-26T06:33:19Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "game_max": "2026.11.25.5949",
+  "game_max_revision": 5949,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/DymndLab/PawPrints/releases/download/v0.6.2/PawPrints-0.6.2.zip",
+    "sha256": "57318837B8A0208A77C2CA38FC610D40119E2B1DDDC7A83F0F322063D8320A6D",
+    "size": 1852023,
+    "content_type": "application/zip"
+  },
+  "install_size": 3035710,
+  "install": {
+    "root": "PawPrints",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "max": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/DymndLab/PawPrints/releases/tag/v0.6.2",
+  "changelog_text": "Supports **Windows x64**, **KSA 2026.11.25.5949**, and **StarMap 0.5.4**. Native Linux testing is pending.\n\n- PawPrints closes when you leave the Vehicle Editor, so an unfinished New Drawing screen won’t carry over into the next editor session.\n- Exploded views use the same parts-table letter as other views for the same part. Right-click a part label to switch between its table symbol and full text.\n- Choose circular parts-table symbols or picket-shaped flagnote symbols in Preferences. Right-click an existing symbol to change its shape on the drawing.\n- Remove individual marks under **Place → Placed wear**. **Ctrl+Z** restores the removed mark.",
+  "listing": {
+    "name": "PawPrints",
+    "authors": [
+      "Dymnd"
+    ],
+    "abstract": "Create blueprint-style craft drawings inside Kitten Space Agency, with projected and exploded views, annotations, and performance blocks.",
+    "description": "Turn the craft in your Vehicle Editor into a blueprint you can save, edit and share.\n\n- Start with a blank sheet, use a template, or drag views into a snapping grid. Choose first- or third-angle projection and scale linked views together.\n- Create exploded views of a whole craft or a subassembly. Add part labels, flagnotes, dimensions, performance tables and a custom title block.\n- Pick a paper theme, add wear, or place a kitten or banana for scale.\n- Save an editable drawing to reopen later. Preview your final 4K PNG and its file size before saving it.\n\nLoad a craft in the Vehicle Editor and choose **Editor > Open PawPrint Editor** or press **Ctrl+Alt+P**.\n",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "tools"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/pawprints-technical-drawings-creation-for-ksa-craft.1726/",
+      "repository": "https://github.com/DymndLab/PawPrints",
+      "bugtracker": "https://github.com/DymndLab/PawPrints/issues"
+    }
+  }
+}
