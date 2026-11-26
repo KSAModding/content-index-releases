@@ -813,8 +813,12 @@ class GitHubHost(Host):
             return assets[0] if assets else None
 
         identifier = self.listing_id.lower()
-        tag = (payload.get("tag_name") or "")[len(self.tag_prefix):].lstrip("vV").lower()
-        for wanted in (f"{identifier}.zip", f"{identifier}-{tag}.zip", f"{identifier}_{tag}.zip"):
+        full_tag = (payload.get("tag_name") or "").lower()
+        tag = full_tag[len(self.tag_prefix):].lstrip("v")
+        names = [f"{identifier}.zip", f"{identifier}-{tag}.zip", f"{identifier}_{tag}.zip"]
+        if self.tag_prefix:
+            names.append(f"{identifier}-{full_tag}.zip")
+        for wanted in names:
             for asset in assets:
                 if asset["name"].lower() == wanted:
                     return asset

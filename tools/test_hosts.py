@@ -700,6 +700,17 @@ class TagPrefix(unittest.TestCase):
             chosen = self.host(prefix)._release(payload)
             self.assertEqual(chosen.asset_name, "gatOS-1.2.0.zip", msg=prefix)
 
+    def test_the_full_tag_is_the_last_exact_match(self):
+        full = "krpc-ksa-v1.2.3.zip"
+        platform = "krpc-ksa-v1.2.3-linux.zip"
+        stub = "krpc-cpp-v1.2.3.zip"
+        host = GitHubHost("o/gatos", FakeHttp({}), "kRPC", tag_prefix="ksa-v", content_type="mod")
+        chosen = host._release(gatos_release("ksa-v1.2.3", stub, platform, full))
+        self.assertEqual(chosen.asset_name, full)
+        self.assertEqual([(asset.platform, asset.name) for asset in chosen.platforms], [("linux", platform)])
+        preferred = host._release(gatos_release("ksa-v1.2.3", full, "krpc_1.2.3.zip"))
+        self.assertEqual(preferred.asset_name, "krpc_1.2.3.zip")
+
     def test_the_prefix_is_part_of_the_key(self):
         self.assertEqual(self.host("").key, "github:o/gatos")
         self.assertEqual(self.host("gatos-v").key, "github:o/gatos#gatos-v")
