@@ -1690,16 +1690,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 21,
+      "total": 22,
       "hosts": {
-        "ksamods": 21
+        "ksamods": 22
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 21,
+          "total": 22,
           "hosts": {
-            "ksamods": 21
+            "ksamods": 22
           }
         }
       ]
