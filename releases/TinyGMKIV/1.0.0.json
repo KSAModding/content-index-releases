@@ -1,0 +1,36 @@
+{
+  "spec_version": 1,
+  "id": "TinyGMKIV",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-27T22:24:49Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/TinyGMKIV/1.0.0",
+    "sha256": "BFE0E587FBD05365E686F00E74EBF2C507FED99B6EB04E67E0773EB2C1C0AFA8",
+    "size": 2762,
+    "content_type": "application/zip"
+  },
+  "install_size": 26585,
+  "install": {
+    "root": "Tiny G MK IV",
+    "derived": true,
+    "folder": "Tiny G MK IV"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Tiny G MK IV",
+    "authors": [
+      "Goddchen"
+    ],
+    "abstract": "Lightest Rocket to LEO (5.81t)",
+    "description": "## Screenshots\n\n![Screenshot 1](ksa-image:screenshot-52)",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/TinyGMKIV"
+    }
+  }
+}
