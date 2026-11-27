@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "ModernUI",
+  "type": "mod",
+  "version": "0.2.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-27T16:59:05Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "download": {
+    "url": "https://github.com/ericnondahl/ModernUI/releases/download/v0.2.0/ModernUI.zip",
+    "sha256": "1B8E76986DB66FE2EF8BD83A36B6E34BD0D847AA8E4F1BE4B48DAC0A9F7B639F",
+    "size": 238773,
+    "content_type": "application/zip"
+  },
+  "install_size": 489647,
+  "install": {
+    "root": "ModernUI",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/ericnondahl/ModernUI/releases/tag/v0.2.0",
+  "changelog_text": "Adds HUD colours and a staging list you can read and rearrange in flight.\n\n- **HUD colour.** **Mods → ModernUI colour** draws the whole HUD in amber, orange, cyan, green or pink instead of white. It is saved in `settings.json`.\n- **See what each stage fires.** Each stage lists its actions as chips: engines with their fuel, decouplers and parachutes. Hover a chip to light its parts on the vessel and see its name. Closed, the staging header still shows what the next stage fires.\n- **Restage in flight.** Drag a chip to another stage, or drag a stage by its name to reorder. Both go through the game's own staging code, as the stock panel's drags do. Stages that have already fired can't be changed.\n- **Long staging lists scroll.** The open list is about six stages tall. Strips above and below name the hidden stages; click one or use the mouse wheel, and hold a dragged chip over a strip to scroll to a hidden stage. Before, stages past the eighth were hidden with no sign, and a long list pushed the crew card over the rings.\n- **Unnamed parts get names.** Parts the game leaves unnamed are named from their tags (escape tower, interstellar drive, heatshield, interstage, service module).\n\n![Staging: hover an action, drag it to another stage, drag a stage to reorder](https://github.com/ericnondahl/ModernUI/blob/main/images/staging.jpg?raw=true)\n\n**Install:** unzip `ModernUI.zip` into your mods folder (you get `mods/ModernUI/`), enable ModernUI, and start the game through StarMap. Or install it with Borea: find ModernUI in Discover.\n\n**Dependencies:** [StarMap](https://github.com/StarMapLoader/StarMap) 0.5.4 or later (Borea installs it for you). Built for KSA 2026.11.25.5949. Tested on Windows and macOS (the community Mac port); Linux untested so far.\n\n**License:** MIT (see LICENSE). The bundled [Barlow](https://github.com/jpt/barlow) fonts (version 1.408) are under the SIL Open Font License 1.1; their license and the other notices are in THIRD_PARTY_NOTICES.md, in the zip and the repository.",
+  "listing": {
+    "name": "ModernUI",
+    "authors": [
+      "ericnondahl"
+    ],
+    "abstract": "A launch-webcast style flight HUD that replaces every stock flight gauge",
+    "description": "# ModernUI\n\nA flight HUD in the style of a launch webcast: flat, black and white, thin rings and big\nnumbers. It replaces every stock flight gauge, controls included, and stays out of the way\nwhen nothing needs you.\n\n![ModernUI in flight](ksa-image:Flight)\n\n- **Rings** for speed (filling towards orbit) and altitude; apoapsis and periapsis with\n  warp-to.\n- **A line-drawn navball** with every marker, heading, pitch, roll and their rates.\n- **Engine deck**: delta-v, TWR, stage; ignite, shutdown, stage, RCS.\n- **Staging list** with each stage's delta-v, TWR, Isp and burn time, and what it fires\n  (engines with their fuel, decouplers, parachutes). Drag an action to another stage, or a\n  stage to reorder, in flight.\n- **Crew as wireframe cats**, with life support, power, radiation, and every vessel's next\n  crew deadline.\n- **Autopilot**, **burn control**, a **map-view burn editor**, a **target card**, and EVA\n  controls.\n- **Three modes** (P): CLEAN (the webcast look), FLIGHT (panels fold to short headers), FULL.\n- **Six colours**: white, amber, orange, cyan, green or pink (Mods → ModernUI colour).\n\nEvery control does what the stock button does, through the same game code.\n\n![Staging: hover an action to see it on the rocket, drag it to another stage, drag a stage to reorder](ksa-image:Staging)\n\n![The HUD in each colour: white, amber, orange, cyan, green, pink](ksa-image:Colours)\n\n![Ascent in CLEAN mode](ksa-image:Clean)\n\n![Autopilot in orbit](ksa-image:Autopilot)\n\n![Burn editor in map view](ksa-image:BurnEditor)\n\n![EVA](ksa-image:Eva)\n\nTested on Windows and macOS (the community Mac port); reports from Linux are welcome.",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/modernui-0-1-0-a-launch-webcast-style-flight-hud.1821/",
+      "repository": "https://github.com/ericnondahl/ModernUI",
+      "bugtracker": "https://github.com/ericnondahl/ModernUI/issues"
+    }
+  }
+}
