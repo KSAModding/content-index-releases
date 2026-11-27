@@ -1,0 +1,35 @@
+{
+  "spec_version": 1,
+  "id": "BenderLaunchStack",
+  "type": "vehicle",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-27T16:44:56Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "download": {
+    "url": "https://ksamods.gg/share/files/vehicle/BenderLaunchStack/1.0.0",
+    "sha256": "9569DA39FAB5419DFE1BC635E857301C7E58CE5FE1D04C0D6C90B7297A899017",
+    "size": 122960,
+    "content_type": "application/zip"
+  },
+  "install_size": 3582837,
+  "install": {
+    "root": "Bender Launch Stack",
+    "derived": true,
+    "folder": "Bender Launch Stack"
+  },
+  "dependencies": [],
+  "listing": {
+    "name": "Bender Launch Stack",
+    "authors": [
+      "Tomservo"
+    ],
+    "abstract": "Tomservo's Bender on a launch stack",
+    "license": "CC-BY-4.0",
+    "links": {
+      "homepage": "https://ksamods.gg/vehicles/BenderLaunchStack"
+    }
+  }
+}
