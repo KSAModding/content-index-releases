@@ -1,0 +1,46 @@
+{
+  "spec_version": 1,
+  "id": "PrincipiaKSA",
+  "type": "mod",
+  "version": "1.3.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-26T23:34:06Z",
+  "game_min": "2026.11.16.5901",
+  "game_min_revision": 5901,
+  "download": {
+    "url": "https://github.com/parsaes80/PrincipiaKSA/releases/download/v1.3.1/PrincipiaKSA.zip",
+    "sha256": "ABD1D7E10AEA742F976C09B3A0D36385F79941C4F78EBC22A0A28C5534DC2E91",
+    "size": 23348315,
+    "content_type": "application/zip"
+  },
+  "install_size": 23345497,
+  "install": {
+    "root": "PrincipiaKSA",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.0",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/parsaes80/PrincipiaKSA/releases/tag/v1.3.1",
+  "changelog_text": "**Requires KSA 2026.11.16 or newer** (plus StarMap 0.5.0+, and a CPU with AVX and FMA, or Apple Silicon).\nOlder KSA builds can crash on near-parabolic orbits, which KSA itself fixed in 2026.11.16.\n\n### Faster time warp\nHigh warp is several times faster with n-body vessels. \n\n- **Looser integration for long steps.** A vessel's n-body step keeps Principia's 1 mm accuracy at normal warp\n  and relaxes it gradually (1 mm per minute of step, up to 1 m) for the very long steps of high warp, which makes\n  them several times cheaper. Over five simulated years in low orbit, the orbit's size, shape, inclination and\n  node regression stay the same as at full accuracy; only the vessel's position along its orbit drifts slightly.\n- **No more replanning other vessels every step.** Keeping KSA's orbits on the n-body path used to make KSA\n  recompute those vessels' whole flight plans almost every frame (the \"Final Calcs\" rows in KSA's warp overlay).\n  They now just get their updated orbit.\n\nLow orbits at max warp are still slower than in the unmodded game: n-body integration costs more the more game\ntime each frame covers.\n\n### Lighter on the CPU while coasting\nThe prediction and flight plan were recomputed every frame. While you coast and nothing changes, they are now\nupdated twice a second, which gives the same path for a fraction of the work. Anything you do (dragging or editing\na node, changing settings, the frame or the target, staging, firing engines or RCS) still updates them at once.\n\n### Removed\n- The workaround for KSA's near-parabolic orbit crash, now fixed in KSA itself (hence the version requirement).\n- The extra logging added to track down the burn divide-by-zero, fixed in v1.3.0.\n\n### Under the hood\nA cleanup of the whole codebase: dead code removed, small helpers inlined, comments trimmed. No behaviour change.",
+  "listing": {
+    "name": "PrincipiaKSA",
+    "authors": [
+      "SMOKE"
+    ],
+    "abstract": "Replaces the games Kepler based gravity, with more realistic N-body Gravity.",
+    "description": "This mod replaces the game's simplified gravity model and replaces it with N-body simulation. Such a mod called Principia(https://github.com/mockingbirdnest/Principia) existed for KSP and now repo has ported it to KSA. N-body gravity works by calculating all the gravity forces acting on an object not just 2 like the default KSA one, so as a result the path of a vessel in sapce can be much more complicated and realistic than the normal game. This simulation demands alot of CPU power and may cause stuttering in heavy simulation moments. Principia offers much more depth to game and is very fun for people who have mastered the games own physics.\n\n![text](ksa-image:OrbitlLines)",
+    "license": "MIT",
+    "tags": [
+      "gameplay"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/principiaksa.1557/",
+      "repository": "https://github.com/parsaes80/PrincipiaKSA"
+    }
+  }
+}
