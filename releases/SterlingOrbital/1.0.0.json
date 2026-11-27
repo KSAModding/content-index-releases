@@ -1,0 +1,52 @@
+{
+  "spec_version": 1,
+  "id": "SterlingOrbital",
+  "type": "mod",
+  "version": "1.0.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-26T00:54:33Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "os": [
+    "windows"
+  ],
+  "download": {
+    "url": "https://github.com/SterlingOrbital/SterlingOrbital/releases/download/v1.0.0/SterlingOrbital_v1.0.0.zip",
+    "sha256": "4B0C1E76ABBAA1E7C5404D85A14C94FE4F47B1BF5E94D7F6958B68902C53351A",
+    "size": 97983446,
+    "content_type": "application/x-zip-compressed"
+  },
+  "install_size": 183623140,
+  "install": {
+    "root": "SterlingOrbital",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/SterlingOrbital/SterlingOrbital/releases/tag/v1.0.0",
+  "changelog_text": "First public release of the Sterling Orbital Sparrow Launch System for Kitten Space Agency.\n\n**Download `SterlingOrbital_v1.0.0.zip` below** and copy the `SterlingOrbital` folder into `Documents\\My Games\\Kitten Space Agency\\mods\\`, then enable it in `manifest.toml`. The flight software needs the StarMap mod loader.\n\n### Included\n- Sparrow reusable two-stage rocket: first stage (clean, sooted and plain liveries), interstage, second stage, payload adapter, fairing, grid fins, landing legs, 24 built-in attitude thrusters\n- Anvil 1D sea-level engines\n- Octaweb with 9 / 3 / 1 engine sets to ignite\n- Anvil Vac upper-stage engine\n- Drone ship \"It Was Never Goodbye\"\n- Flight software: mission control panel (Sterling Orbital menu in the top bar, or Ctrl+Shift+F)\n- Launch webcast UI\n- Automated ascent, boostback or drone ship recovery, entry and landing burns, RECOVER VEHICLE after landing.\n\n### Requirements\n- Kitten Space Agency build 2026.11.25.5949 or newer\n- StarMap mod loader\n\n### Known limitations\n- The guidance system is not perfect, but excitement is guaranteed.\n- Automated flights launch from KSC (LC-39A) only in this version\n- First-stage soot is not kept when a save is reloaded\n\n### License and source\n- Code: MIT. Source: [source/SterlingFlight](https://github.com/SterlingOrbital/SterlingOrbital/tree/main/source/SterlingFlight) in this repo\n- Parts, models, textures: CC BY 4.0 (credits in the README)\n- Bai Jamjuree font: SIL OFL 1.1\n- Full text in `LICENSE` (repository root and inside the mod folder)\n\nSee the README for full instructions and credits.",
+  "listing": {
+    "name": "Sterling Orbital: Sparrow Launch System",
+    "authors": [
+      "Sterling Orbital"
+    ],
+    "abstract": "A reusable two-stage rocket with its own engines, a drone ship, and flight software that flies the whole mission and lands the booster back at the pad or at sea.",
+    "description": "The Sparrow is a reusable two-stage rocket for Kitten Space Agency. The flight software flies the whole mission:\nascent, staging, boostback or drone ship recovery, and a propulsive landing of the first stage.\n\nWhat's included:\n\n- Parts: first stage (clean and sooted liveries), interstage with built-in attitude thrusters, second stage, payload\n  adapter, fairing halves, grid fins, landing legs, the octaweb with nine Anvil 1D engines, and the Anvil Vac\n  upper-stage engine.\n- The autonomous drone ship \"It Was Never Goodbye\".\n- Flight software: mission control panel (Sterling Orbital menu or Ctrl+Shift+F), launch webcast, booster guidance\n  and landing, grid fin aerodynamics, landing leg suspension, engine sets (9 / 3 / 1), first-stage soot after the\n  entry and landing burns.\n\nAutomated flights launch from KSC (LC-39A) for now.\n\nParts derived from \"Falcon 9 - SpaceX\" by Stanley Creative, CC BY 4.0. Not affiliated with or endorsed by Space\nExploration Technologies Corp.\n",
+    "license": "MIT AND CC-BY-4.0",
+    "tags": [
+      "parts",
+      "gameplay",
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/sterling-orbital-sparrow-launch-system-reusable-rocket-autopilot-landings.1813/",
+      "repository": "https://github.com/SterlingOrbital/SterlingOrbital",
+      "bugtracker": "https://github.com/SterlingOrbital/SterlingOrbital/issues"
+    }
+  }
+}
