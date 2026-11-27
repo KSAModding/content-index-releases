@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "ModernUI",
+  "type": "mod",
+  "version": "0.1.1",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-27T01:32:10Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "download": {
+    "url": "https://github.com/ericnondahl/ModernUI/releases/download/v0.1.1/ModernUI.zip",
+    "sha256": "E8019895A952A3BC02103D98CD1AD826DAE74EE7F10FCE70D004F1A32591BF11",
+    "size": 227413,
+    "content_type": "application/zip"
+  },
+  "install_size": 466103,
+  "install": {
+    "root": "ModernUI",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/ericnondahl/ModernUI/releases/tag/v0.1.1",
+  "changelog_text": "Makes ModernUI fail safe when a game update breaks something it uses. KSA is in pre-alpha and ModernUI reaches into the game's internals, so a new build can rename or remove something it relies on.\n\n- **The stock HUD comes back.** ModernUI switches itself off for the session, the stock HUD returns, and the error goes once into `logs/console.log`. **Mods → ModernUI** says it is off, and ticking it tries again.\n- **Missing pieces are skipped.** If something ModernUI hooks into is gone, only that feature is lost (for example, alerts keep their stock position); the rest keeps working. Before, it could stop the whole mod loading.\n- **One-off errors no longer switch it off.** An occasional error just skips a frame.\n\nIf ModernUI switches itself off after a game update, please report it with the `ModernUI:` lines from `logs/console.log`.\n\n**Install:** unzip `ModernUI.zip` into your mods folder (you get `mods/ModernUI/`), enable ModernUI, and start the game through StarMap. Or install it with Borea: find ModernUI in Discover.\n\n**Dependencies:** [StarMap](https://github.com/StarMapLoader/StarMap) 0.5.4 or later (Borea installs it for you). Built for KSA 2026.11.25.5949. Tested on Windows and macOS (the community Mac port); Linux untested so far.\n\n**License:** MIT (see LICENSE). The bundled [Barlow](https://github.com/jpt/barlow) fonts (version 1.408) are under the SIL Open Font License 1.1; their license and the other notices are in THIRD_PARTY_NOTICES.md, in the zip and the repository.",
+  "listing": {
+    "name": "ModernUI",
+    "authors": [
+      "ericnondahl"
+    ],
+    "abstract": "A launch-webcast style flight HUD that replaces every stock flight gauge",
+    "description": "# ModernUI\n\nA flight HUD in the style of a launch webcast: flat, black and white, thin rings and big\nnumbers. It replaces every stock flight gauge, controls included, and stays out of the way\nwhen nothing needs you.\n\n![ModernUI in flight](ksa-image:Flight)\n\n- **Rings** for speed (filling towards orbit) and altitude; apoapsis and periapsis with\n  warp-to.\n- **A line-drawn navball** with every marker, heading, pitch, roll and their rates.\n- **Engine deck**: delta-v, TWR, stage; ignite, shutdown, stage, RCS.\n- **Staging list** with each stage's delta-v, TWR, Isp and burn time.\n- **Crew as wireframe cats**, with life support, power, radiation, and every vessel's next\n  crew deadline.\n- **Autopilot**, **burn control**, a **map-view burn editor**, a **target card**, and EVA\n  controls.\n- **Three modes** (P): CLEAN (the webcast look), FLIGHT (panels fold to one line), FULL.\n\nEvery control does what the stock button does, through the same game code.\n\n![Ascent in CLEAN mode](ksa-image:Clean)\n\n![Autopilot in orbit](ksa-image:Autopilot)\n\n![Burn editor in map view](ksa-image:BurnEditor)\n\n![EVA](ksa-image:Eva)\n\nTested on Windows and macOS (the community Mac port); reports from Linux are welcome.",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/modernui-0-1-0-a-launch-webcast-style-flight-hud.1821/",
+      "repository": "https://github.com/ericnondahl/ModernUI",
+      "bugtracker": "https://github.com/ericnondahl/ModernUI/issues"
+    }
+  }
+}
