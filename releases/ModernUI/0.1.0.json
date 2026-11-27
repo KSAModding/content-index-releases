@@ -1,0 +1,47 @@
+{
+  "spec_version": 1,
+  "id": "ModernUI",
+  "type": "mod",
+  "version": "0.1.0",
+  "version_scheme": "semver",
+  "release_status": "stable",
+  "release_date": "2026-11-27T00:33:22Z",
+  "game_min": "2026.11.25.5949",
+  "game_min_revision": 5949,
+  "download": {
+    "url": "https://github.com/ericnondahl/ModernUI/releases/download/v0.1.0/ModernUI.zip",
+    "sha256": "71CCBB713AF91EADFB472BEF1C73E13CB5FF4B6C90E8566111795F1B56B55D15",
+    "size": 225475,
+    "content_type": "application/zip"
+  },
+  "install_size": 463179,
+  "install": {
+    "root": "ModernUI",
+    "derived": true
+  },
+  "loader": {
+    "id": "StarMap",
+    "min": "0.5.4",
+    "source": "authored"
+  },
+  "dependencies": [],
+  "changelog": "https://github.com/ericnondahl/ModernUI/releases/tag/v0.1.0",
+  "changelog_text": "First release of ModernUI: a launch-webcast style flight HUD for Kitten Space Agency that replaces every stock flight gauge, controls included.\n\n**Install:** unzip `ModernUI.zip` into your mods folder (you get `mods/ModernUI/`), enable ModernUI, and start the game through StarMap. Or install it with Borea once it is in the content index.\n\n**Dependencies:** [StarMap](https://github.com/StarMapLoader/StarMap) 0.5.4 or later (Borea installs it for you). Built for KSA 2026.11.25.5949. Tested on Windows and macOS (the community Mac port); Linux untested so far.\n\n**Keys:** P cycles the modes (CLEAN, FLIGHT, FULL). Mods → ModernUI in the menu bar turns it off.\n\n**License:** MIT (see LICENSE). The bundled [Barlow](https://github.com/jpt/barlow) fonts (version 1.408) are under the SIL Open Font License 1.1; their license and the other notices are in THIRD_PARTY_NOTICES.md, in the zip and the repository.",
+  "listing": {
+    "name": "ModernUI",
+    "authors": [
+      "ericnondahl"
+    ],
+    "abstract": "A launch-webcast style flight HUD that replaces every stock flight gauge",
+    "description": "# ModernUI\n\nA flight HUD in the style of a launch webcast: flat, black and white, thin rings and big\nnumbers. It replaces every stock flight gauge, controls included, and stays out of the way\nwhen nothing needs you.\n\n![ModernUI in flight](ksa-image:Flight)\n\n- **Rings** for speed (filling towards orbit) and altitude; apoapsis and periapsis with\n  warp-to.\n- **A line-drawn navball** with every marker, heading, pitch, roll and their rates.\n- **Engine deck**: delta-v, TWR, stage; ignite, shutdown, stage, RCS.\n- **Staging list** with each stage's delta-v, TWR, Isp and burn time.\n- **Crew as wireframe cats**, with life support, power, radiation, and every vessel's next\n  crew deadline.\n- **Autopilot**, **burn control**, a **map-view burn editor**, a **target card**, and EVA\n  controls.\n- **Three modes** (P): CLEAN (the webcast look), FLIGHT (panels fold to one line), FULL.\n\nEvery control does what the stock button does, through the same game code.\n\n![Ascent in CLEAN mode](ksa-image:Clean)\n\n![Autopilot in orbit](ksa-image:Autopilot)\n\n![Burn editor in map view](ksa-image:BurnEditor)\n\n![EVA](ksa-image:Eva)\n\nTested on Windows and macOS (the community Mac port); reports from Linux are welcome.",
+    "license": "MIT AND OFL-1.1",
+    "tags": [
+      "user-interface"
+    ],
+    "links": {
+      "forums": "https://forums.ahwoo.com/forums/kitten-space-agency/mod-releases/modernui-0-1-0-a-launch-webcast-style-flight-hud.1821/",
+      "repository": "https://github.com/ericnondahl/ModernUI",
+      "bugtracker": "https://github.com/ericnondahl/ModernUI/issues"
+    }
+  }
+}
