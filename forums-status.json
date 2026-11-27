@@ -289,6 +289,11 @@
       "in_sitemap": true
     },
     {
+      "id": "SterlingOrbital",
+      "thread": 1813,
+      "in_sitemap": false
+    },
+    {
       "id": "unscience",
       "thread": 1261,
       "in_sitemap": true
