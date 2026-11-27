@@ -1,7 +1,7 @@
 {
   "spec_version": 1,
-  "checked_at": "2026-11-26T12:00:51Z",
-  "counted_at": "2026-11-26T12:00:51Z",
+  "checked_at": "2026-11-27T13:06:51Z",
+  "counted_at": "2026-11-27T13:06:51Z",
   "listings": [
     {
       "id": "AccelerationAbsorbers",
@@ -181,7 +181,7 @@
     {
       "id": "ModernUI",
       "thread": 1821,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "ModMenu",
@@ -291,7 +291,7 @@
     {
       "id": "SterlingOrbital",
       "thread": 1813,
-      "in_sitemap": false
+      "in_sitemap": true
     },
     {
       "id": "unscience",
