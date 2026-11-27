@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/BenderLaunchStack/1.0.0",
     "sha256": "9569DA39FAB5419DFE1BC635E857301C7E58CE5FE1D04C0D6C90B7297A899017",
     "size": 122960,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-benderlaunchstack-1_0_0-00285932/BenderLaunchStack-1.0.0.zip"
+    ]
   },
   "install_size": 3582837,
   "install": {
