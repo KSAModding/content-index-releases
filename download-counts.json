@@ -3987,16 +3987,16 @@
     },
     {
       "id": "lander",
-      "total": 8,
+      "total": 9,
       "hosts": {
-        "ksamods": 8
+        "ksamods": 9
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 8,
+          "total": 9,
           "hosts": {
-            "ksamods": 8
+            "ksamods": 9
           }
         }
       ]
@@ -5120,16 +5120,16 @@
     },
     {
       "id": "PodRacerII",
-      "total": 20,
+      "total": 21,
       "hosts": {
-        "ksamods": 20
+        "ksamods": 21
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 20,
+          "total": 21,
           "hosts": {
-            "ksamods": 20
+            "ksamods": 21
           }
         }
       ]
@@ -5985,16 +5985,16 @@
     },
     {
       "id": "Spaceplanev2",
-      "total": 5,
+      "total": 9,
       "hosts": {
-        "ksamods": 5
+        "ksamods": 9
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 5,
+          "total": 9,
           "hosts": {
-            "ksamods": 5
+            "ksamods": 9
           }
         }
       ]
@@ -6268,16 +6268,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 26,
+      "total": 27,
       "hosts": {
-        "ksamods": 26
+        "ksamods": 27
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 25,
+          "total": 26,
           "hosts": {
-            "ksamods": 25
+            "ksamods": 26
           }
         },
         {
