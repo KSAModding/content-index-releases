@@ -12,7 +12,10 @@
     "url": "https://ksamods.gg/share/files/vehicle/TinyGMKIV/1.0.0",
     "sha256": "BFE0E587FBD05365E686F00E74EBF2C507FED99B6EB04E67E0773EB2C1C0AFA8",
     "size": 2762,
-    "content_type": "application/zip"
+    "content_type": "application/zip",
+    "mirrors": [
+      "https://archive.org/download/ksamods-vehicle-tinygmkiv-1_0_0-554dd303/TinyGMKIV-1.0.0.zip"
+    ]
   },
   "install_size": 26585,
   "install": {
