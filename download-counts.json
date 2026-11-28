@@ -776,16 +776,16 @@
     },
     {
       "id": "airplane",
-      "total": 18,
+      "total": 19,
       "hosts": {
-        "ksamods": 18
+        "ksamods": 19
       },
       "releases": [
         {
           "version": "1.0.1",
-          "total": 17,
+          "total": 18,
           "hosts": {
-            "ksamods": 17
+            "ksamods": 18
           }
         },
         {
@@ -891,32 +891,32 @@
     },
     {
       "id": "BenderLaunchStack",
-      "total": 0,
+      "total": 1,
       "hosts": {
-        "ksamods": 0
+        "ksamods": 1
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 0,
+          "total": 1,
           "hosts": {
-            "ksamods": 0
+            "ksamods": 1
           }
         }
       ]
     },
     {
       "id": "BlipA",
-      "total": 9,
+      "total": 11,
       "hosts": {
-        "ksamods": 9
+        "ksamods": 11
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 9,
+          "total": 11,
           "hosts": {
-            "ksamods": 9
+            "ksamods": 11
           }
         }
       ]
@@ -1750,16 +1750,16 @@
     },
     {
       "id": "fighterjettest",
-      "total": 22,
+      "total": 23,
       "hosts": {
-        "ksamods": 22
+        "ksamods": 23
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 22,
+          "total": 23,
           "hosts": {
-            "ksamods": 22
+            "ksamods": 23
           }
         }
       ]
@@ -4024,16 +4024,16 @@
     },
     {
       "id": "lander",
-      "total": 9,
+      "total": 10,
       "hosts": {
-        "ksamods": 9
+        "ksamods": 10
       },
       "releases": [
         {
           "version": "1.1.0",
-          "total": 9,
+          "total": 10,
           "hosts": {
-            "ksamods": 9
+            "ksamods": 10
           }
         }
       ]
@@ -4073,16 +4073,16 @@
     },
     {
       "id": "LunarLander",
-      "total": 53,
+      "total": 54,
       "hosts": {
-        "ksamods": 53
+        "ksamods": 54
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 53,
+          "total": 54,
           "hosts": {
-            "ksamods": 53
+            "ksamods": 54
           }
         }
       ]
@@ -6043,32 +6043,32 @@
     },
     {
       "id": "sillygoobshuttle",
-      "total": 8,
+      "total": 10,
       "hosts": {
-        "ksamods": 8
+        "ksamods": 10
       },
       "releases": [
         {
           "version": "0.9.0",
-          "total": 8,
+          "total": 10,
           "hosts": {
-            "ksamods": 8
+            "ksamods": 10
           }
         }
       ]
     },
     {
       "id": "Spaceplanev2",
-      "total": 11,
+      "total": 12,
       "hosts": {
-        "ksamods": 11
+        "ksamods": 12
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 11,
+          "total": 12,
           "hosts": {
-            "ksamods": 11
+            "ksamods": 12
           }
         }
       ]
@@ -6358,16 +6358,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 27,
+      "total": 28,
       "hosts": {
-        "ksamods": 27
+        "ksamods": 28
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 26,
+          "total": 27,
           "hosts": {
-            "ksamods": 26
+            "ksamods": 27
           }
         },
         {
@@ -6384,6 +6384,22 @@
             "ksamods": 0
           }
         },
+        {
+          "version": "1.0.0",
+          "total": 0,
+          "hosts": {
+            "ksamods": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "TinyGMKIV",
+      "total": 0,
+      "hosts": {
+        "ksamods": 0
+      },
+      "releases": [
         {
           "version": "1.0.0",
           "total": 0,
