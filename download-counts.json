@@ -1886,16 +1886,16 @@
     },
     {
       "id": "hangglider",
-      "total": 10,
+      "total": 11,
       "hosts": {
-        "ksamods": 10
+        "ksamods": 11
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 10,
+          "total": 11,
           "hosts": {
-            "ksamods": 10
+            "ksamods": 11
           }
         }
       ]
@@ -5826,16 +5826,16 @@
     },
     {
       "id": "Ringwingshuttle",
-      "total": 4,
+      "total": 5,
       "hosts": {
-        "ksamods": 4
+        "ksamods": 5
       },
       "releases": [
         {
           "version": "1.0.0",
-          "total": 4,
+          "total": 5,
           "hosts": {
-            "ksamods": 4
+            "ksamods": 5
           }
         }
       ]
@@ -6043,32 +6043,32 @@
     },
     {
       "id": "sillygoobshuttle",
-      "total": 10,
-      "hosts": {
-        "ksamods": 10
-      },
-      "releases": [
-        {
-          "version": "0.9.0",
-          "total": 10,
-          "hosts": {
-            "ksamods": 10
-          }
-        }
-      ]
-    },
-    {
-      "id": "Spaceplanev2",
       "total": 12,
       "hosts": {
         "ksamods": 12
       },
       "releases": [
         {
-          "version": "1.0.0",
+          "version": "0.9.0",
           "total": 12,
           "hosts": {
             "ksamods": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "Spaceplanev2",
+      "total": 13,
+      "hosts": {
+        "ksamods": 13
+      },
+      "releases": [
+        {
+          "version": "1.0.0",
+          "total": 13,
+          "hosts": {
+            "ksamods": 13
           }
         }
       ]
@@ -6358,16 +6358,16 @@
     },
     {
       "id": "TheHailMary",
-      "total": 28,
+      "total": 31,
       "hosts": {
-        "ksamods": 28
+        "ksamods": 31
       },
       "releases": [
         {
           "version": "1.3.0",
-          "total": 27,
+          "total": 30,
           "hosts": {
-            "ksamods": 27
+            "ksamods": 30
           }
         },
         {
